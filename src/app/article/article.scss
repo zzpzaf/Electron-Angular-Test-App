@@ -1,8 +1,9 @@
 
 .login-form {
-  max-width: 300px;
+  max-width: 400px;
   margin: 0 auto;
-  padding: 24px;
+  // padding: 24px;
+  color: rgb(63, 83, 237);
 }
 
       .login-form-margin {
@@ -17,9 +18,15 @@
         width: 100%;
       }
 
+::ng-deep .ant-checkbox-wrapper {
+  color: rgb(63, 83, 237);  
+}
+
 :host {
   display: flex;
+  background-color:#011e39;
   justify-content: center;
   align-items: center;
   height: 100%;
+  width: 100%;
 }
