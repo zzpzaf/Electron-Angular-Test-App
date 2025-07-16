@@ -12,7 +12,7 @@ export interface SiderMenuItem {
 //   ];
 export const SiderMenuItems: SiderMenuItem[] = [
     { label: 'Home', icon: '', route: '/home' },
-    { label: 'Settings', icon: '', route: '/settings' },
+    { label: 'Article', icon: '', route: '/article' },
     { label: 'Profile', icon: '', route: '/profile' },
     { label: 'Help', icon: '', route: '/help' }
   ];
