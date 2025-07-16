@@ -1,0 +1,30 @@
+<!-- <p>layout works!</p> -->
+<nz-layout>
+  <nz-sider nzCollapsible [nzWidth]="120" [nzCollapsedWidth]="40">
+    <div class="logo">PZ</div>
+    <ul nz-menu nzTheme="dark" nzMode="inline">
+      <li nz-menu-item>
+        <span nz-icon nzType="home"></span>
+        <span>Home</span>
+      </li>
+      <li nz-menu-item>
+        <span nz-icon nzType="setting"></span>
+        <span>Settings</span>
+      </li>
+    </ul>
+  </nz-sider>
+
+  <nz-layout>
+    <nz-header>
+      <h1>My Electron App</h1>
+    </nz-header>
+    <nz-content >
+      <div >
+        Main Content Goes Here
+      </div>
+    </nz-content>
+    <nz-footer>
+      © Copyright Panos Zafiropoulos 2025
+    </nz-footer>
+  </nz-layout>
+</nz-layout>

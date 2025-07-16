@@ -11,7 +11,8 @@
     "electron": "wait-on dist/electronang1/browser/index.html && electron .",
     "electron:build": "ng build --configuration production && electron-builder",
     "clean": "rimraf dist",
-    "build:all": "npm run clean && npm run electron:build"
+    "build:all": "npm run clean && npm run electron:build",
+    "cleanstart": "npm run clean && npm run start"
   },
   "prettier": {
     "overrides": [

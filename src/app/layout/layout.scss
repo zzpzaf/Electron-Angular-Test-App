@@ -1,0 +1,66 @@
+.logo {
+  height: 32px;
+  margin: 16px;
+  color:aquamarine
+}
+
+nz-header {
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+}
+
+nz-header h1 {
+  margin: 0;
+  font-size: 20px;
+  color:aquamarine
+}
+
+
+::ng-deep .ant-layout-sider-trigger {
+  background: #001529;
+  color: aquamarine
+}
+
+
+
+::ng-deep .ant-layout-sider-children {
+  padding: 0 !important;
+}
+
+::ng-deep .ant-menu {
+  padding: 0 !important;
+}
+
+::ng-deep .ant-menu-item {
+  padding: 0 !important;
+  margin: 0 !important;
+  display: flex !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+}
+
+::ng-deep .ant-menu-item .anticon {
+  margin-right: 4px !important;
+}
+
+::ng-deep .ant-menu-item .ant-menu-title-content {
+  text-align: left !important;
+  width: 100% !important;
+}
+
+
+
+
+::ng-deep nz-content {
+  // margin: 24px 16px;
+  padding: 24px;
+  background-color: darkslategrey;
+  // min-height: calc(100vh - 64px);
+}
+
+nz-footer {
+  text-align: center;
+  color: aquamarine;
+  background: #001529;  // same as sider/header default dark background
+}
