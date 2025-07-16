@@ -33,6 +33,9 @@
     "@angular/platform-browser": "^20.1.0",
     "@angular/router": "^20.1.0",
     "ng-zorro-antd": "^20.0.0",
+    "puppeteer": "^24.13.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "rimraf": "^6.0.1",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
@@ -42,6 +45,7 @@
     "@angular/cli": "^20.1.0",
     "@angular/compiler-cli": "^20.1.0",
     "@types/jasmine": "~5.1.0",
+    "@types/puppeteer": "^5.4.7",
     "concurrently": "^9.2.0",
     "electron": "^37.2.1",
     "electron-builder": "^26.0.12",
