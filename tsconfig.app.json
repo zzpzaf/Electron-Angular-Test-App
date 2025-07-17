@@ -8,7 +8,7 @@
   },
   "include": [
     "src/**/*.ts"
-  ],
+, "shared/varObjects.ts"  ],
   "exclude": [
     "src/**/*.spec.ts"
   ]

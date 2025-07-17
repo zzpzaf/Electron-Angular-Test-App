@@ -3,16 +3,18 @@
   "version": "0.0.0",
   "main": "electron/main.js",
   "scripts": {
-    "ng:build": "ng build",
+    "build:angular": "ng build --configuration production",
     "ng:watch": "ng build --watch",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "start": "concurrently \"npm run watch\" \"npm run electron\"",
-    "electron": "wait-on dist/electronang1/browser/index.html && electron .",
+    "electron": "wait-on dist/electronang1/browser/index.html && electron ./dist/electron/main.js",
     "electron:build": "ng build --configuration production && electron-builder",
     "clean": "rimraf dist",
-    "build:all": "npm run clean && npm run electron:build",
-    "cleanstart": "npm run clean && npm run start"
+    "build:main": "tsc -p tsconfig.main.json",
+    "start:electron": "npm run build:main && electron ./dist/electron/main.js",
+    "start:electron:full": "npm run build:angular && npm run build:main && electron ./dist/electron/main.js",
+    "cleanstart": "npm run clean && npm run build:main && npm run start"
   },
   "prettier": {
     "overrides": [
@@ -32,6 +34,7 @@
     "@angular/forms": "^20.1.0",
     "@angular/platform-browser": "^20.1.0",
     "@angular/router": "^20.1.0",
+    "electron-is-dev": "^3.0.1",
     "ng-zorro-antd": "^20.0.0",
     "puppeteer": "^24.13.0",
     "puppeteer-extra": "^3.3.6",
@@ -44,6 +47,7 @@
     "@angular/build": "^20.1.0",
     "@angular/cli": "^20.1.0",
     "@angular/compiler-cli": "^20.1.0",
+    "@types/electron": "^1.4.38",
     "@types/jasmine": "~5.1.0",
     "@types/puppeteer": "^5.4.7",
     "concurrently": "^9.2.0",

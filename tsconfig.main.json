@@ -1,0 +1,23 @@
+// Electron/Node TypeScript settings (for 'backend'/Node)
+// This tells TypeScript:
+// Only compile files required for electron control 
+// (e.g. files inside the /electron folder such as main, preload, scrapers, /helpers, /provesses, etc)
+// AND any file reqyuired for both Electron and Angular, such as those in the /shared folder. This is why
+// we set rootDir tp "." (electron and shared folders are at the same project root level).
+// Output JavaScript files are placed to dist/... folder.
+// Use CommonJS modules (needed for Electron main process).
+// Use Node-compatible target (ES2022 or ES2020).
+
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "outDir": "./dist",
+    "rootDir": ".",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  },
+  "include": ["electron/**/*", "shared/projectObjects/**/*"]
+}
+
