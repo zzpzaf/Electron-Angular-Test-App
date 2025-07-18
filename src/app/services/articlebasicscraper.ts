@@ -1,5 +1,7 @@
 
 import { Injectable } from '@angular/core';
+import { ScrapeResult } from '../appObjects/angObjects';
+
 
 @Injectable({
   providedIn: 'root'
@@ -26,7 +28,7 @@ export class Articlebasicscraper {
       // The 'scrape-article' channel should be handled in the main process
       // and it should return a promise that resolves with the scraped data.
       // The result will be an object with success status and either data or error.
-      const result = await window.electronAPI.invoke('scrape-article', url);
+      const result = await window.electronAPI.invoke('scrape-article', url) as ScrapeResult;
       return result;
     } catch (error: any) {
       console.error('Error during scrapeArticle invoke:', error);

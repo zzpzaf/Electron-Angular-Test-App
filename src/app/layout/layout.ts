@@ -19,6 +19,13 @@ import { RouterModule } from '@angular/router';
 })
 export class Layout {
 
-  siderMenuItems = SiderMenuItems;
+  public siderMenuItems = SiderMenuItems;
+  public headerTitle = 'MEDIUM Scrapper';
+  public footerContent = '© 2025 Panos Zafiropoulos. All rights reserved.';
+  
+  ngOnInit(): void {
+    document.title = this.headerTitle;
+  }
+
 
 }

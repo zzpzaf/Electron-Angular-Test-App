@@ -1,0 +1,50 @@
+// :host {
+//   display: flex;
+//   flex-direction: column;    // stack items vertically
+//   background-color: #051524;
+//   justify-content: flex-start; // align at the top
+//   align-items: center;       // center horizontally
+//   padding-top: 32px;         // <--- top gap (adjust as needed)
+//   height: 100%;
+//   width: 100%;
+// }
+
+.markdown-container {
+  height: 100%; // or set a fixed height like 600px if needed
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 1rem;
+  box-sizing: border-box;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background-color: #fff;
+}
+
+.markdown-content {
+  h1, h2, h3 {
+    margin-top: 1em;
+    margin-bottom: 0.5rem;
+  }
+  p {
+    margin-bottom: 1em;
+  }
+  code {
+    background: #f4f4f4;
+    padding: 0.2em 0.4em;
+    border-radius: 4px;
+  }
+  pre {
+    background: #f4f4f4;
+    padding: 1em;
+    overflow-x: auto;
+  }
+  // it should be moved to a global style file
+  // a {
+  //   color: #cc5f00;
+  //   text-decoration: none;
+
+  //   &:hover {
+  //     text-decoration: underline;
+  //   }
+  // }
+}

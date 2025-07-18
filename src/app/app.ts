@@ -2,11 +2,11 @@ import { Component, signal } from '@angular/core';
 import { Layout } from "./layout/layout";
 
 
-declare global {
-  interface Window {
-    electronAPI: any;
-  }
-}
+// declare global {
+//   interface Window {
+//     electronAPI: any;
+//   }
+// }
 
 @Component({
   selector: 'app-root',

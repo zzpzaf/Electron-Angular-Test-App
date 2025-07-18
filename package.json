@@ -13,8 +13,10 @@
     "clean": "rimraf dist",
     "build:main": "tsc -p tsconfig.main.json",
     "start:electron": "npm run build:main && electron ./dist/electron/main.js",
-    "start:electron:full": "npm run build:angular && npm run build:main && electron ./dist/electron/main.js",
-    "cleanstart": "npm run clean && npm run build:main && npm run start"
+    "start:electron:full": "npm run build:angular && npm run build:main && npm run copy:markdown && electron ./dist/electron/main.js",
+    "cleanstart": "npm run clean && npm run build:main && npm run copy:markdown && npm run start",
+    "copy:markdown": "npx cpy 'electron/resources/markdown/**/*' dist/electron/resources/markdown"
+
   },
   "prettier": {
     "overrides": [
@@ -35,6 +37,7 @@
     "@angular/platform-browser": "^20.1.0",
     "@angular/router": "^20.1.0",
     "electron-is-dev": "^3.0.1",
+    "marked": "^16.1.0",
     "ng-zorro-antd": "^20.0.0",
     "puppeteer": "^24.13.0",
     "puppeteer-extra": "^3.3.6",
@@ -51,6 +54,7 @@
     "@types/jasmine": "~5.1.0",
     "@types/puppeteer": "^5.4.7",
     "concurrently": "^9.2.0",
+    "cpy-cli": "^5.0.0",
     "electron": "^37.2.1",
     "electron-builder": "^26.0.12",
     "jasmine-core": "~5.8.0",

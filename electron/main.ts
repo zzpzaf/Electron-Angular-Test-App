@@ -1,8 +1,12 @@
+import type { IpcMainInvokeEvent, IpcMainEvent } from 'electron';
 const isDev = require('electron-is-dev');
 
 const { app, BrowserWindow, ipcMain } = require('electron');
+
+const fs = require('fs');
 const path = require('path');
-import type { IpcMainInvokeEvent, IpcMainEvent } from 'electron';
+
+
 
 const {
   scrapeArticleBasic,
@@ -14,6 +18,8 @@ function createWindow() {
   const mainAppWin = new BrowserWindow({
     width: 1000,
     height: 700,
+    // icon: path.join(__dirname, 'assets/icon.png'),
+    // title: 'MEDIUM Scrapper',
     show: false, // show only when ready
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -72,6 +78,12 @@ app.on('window-all-closed', () => {
   }
 });
 
+
+// ipcMain.on('test-channel', (event: IpcMainEvent, arg: unknown) => {
+//   console.log('Received from Angular (test-channel):', arg);
+// });
+
+
 ipcMain.handle(
   'scrape-article',
   async (event: IpcMainInvokeEvent, url: string) => {
@@ -90,6 +102,10 @@ ipcMain.handle(
   }
 );
 
-ipcMain.on('test-channel', (event: IpcMainEvent, arg: unknown) => {
-  console.log('Received from Angular (test-channel):', arg);
+
+ipcMain.handle(
+  'read-markdown', 
+  async (event: IpcMainInvokeEvent, fileName: string) => {
+    const filePath = path.join(__dirname, 'resources', 'markdown', fileName);
+    return await fs.promises.readFile(filePath, 'utf8');
 });

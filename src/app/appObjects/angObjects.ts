@@ -16,3 +16,10 @@ export const SiderMenuItems: SiderMenuItem[] = [
     { label: 'Profile', icon: '', route: '/profile' },
     { label: 'Help', icon: '', route: '/help' }
   ];
+
+
+export interface ScrapeResult {
+  success: boolean;
+  data?: any;
+  error?: string;
+}
