@@ -111,6 +111,7 @@
     display: flex;
     justify-content: flex-end;
     width: 100%; // 👈 fill container width
+    gap: 8px; // 👈 adds horizontal space between buttons
   }
 }
 

@@ -34,9 +34,9 @@
 </form>
 
 @if (scrappedError().length > 0) {
-  <div class="error-message">
-    <p>Error: {{ scrappedError() }}</p>
-  </div>
+<div class="error-message">
+  <p>Error: {{ scrappedError() }}</p>
+</div>
 }
 
 <!-- ------------------------------------------------- -->
@@ -51,13 +51,27 @@
   ></textarea>
 
   <div class="button-container">
+
+    <button nz-button nzType="primary"
+      [disabled]="scrappedDataArrayString().length === 0" 
+      (click)="onClearScrappedData()">
+      Clear
+    </button>
+
+    <button nz-button nzType="primary"
+      [disabled]="scrappedDataArrayString().length === 0" 
+      (click)="onCopyScrappedData()">
+      Copy
+    </button>
+
     <button
       nz-button
       nzType="primary"
-      [disabled]="!buttonEnabled()"
+      [disabled]="scrappedDataArrayString().length === 0" 
       (click)="onSaveScrappedData()"
     >
       Save
     </button>
   </div>
+
 </div>
