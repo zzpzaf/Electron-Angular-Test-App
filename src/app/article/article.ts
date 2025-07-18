@@ -54,7 +54,6 @@ export class Article {
   submitForm(): void {
     if (this.validateForm.valid) {
       // console.log('submit', this.validateForm.value);
-      // let url="https://medium.com/javascript-in-plain-english/stop-struggling-with-angular-routes-the-complete-data-passing-handbook-with-live-examples-b53b077dd5af?source=home_for_you---------2-98--------------------25c5297b_3529_4abd_8f5d_cb66cab38e6e-------15-------";
       const urlValue = this.validateForm.value.url;
       const rememberValue = this.validateForm.value.remember;
       console.log('Submitted URL: ', urlValue);
@@ -153,6 +152,18 @@ export class Article {
     }
   }
 
-  onSaveScrappedData() {}
+  onSaveScrappedData() {
+    if (this.scrappedDataArray().length > 0 ) {
+      this.runSaveScappedData();
+    }
+  }
+
+  async runSaveScappedData() {
+  try {
+    const result = await window.electronAPI.invoke('save-scrapped-data', this.scrappedDataArrayString());
+    } catch (error) {
+    console.error('Error saving scrapped data:', error);
+    }
+  }
 
 }

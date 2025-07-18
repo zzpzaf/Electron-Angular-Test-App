@@ -1,4 +1,7 @@
 import { existsSync, mkdirSync } from "fs";
+import { app, dialog } from 'electron';
+import fs from 'fs';
+import path from 'path';
 
 export function ensureFolderExists(folderPath: string): void {
   if (!existsSync(folderPath)) {
@@ -80,3 +83,64 @@ export function formatDate(input: string): string {
 function pad(n: number): string {
   return n.toString().padStart(2, "0");
 }
+
+
+
+
+const CONFIG_FILE = path.join(app.getPath('userData'), 'medium-scrapper-app-config.json');
+
+export async function handleSaveScrappedData(scrappedData: string): Promise<{
+  success: boolean;
+  message: string;
+  error?: string;
+}> {
+  try {
+    const filenamePrefix = 'articles_scrapped_data_' + new Date().toISOString().replace(/:/g, '-');
+    const lastFolder = getLastSavedFolder();
+
+    const { filePath, canceled } = await dialog.showSaveDialog({
+      title: 'Save Scrapped Data',
+      defaultPath: lastFolder
+        ? path.join(lastFolder, `${filenamePrefix}.txt`)
+        : path.join(app.getPath('documents'), `${filenamePrefix}.txt`),
+      filters: [{ name: 'Text Files', extensions: ['txt'] }]
+    });
+
+    if (canceled || !filePath) {
+      return { success: false, message: 'Save canceled' };
+    }
+
+    await fs.promises.writeFile(filePath, scrappedData, 'utf8');
+
+    setLastSavedFolder(path.dirname(filePath));
+
+    return { success: true, message: 'Scrapped data saved' };
+  } catch (error) {
+    console.error('Error saving scrapped data:', error);
+    return {
+      success: false,
+      message: 'Error saving scrapped data',
+      error: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
+function getLastSavedFolder(): string | null {
+  if (fs.existsSync(CONFIG_FILE)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+      return data.lastSavedFolder || null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function setLastSavedFolder(folderPath: string): void {
+  const data = { lastSavedFolder: folderPath };
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(data), 'utf8');
+}
+
+
+

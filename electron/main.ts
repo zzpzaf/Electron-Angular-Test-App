@@ -1,16 +1,22 @@
-import type { IpcMainInvokeEvent, IpcMainEvent } from 'electron';
+import { type IpcMainInvokeEvent, dialog } from 'electron';
+import fs from 'fs';
+import path from 'path';
+import { scrapeArticleBasic } from './processes/scrappers/scrape-article-basic';
+import { handleSaveScrappedData } from './helpers/utils';
+
+
+
 const isDev = require('electron-is-dev');
 
 const { app, BrowserWindow, ipcMain } = require('electron');
 
-const fs = require('fs');
-const path = require('path');
+// const fs = require('fs');
+// const path = require('path');
+// const {
+//   scrapeArticleBasic,
+// } = require('./processes/scrappers/scrape-article-basic');
 
 
-
-const {
-  scrapeArticleBasic,
-} = require('./processes/scrappers/scrape-article-basic');
 
 function createWindow() {
   console.log('App ready, creating window');
@@ -31,6 +37,7 @@ function createWindow() {
     process.cwd(),
     'dist/electronang1/browser/index.html'
   );
+
   console.log('process.cwd():', process.cwd());
   console.log('__dirname:', __dirname);
   console.log('Loading Angular app from:', angularDistPath);
@@ -79,10 +86,9 @@ app.on('window-all-closed', () => {
 });
 
 
-// ipcMain.on('test-channel', (event: IpcMainEvent, arg: unknown) => {
-//   console.log('Received from Angular (test-channel):', arg);
-// });
 
+// Custom IPC handlers
+// -----------------------------------------------------------------
 
 ipcMain.handle(
   'scrape-article',
@@ -109,3 +115,12 @@ ipcMain.handle(
     const filePath = path.join(__dirname, 'resources', 'markdown', fileName);
     return await fs.promises.readFile(filePath, 'utf8');
 });
+
+
+
+ipcMain.handle(
+  'save-scrapped-data',
+  async (_event: IpcMainInvokeEvent, scrappedData: string) => {
+    return await handleSaveScrappedData(scrappedData);
+  }
+);
