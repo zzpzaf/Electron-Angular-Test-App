@@ -51,6 +51,10 @@
   margin: 16px auto;         // auto left/right centers it
 }
 
+::ng-deep .ant-form-item-extra {
+  color: #6ba4d9; /* or any color you want */
+  font-size:x-small;
+}
 
 // -----------------------------------------------
 

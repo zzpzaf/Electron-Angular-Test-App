@@ -1,5 +1,7 @@
 /* To learn more about Typescript configuration file: https://www.typescriptlang.org/docs/handbook/tsconfig-json.html. */
 /* To learn more about Angular compiler options: https://angular.dev/reference/configs/angular-compiler-options. */
+
+// tsconfig.app.json
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
@@ -7,8 +9,10 @@
     "types": []
   },
   "include": [
-    "src/**/*.ts"
-, "shared/varObjects.ts"  ],
+    "src/**/*.ts",
+    "shared/projectObjects/varObjects.ts",
+    "shared/utils/shared-utils.ts"
+  ],
   "exclude": [
     "src/**/*.spec.ts"
   ]

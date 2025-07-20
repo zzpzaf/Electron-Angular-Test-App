@@ -1,11 +1,15 @@
+export interface listURLData {
+  listname: string;
+  pubauthorslug: string;
+}
 
 
-export interface PostData {
+export interface PostData extends listURLData{
   counter: number;
-  category: string;
+  hostname: string;
   timestamp: string;
-  pubname: string
-  authorname: string,
+  pubname: string;
+  authorname: string;
   title: string;
   link: string;
   image: string;

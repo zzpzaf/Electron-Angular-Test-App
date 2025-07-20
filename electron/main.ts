@@ -1,8 +1,9 @@
 import { type IpcMainInvokeEvent, dialog } from 'electron';
 import fs from 'fs';
 import path from 'path';
-import { scrapeArticleBasic } from './processes/scrappers/scrape-article-basic';
-import { handleSaveScrappedData } from './helpers/utils';
+import { scrapeArticleBasic, scrapeList } from './processes/scrappers/scrape-functions';
+import { handleSaveScrappedData } from './helpers/electron-utils';
+import { listURLData } from '../shared/projectObjects/varObjects';
 
 
 
@@ -120,7 +121,27 @@ ipcMain.handle(
 
 ipcMain.handle(
   'save-scrapped-data',
-  async (_event: IpcMainInvokeEvent, scrappedData: string) => {
-    return await handleSaveScrappedData(scrappedData);
+  async (_event: IpcMainInvokeEvent, scrappedData: string, urlObj?: listURLData) => {
+    return await handleSaveScrappedData(scrappedData, urlObj);
   }
 );
+
+
+ipcMain.handle(
+  'scrape-list',
+ async (event: IpcMainInvokeEvent, url: string) => {
+    console.log(`Received scrape-list request for URL: ${url}`);
+    try {
+      const result = await scrapeList(url);
+      console.log('Scraping successful');
+      return { success: true, data: result };
+    } catch (error: unknown) {
+      console.error('Scraping error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+);
+

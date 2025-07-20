@@ -1,7 +1,8 @@
-import { existsSync, mkdirSync } from "fs";
+import { existsSync, mkdirSync } from 'fs';
 import { app, dialog } from 'electron';
 import fs from 'fs';
 import path from 'path';
+import { listURLData } from '../../shared/projectObjects/varObjects';
 
 export function ensureFolderExists(folderPath: string): void {
   if (!existsSync(folderPath)) {
@@ -16,7 +17,6 @@ export function ensureFolderExists(folderPath: string): void {
 }
 
 export function formatDate(input: string): string {
-
   console.log(`formatDate(${input})`);
 
   const now = new Date();
@@ -41,8 +41,6 @@ export function formatDate(input: string): string {
     )}${pad(now.getDate())}`;
   }
 
-
-
   if (/^\d+\s*(h|hours)\s+ago$/.test(input)) {
     const hoursAgo = parseInt(input);
     const pastDate = new Date(now);
@@ -63,47 +61,54 @@ export function formatDate(input: string): string {
   }
 
   if (/^[A-Z][a-z]{2} \d{1,2}$/.test(input)) {
-    const [monthStr, day] = input.split(" ");
+    const [monthStr, day] = input.split(' ');
     return `${String(now.getFullYear()).slice(2)}${pad(
       months[monthStr] + 1
     )}${pad(parseInt(day, 10))}`;
   }
 
   if (/^[A-Z][a-z]{2} \d{1,2}, \d{4}$/.test(input)) {
-    const [monthStr, dayWithComma, year] = input.split(" ");
-    const day = dayWithComma.replace(",", "");
+    const [monthStr, dayWithComma, year] = input.split(' ');
+    const day = dayWithComma.replace(',', '');
     return `${year.slice(2)}${pad(months[monthStr] + 1)}${pad(
       parseInt(day, 10)
     )}`;
   }
 
-  return "Unknown";
+  return 'Unknown';
 }
 
 function pad(n: number): string {
-  return n.toString().padStart(2, "0");
+  return n.toString().padStart(2, '0');
 }
 
+const CONFIG_FILE = path.join(
+  app.getPath('userData'),
+  'medium-scrapper-app-config.json'
+);
 
 
 
-const CONFIG_FILE = path.join(app.getPath('userData'), 'medium-scrapper-app-config.json');
-
-export async function handleSaveScrappedData(scrappedData: string): Promise<{
+export async function handleSaveScrappedData(scrappedData: string, urlObj?:listURLData ): Promise<{
   success: boolean;
   message: string;
   error?: string;
 }> {
+
+  let fileNameFirstPrefix = 'posts_scrapped_data_';
+  if (urlObj) fileNameFirstPrefix = fileNameFirstPrefix + urlObj.pubauthorslug + '_' + urlObj.listname + '_';
+
   try {
-    const filenamePrefix = 'articles_scrapped_data_' + new Date().toISOString().replace(/:/g, '-');
+    const filenamePrefix =
+      fileNameFirstPrefix + new Date().toISOString().replace(/:/g, '-');
     const lastFolder = getLastSavedFolder();
 
     const { filePath, canceled } = await dialog.showSaveDialog({
       title: 'Save Scrapped Data',
       defaultPath: lastFolder
-        ? path.join(lastFolder, `${filenamePrefix}.txt`)
-        : path.join(app.getPath('documents'), `${filenamePrefix}.txt`),
-      filters: [{ name: 'Text Files', extensions: ['txt'] }]
+        ? path.join(lastFolder, `${filenamePrefix}.json`)
+        : path.join(app.getPath('documents'), `${filenamePrefix}.json`),
+      filters: [{ name: 'JSON Files', extensions: ['json'] }],
     });
 
     if (canceled || !filePath) {
@@ -120,7 +125,7 @@ export async function handleSaveScrappedData(scrappedData: string): Promise<{
     return {
       success: false,
       message: 'Error saving scrapped data',
-      error: error instanceof Error ? error.message : String(error)
+      error: error instanceof Error ? error.message : String(error),
     };
   }
 }
@@ -141,6 +146,3 @@ function setLastSavedFolder(folderPath: string): void {
   const data = { lastSavedFolder: folderPath };
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(data), 'utf8');
 }
-
-
-

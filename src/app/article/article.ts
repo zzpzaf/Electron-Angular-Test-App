@@ -11,7 +11,11 @@ import { NzCheckboxModule } from 'ng-zorro-antd/checkbox';
 import { NzFormModule } from 'ng-zorro-antd/form';
 import { NzInputModule } from 'ng-zorro-antd/input';
 import { Articlebasicscraper } from '../services/articlebasicscraper';
-import { PostData } from '../../../shared/projectObjects/varObjects'; // Import the PostData interface
+import {
+  listURLData,
+  PostData,
+} from '../../../shared/projectObjects/varObjects'; // Import the PostData interface
+import { analyzeListedLink, isValidUrl } from '../../../shared/utils/shared-utils';
 
 // Adjust the import path as necessary
 
@@ -30,7 +34,7 @@ import { PostData } from '../../../shared/projectObjects/varObjects'; // Import 
 })
 export class Article {
   private fb = inject(NonNullableFormBuilder);
-  public validateForm!: FormGroup;
+  public linkScrapeForm!: FormGroup;
   private scrapper = inject(Articlebasicscraper);
   // public scrappedData = "";
   public scrappedError = signal<string>('');
@@ -39,28 +43,50 @@ export class Article {
   public scrappedDataArrayString = signal<string>('');
   // public isSaveButtonEnabled = signal<boolean>(false);
   public isAddedChecked = signal<boolean>(true); // Default to true
+  public linkURL = signal<string>('');
+  private listurldata: listURLData = { listname: '', pubauthorslug: '' };
 
   ngOnInit(): void {
-    this.validateForm = this.fb.group({
-      url: this.fb.control('', [Validators.required]),
-      add: this.fb.control(true),
-    });
-    this.validateForm.get('add')?.valueChanges.subscribe((value) => {
+    this.setupForm();
+    this.linkScrapeForm.get('add')?.valueChanges.subscribe((value) => {
       console.log('Checkbox changed to:', value);
       this.isAddedChecked.set(value); // Update the signal when checkbox changes
+    });
+    this.linkScrapeForm.get('url')?.valueChanges.subscribe((urlValue) => {
+      this.listurldata = { listname: '', pubauthorslug: '' };
+      if (urlValue.trim().length > 0 && isValidUrl(urlValue.trim())) {
+        console.log('URL changed to:', urlValue);
+        this.linkURL.set(urlValue);
+        this.listurldata = analyzeListedLink(urlValue);
+        // console.log('List Name (if):', this.listurldata.listname.trim());
+        this.listurldata = analyzeListedLink(urlValue);
+        // console.log('List Name (if):', this.listurldata.listname.trim());
+      }
+      if (this.listurldata.listname.trim().length > 0) {
+        this.linkScrapeForm.get('add')?.setValue(false);
+      } else if (this.listurldata.listname.trim().length === 0) {
+        this.linkScrapeForm.get('add')?.setValue(true);
+      }
+    });
+  }
+
+  setupForm() {
+    this.linkScrapeForm = this.fb.group({
+      url: this.fb.control('', [Validators.required]),
+      add: this.fb.control(true),
     });
   }
 
   submitForm(): void {
-    if (this.validateForm.valid) {
+    if (this.linkScrapeForm.valid) {
       // console.log('submit', this.validateForm.value);
-      const urlValue = this.validateForm.value.url;
-      const rememberValue = this.validateForm.value.remember;
+      const urlValue = this.linkScrapeForm.value.url;
+      const rememberValue = this.linkScrapeForm.value.remember;
       console.log('Submitted URL: ', urlValue);
       this.runScraper(urlValue);
       // this.isSaveButtonEnabled.set(false);
     } else {
-      Object.values(this.validateForm.controls).forEach((control) => {
+      Object.values(this.linkScrapeForm.controls).forEach((control) => {
         if (control.invalid) {
           control.markAsDirty();
           control.updateValueAndValidity({ onlySelf: true });
@@ -74,36 +100,46 @@ export class Article {
     let result = null;
 
     try {
-      const response = await this.scrapper.scrapeArticle(url);
-      if (response.success) {
-        result = response.data;
-        this.scrappedData.set(response.data as PostData); // Store the result as PostData
-        // this.isSaveButtonEnabled.set(true);
+      // Call the appropriate service method: scrapeArticle() or scrapeList()
+      if (this.listurldata.listname.trim().length > 0) {
+        const response = await this.scrapper.scrapeList(url);
+        if (response.success) {
+          this.scrappedDataArray.set(response.data as PostData[]); // Store the result as PostData[]
+          result = response.data;
+        } else {
+          result = response.error;
+        }
       } else {
-        // result = { error: response.error };
-        this.scrappedError.set(JSON.stringify(response.error));
-        // this.isSaveButtonEnabled.set(false);
+        const response = await this.scrapper.scrapeArticle(url);
+        if (response.success) {
+          this.scrappedData.set(response.data as PostData); // Store the result as PostData
+          result = response.data;
+          const currentData = this.scrappedData();
+          if (currentData !== null) {
+            if (!this.isAddedChecked()) {
+              this.scrappedDataArray.set([]); // Clear the array if 'add' is not checked
+            }
+            this.scrappedDataArray.set([
+              ...this.scrappedDataArray(),
+              currentData,
+            ]); // Update the array with the new result
+          }
+        } else {
+          result = response.error;
+        }
       }
     } catch (err) {
       result = { error: err };
       this.scrappedError.set(JSON.stringify(err));
-      // this.isSaveButtonEnabled.set(false);
     } finally {
       loading = false;
-    }
-
+    }   
     console.log('Scraper data:', JSON.stringify(result));
 
-    const currentData = this.scrappedData();
-    if (currentData !== null) {
-      if (!this.isAddedChecked()) {
-        this.scrappedDataArray.set([]); // Clear the array if 'add' is not checked
-      }
-      this.scrappedDataArray.set([...this.scrappedDataArray(), currentData]); // Update the array with the new result
-    }
-    this.scrappedDataArrayString.set(JSON.stringify(this.scrappedDataArray())); // Update the string representation of the array
+    this.scrappedDataArrayString.set(
+      JSON.stringify(this.scrappedDataArray(), null, 2)
+    ); // Beutify the JSON data;
 
-    // this.scrappedData = JSON.stringify(result); // Store the result as a string
   }
 
   onDragOver(event: DragEvent): void {
@@ -118,7 +154,7 @@ export class Article {
       event.dataTransfer?.getData('text/plain');
 
     if (data) {
-      const urlControl = this.validateForm.get('url');
+      const urlControl = this.linkScrapeForm.get('url');
       if (urlControl) {
         urlControl.setValue(''); // Clear existing value
         urlControl.setValue(data.trim()); // Set new dragged value
@@ -128,12 +164,11 @@ export class Article {
     }
   }
 
-
   onClearScrappedData() {
     this.scrappedDataArray.set([]); // Clear the array
     this.scrappedDataArrayString.set(''); // Clear the string representation of the array
     this.scrappedData.set(null); // Clear the scrapped data
-    this.validateForm.reset(); // Reset the form
+    this.linkScrapeForm.reset(); // Reset the form
   }
 
   onCopyScrappedData() {
@@ -153,17 +188,30 @@ export class Article {
   }
 
   onSaveScrappedData() {
-    if (this.scrappedDataArray().length > 0 ) {
+    if (this.scrappedDataArray().length > 0) {
       this.runSaveScappedData();
     }
   }
 
   async runSaveScappedData() {
-  try {
-    const result = await window.electronAPI.invoke('save-scrapped-data', this.scrappedDataArrayString());
+    // console.log('------> List Name: ', listurldata.listname);
+    // console.log('------> Author Name: ', listurldata.pubauthorslug);
+
+    try {
+      if (this.listurldata.listname.trim().length > 0) {
+        const result = await window.electronAPI.invoke(
+          'save-scrapped-data',
+          this.scrappedDataArrayString(),
+          this.listurldata
+        );
+      } else {
+        const result = await window.electronAPI.invoke(
+          'save-scrapped-data',
+          this.scrappedDataArrayString()
+        );
+      }
     } catch (error) {
-    console.error('Error saving scrapped data:', error);
+      console.error('Error saving scrapped data:', error);
     }
   }
-
 }

@@ -1,14 +1,14 @@
 <form
   nz-form
   nzLayout="inline"
-  [formGroup]="validateForm"
+  [formGroup]="linkScrapeForm"
   class="login-form"
   (ngSubmit)="submitForm()"
 >
   <nz-form-item class="login-form-spacer"></nz-form-item>
 
   <nz-form-item class="login-form-input">
-    <nz-form-control nzErrorTip="Please input the URL">
+    <nz-form-control nzErrorTip="Please input the URL" nzExtra="Enter type, paste or drop an Article or List URL here">
       <nz-input-group>
         <input
           type="text"
@@ -53,7 +53,7 @@
   <div class="button-container">
 
     <button nz-button nzType="primary"
-      [disabled]="scrappedDataArrayString().length === 0" 
+      [disabled]="scrappedDataArrayString().length === 0  && linkURL().length === 0" 
       (click)="onClearScrappedData()">
       Clear
     </button>
