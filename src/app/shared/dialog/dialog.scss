@@ -1,0 +1,176 @@
+@use 'sass:color';
+
+$info-color: #1890ff;
+$conf-color: #faad14;
+$success-color: #52c41a;
+$error-color: #ff4d4f;
+$warning-color: #fa8c16;
+
+$dialog-padding: 1.5rem;
+$dialog-border-radius: 8px;
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; 
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+  margin-left: .5rem;
+
+  i {
+    font-size: 1.8rem;
+    margin-right: 0.5rem;
+  }
+}
+
+.dialog-content {
+  margin-bottom: 1.5rem;
+  margin-left: 0.5rem;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+// Dialog left borders
+.info-dialog    { border-left: 4px solid $info-color; }
+.conf-dialog    { border-left: 4px solid $conf-color; }
+.succ-dialog    { border-left: 4px solid $success-color; }
+.error-dialog   { border-left: 4px solid $error-color; }
+.warn-dialog    { border-left: 4px solid $warning-color; }
+
+// Header icon colors
+.info-dialog .dialog-header i  { color: $info-color; }
+.conf-dialog .dialog-header i  { color: $conf-color; }
+.succ-dialog .dialog-header i  { color: $success-color; }
+.error-dialog .dialog-header i { color: $error-color; }
+.warn-dialog .dialog-header i  { color: $warning-color; }
+
+// POSITIVE BUTTONS (filled)
+.positive-info.ant-btn {
+  background-color: $info-color;
+  color: white;
+  border-color: $info-color;
+
+  &:hover,
+  &:focus {
+    background-color: color.adjust($info-color, $lightness: -5%);
+    border-color: color.adjust($info-color, $lightness: -5%);
+  }
+}
+
+.positive-conf.ant-btn {
+  background-color: $conf-color;
+  color: white;
+  border-color: $conf-color;
+
+  &:hover,
+  &:focus {
+    background-color: color.adjust($conf-color, $lightness: -5%);
+    border-color: color.adjust($conf-color, $lightness: -5%);
+  }
+}
+
+.positive-succ.ant-btn {
+  background-color: $success-color;
+  color: white;
+  border-color: $success-color;
+
+  &:hover,
+  &:focus {
+    background-color: color.adjust($success-color, $lightness: -5%);
+    border-color: color.adjust($success-color, $lightness: -5%);
+  }
+}
+
+.positive-error.ant-btn {
+  background-color: $error-color;
+  color: white;
+  border-color: $error-color;
+
+  &:hover,
+  &:focus {
+    background-color: color.adjust($error-color, $lightness: -5%);
+    border-color: color.adjust($error-color, $lightness: -5%);
+  }
+}
+
+.positive-warn.ant-btn {
+  background-color: $warning-color;
+  color: white;
+  border-color: $warning-color;
+
+  &:hover,
+  &:focus {
+    background-color: color.adjust($warning-color, $lightness: -5%);
+    border-color: color.adjust($warning-color, $lightness: -5%);
+  }
+}
+
+// NEGATIVE BUTTONS (outlined)
+.negative-info.ant-btn {
+  background-color: transparent;
+  color: $info-color;
+  border: 1px solid $info-color;
+
+  &:hover,
+  &:focus {
+    background-color: $info-color;
+    color: white;
+    border-color: $info-color;
+  }
+}
+
+.negative-conf.ant-btn {
+  background-color: transparent;
+  color: $conf-color;
+  border: 1px solid $conf-color;
+
+  &:hover,
+  &:focus {
+    background-color: $conf-color;
+    color: white;
+    border-color: $conf-color;
+  }
+}
+
+.negative-succ.ant-btn {
+  background-color: transparent;
+  color: $success-color;
+  border: 1px solid $success-color;
+
+  &:hover,
+  &:focus {
+    background-color: $success-color;
+    color: white;
+    border-color: $success-color;
+  }
+}
+
+.negative-error.ant-btn {
+  background-color: transparent;
+  color: $error-color;
+  border: 1px solid $error-color;
+
+  &:hover,
+  &:focus {
+    background-color: $error-color;
+    color: white;
+    border-color: $error-color;
+  }
+}
+
+.negative-warn.ant-btn {
+  background-color: transparent;
+  color: $warning-color;
+  border: 1px solid $warning-color;
+
+  &:hover,
+  &:focus {
+    background-color: $warning-color;
+    color: white;
+    border-color: $warning-color;
+  }
+}

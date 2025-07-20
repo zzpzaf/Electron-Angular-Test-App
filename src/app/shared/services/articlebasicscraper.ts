@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { ScrapeResult } from '../appObjects/angObjects';
+import { ScrapeResult } from '../../appObjects/angObjects';
 
 @Injectable({
   providedIn: 'root',

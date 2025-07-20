@@ -51,11 +51,10 @@ export async function scrapeArticleBasic(url: string): Promise<PostData> {
 
     return postData;
   } catch (error) {
-
-    const window = BrowserWindow.getAllWindows()[0]; // get first (or target) window
-    window.webContents.send('message-channel', error);
-
-    throw error;
+      let msg: string = 'ERROR accessing the URL/page: ' + url  + ' - ' + error as string ;
+      const window = BrowserWindow.getAllWindows()[0]; // get first (or target) window
+      window.webContents.send('message-channel', msg);
+      throw error;
   } finally {
     await page.close();
     // Do NOT close the browser — we're just connected to it

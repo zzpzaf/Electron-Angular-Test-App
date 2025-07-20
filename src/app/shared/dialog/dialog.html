@@ -1,0 +1,38 @@
+<div [ngClass]="getTokenClass()">
+  <!-- <div class="dialog-header">
+        <i nz-icon [nzType]="getIconName()" nzTheme="twotone"></i>
+        <span>{{ dlgData.header }}</span>
+   </div> -->
+
+  <div class="dialog-header">
+    <span>{{ dlgData.header }}</span>
+    <i
+      nz-icon
+      [nzType]="getIconName()"
+      nzTheme="twotone"
+      [nzTwotoneColor]="getIconColor()"
+    ></i>
+  </div>
+
+  <div class="dialog-content">
+    {{ dlgData.content }}
+  </div>
+  <div class="dialog-actions">
+    <button
+      nz-button
+      [nzType]="'primary'"
+      (click)="onYesClick()"
+      [ngClass]="getButtonClass('positive')"
+    >
+      {{ dlgData.posAnsMsg }}
+    </button>
+    <button
+      *ngIf="dlgData.negAnsMsg"
+      nz-button
+      (click)="onNoClick()"
+      [ngClass]="getButtonClass('negative')"
+    >
+      {{ dlgData.negAnsMsg }}
+    </button>
+  </div>
+</div>

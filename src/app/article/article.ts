@@ -10,12 +10,18 @@ import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzCheckboxModule } from 'ng-zorro-antd/checkbox';
 import { NzFormModule } from 'ng-zorro-antd/form';
 import { NzInputModule } from 'ng-zorro-antd/input';
-import { Articlebasicscraper } from '../services/articlebasicscraper';
+
+import { Articlebasicscraper } from '../shared/services/articlebasicscraper';
 import {
   listURLData,
   PostData,
 } from '../../../shared/projectObjects/varObjects'; // Import the PostData interface
-import { analyzeListedLink, isValidUrl } from '../../../shared/utils/shared-utils';
+import {
+  analyzeListedLink,
+  isValidUrl,
+} from '../../../shared/utils/shared-utils';
+
+import { DlgService } from '../shared/services/dlg-service';
 
 // Adjust the import path as necessary
 
@@ -23,11 +29,11 @@ import { analyzeListedLink, isValidUrl } from '../../../shared/utils/shared-util
   selector: 'app-article',
   imports: [
     ReactiveFormsModule,
+    FormsModule,
     NzFormModule,
     NzInputModule,
     NzCheckboxModule,
     NzButtonModule,
-    FormsModule,
   ],
   templateUrl: './article.html',
   styleUrl: './article.scss',
@@ -45,6 +51,14 @@ export class Article {
   public isAddedChecked = signal<boolean>(true); // Default to true
   public linkURL = signal<string>('');
   private listurldata: listURLData = { listname: '', pubauthorslug: '' };
+
+  // private modal = inject(NzModalService);
+  private dlgService = inject(DlgService);
+  // constructor(private dlgService: DlgService){  }
+
+  // private modalRef = inject(NzModalRef);
+
+  constructor() {}
 
   ngOnInit(): void {
     this.setupForm();
@@ -69,8 +83,24 @@ export class Article {
       }
     });
 
+    // It captures directly any Electron message sent and passed via the "message-channel"
     window.electronAPI.on('message-channel', (message: string) => {
-      console.log('ELECTRON --> :', message);
+      const msg: string = 'ELECTRON --> : ' + message;
+      // It calls the dlgService to pop-up an error message:
+      // this.testError(msg);
+      this.dlgService
+        .popup({
+          token: 'error',
+          header: 'Error!',
+          content: msg,
+          posAnsMsg: 'OK',
+          negAnsMsg: ''
+        })
+        .subscribe((result) => {
+          console.log('Dialog closed with:', result);
+        });
+
+      console.log('>===>>>', msg);
     });
   }
 
@@ -102,6 +132,7 @@ export class Article {
   async runScraper(url: string): Promise<void> {
     let loading = true;
     let result = null;
+    this.scrappedError.set('');
 
     try {
       // Call the appropriate service method: scrapeArticle() or scrapeList()
@@ -129,21 +160,24 @@ export class Article {
             ]); // Update the array with the new result
           }
         } else {
-          result = response.error;
+          if (response.error) this.scrappedError.set(response.error);
         }
       }
     } catch (err) {
-      result = { error: err };
-      this.scrappedError.set(JSON.stringify(err));
+      // result = { error: err };
+      if (err) this.scrappedError.set(JSON.stringify({ err }));
     } finally {
       loading = false;
-    }   
-    console.log('Scraper data:', JSON.stringify(result));
+    }
 
-    this.scrappedDataArrayString.set(
-      JSON.stringify(this.scrappedDataArray(), null, 2)
-    ); // Beutify the JSON data;
-
+    if (result) {
+      console.log('Scraper data:', JSON.stringify(result));
+      this.scrappedDataArrayString.set(
+        JSON.stringify(this.scrappedDataArray(), null, 2)
+      ); // Beutify the JSON data;
+    }
+    if (this.scrappedError().trim().length > 0)
+      console.log('Error Scraping data: ', this.scrappedError());
   }
 
   onDragOver(event: DragEvent): void {
@@ -218,4 +252,46 @@ export class Article {
       console.error('Error saving scrapped data:', error);
     }
   }
+
+  // popupConfirm(msg: string) {
+  //   this.dlgService
+  //     .confirm(
+  //       'Please Confirm!',
+  //       'Are you sure you want to delete this?',
+  //       'Delete',
+  //       'Cancel'
+  //     )
+  //     .subscribe((result) => {
+  //       console.log('Confirm dialog result:', result);
+  //     });
+  // }
+
+  // popupInfo(msg: string) {
+  //   // this.dlgService.info('Info', 'This is an informational message.')
+  //   this.dlgService.info('Info', msg).subscribe((result) => {
+  //     console.log('Info dialog closed:', result);
+  //   });
+  // }
+
+  // popupSuccess(msg: string) {
+  //   this.dlgService
+  //     .success('Success', 'Your action was successful!')
+  //     .subscribe((result) => {
+  //       console.log('Success dialog closed:', result);
+  //     });
+  // }
+
+  // popupError(msg: string) {
+  //   this.dlgService.error('Error', msg).subscribe((result) => {
+  //     console.log('Error dialog closed:', result);
+  //   });
+  // }
+
+  // popupWarning(msg: string) {
+  //   this.dlgService
+  //     .warning('Warning', 'Be careful with this action.')
+  //     .subscribe((result) => {
+  //       console.log('Warning dialog closed:', result);
+  //     });
+  // }
 }
