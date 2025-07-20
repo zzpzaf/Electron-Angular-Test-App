@@ -1,4 +1,4 @@
-// scrape-article-basic.ts
+// scrape-functions.ts
 // This file is part of an Electron application that scrapes basic article data from a given URL.
 // 250715-16
 
@@ -8,6 +8,8 @@ import type * as Puppeteer from 'puppeteer';
 import { PostData } from '../../../shared/projectObjects/varObjects';
 import { formatDate } from '../../helpers/electron-utils';
 import { extractFirstPathPart } from '../../../shared/utils/shared-utils';
+
+import { BrowserWindow } from 'electron';
 
 // Apply stealth plugin
 puppeteer.use(StealthPlugin());
@@ -49,6 +51,10 @@ export async function scrapeArticleBasic(url: string): Promise<PostData> {
 
     return postData;
   } catch (error) {
+
+    const window = BrowserWindow.getAllWindows()[0]; // get first (or target) window
+    window.webContents.send('message-channel', error);
+
     throw error;
   } finally {
     await page.close();

@@ -68,6 +68,10 @@ export class Article {
         this.linkScrapeForm.get('add')?.setValue(true);
       }
     });
+
+    window.electronAPI.on('message-channel', (message: string) => {
+      console.log('ELECTRON --> :', message);
+    });
   }
 
   setupForm() {

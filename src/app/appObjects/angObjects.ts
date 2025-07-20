@@ -12,10 +12,10 @@ export interface SiderMenuItem {
 //   ];
 export const SiderMenuItems: SiderMenuItem[] = [
     { label: 'Home', icon: '', route: '/home' },
-    { label: 'Article', icon: '', route: '/article' },
-    { label: 'Profile', icon: '', route: '/profile' },
+    { label: 'URL', icon: '', route: '/article' },
+    { label: 'Local File', icon: '', route: '/profile' },
     { label: 'Help', icon: '', route: '/help' }
-  ];
+];
 
 
 export interface ScrapeResult {
