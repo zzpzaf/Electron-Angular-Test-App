@@ -1,0 +1,117 @@
+
+<!-- <div class="drop-zone">
+  @if (filePath() === null) {
+    <p>Drop a file anywhere in the window</p>
+  } @else {
+    <p>Dropped file: {{ filePath() }}</p>
+  }
+</div> -->
+
+
+
+<div class="text-area-container">
+  <label class="textarea-label">File Name:</label>
+
+    <div class="input-button-row">
+    <!-- <input
+      type="text"
+      nz-input
+      [(ngModel)]="fileName"
+      placeholder="File Name"
+      class="text-input-field"
+      (drop)="onFileDrop($event)"
+      (dragover)="onDragOver($event)"
+    /> -->
+
+    <input
+      type="text"
+      nz-input
+      [(ngModel)]="fileName"
+      placeholder="File Name"
+      class="text-input-field"
+    />
+
+    <button nz-button nzType="primary" (click)="onGetFileUrls()">
+      Get File...
+    </button>
+  </div>
+
+  @if (importedUrlsArrayString().length === 0) {
+  <label [styleDrct]="customStyles" class="textarea-label"
+    >Imported URLs:
+  </label>
+  } @else {
+  <label class="textarea-label">Imported URLs: </label>
+  }
+
+  <textarea
+    nz-input
+    [(ngModel)]="importedUrlsArrayString"
+    class="stretch-textarea1"
+  ></textarea>
+
+  <div class="scrape-button-row">
+    <button
+      nz-button
+      nzType="primary"
+      [disabled]="importedUrlsArrayString().length === 0"
+      (click)="onScrape()"
+    >
+      Scrape Imported URLs
+    </button>
+  </div>
+
+  <div class="login-form-separator"></div>
+
+  @if (scrappedDataArrayString().length === 0) {
+  <label [styleDrct]="customStyles" class="textarea-label"
+    >Scrape Results:
+  </label>
+  } @else {
+  <label class="textarea-label">Scrape Results: </label>
+  }
+
+  <textarea
+    nz-input
+    [(ngModel)]="scrappedDataArrayString"
+    class="stretch-textarea2"
+  ></textarea>
+
+  <div class="action-button-row">
+    <button
+      nz-button
+      nzType="primary"
+      [disabled]="
+        scrappedDataArray().length === 0 &&
+        scrappedDataArrayString().length === 0 &&
+        fileName.length === 0
+      "
+      (click)="onClearScrapedData()"
+    >
+      Clear All
+    </button>
+
+    <button
+      nz-button
+      nzType="primary"
+      [disabled]="
+        scrappedDataArray().length === 0 &&
+        scrappedDataArrayString().length === 0"
+      (click)="onCopyScrapedData()"
+    >
+      Copy Scraped
+    </button>
+
+    <button
+      nz-button
+      nzType="primary"
+      [disabled]="
+        scrappedDataArrayString().length === 0 &&
+        importedUrlsArrayString().length === 0
+      "
+      (click)="onSaveScrapedData()"
+    >
+      Save Scraped
+    </button>
+  </div>
+</div>

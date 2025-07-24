@@ -86,3 +86,95 @@ export function extractFirstPathPart(pathname: string): string {
 
   return firstPart;
 }
+
+
+// Extracts all https from the text (anywhere in the text)
+export function extractHttps(text: string): string[] {
+  const urlRegex = /https?:\/\/[^\s"'<>]+/g;
+  const matches = text.match(urlRegex);
+  return matches || []; // returns empty array if no matches
+}
+
+// Extracts all https from the text (anywhere in the text)
+// Excludes image URLs (by common image file extensions)
+export function extractNonImageHttps(text: string): string[] {
+  const urlRegex = /https?:\/\/[^\s"'<>]+/gi;
+  const imageExtensions = /\.(jpe?g|png|gif|webp|bmp|svg|tiff?)(\?.*)?$/i;
+
+  const matches = text.match(urlRegex) || [];
+  const nonImageUrls = matches.filter(url => !imageExtensions.test(url));
+  
+  return nonImageUrls;
+  
+}
+
+// Extracts all URLs from the text (anywhere in the text)
+// Extracts URLs specifically from "link" or "url" key-value patterns
+// Excludes image URLs (by common image file extensions)
+export function extractAllNonImageUrls1(text: string): string[] {
+  const generalUrlRegex = /https?:\/\/[^\s"'<>\\]+/gi;
+  const keyUrlRegex = /"(link|url)"\s*:\s*"https?:\/\/[^\s"'<>\\]+"/gi;
+  const imageExtensions = /\.(jpe?g|png|gif|webp|bmp|svg|tiff?)(\?.*)?$/i;
+
+  const keyMatches = [...text.matchAll(keyUrlRegex)]
+    .map(match => {
+      const urlMatch = match[0].match(/https?:\/\/[^\s"'<>\\]+/i);
+      return urlMatch ? urlMatch[0] : null;
+    })
+    .filter((url): url is string => url !== null); // type guard here ✅
+
+  const generalMatches = text.match(generalUrlRegex) || [];
+
+  const allUrls = Array.from(new Set([...keyMatches, ...generalMatches]));
+
+  const nonImageUrls = allUrls.filter(url => !imageExtensions.test(url));
+
+  return nonImageUrls;
+}
+
+// Extracts all URLs from the text (anywhere in the text)
+// Extracts URLs specifically from "link" or "url" key-value patterns
+// Excludes image URLs (by common image file extensions)
+// Excludes pottential images that are prefixed like "image": , "img": "photo": , etc. 
+export function extractAllNonImageUrls(
+  text: string,
+  excludedKeys: string[] = ["image", "img", "thumbnail", "photo", "avatar"]
+): string[] {
+  const generalUrlRegex = /https?:\/\/[^\s"'<>\\]+/gi;
+  const includedKeyRegex = /"(link|url)"\s*:\s*"https?:\/\/[^\s"'<>\\]+"/gi;
+  const imageExtensions = /\.(jpe?g|png|gif|webp|bmp|svg|tiff?)(\?.*)?$/i;
+
+  // Dynamically build regex for excluded keys
+  const excludedKeyPattern = `"(${excludedKeys.join("|")})"\\s*:\\s*"https?:\\/\\/[^"'<>\\\\]+`;
+  const excludedKeyRegex = new RegExp(excludedKeyPattern, "gi");
+
+  // Step 1: Extract URLs from included keys
+  const includedKeyMatches = [...text.matchAll(includedKeyRegex)]
+    .map(match => {
+      const urlMatch = match[0].match(/https?:\/\/[^\s"'<>\\]+/i);
+      return urlMatch ? urlMatch[0] : null;
+    })
+    .filter((url): url is string => url !== null);
+
+  // Step 2: Extract all general URLs from the text
+  const generalMatches = text.match(generalUrlRegex) || [];
+
+  // Step 3: Extract URLs from excluded keys
+  const excludedKeyMatches = [...text.matchAll(excludedKeyRegex)]
+    .map(match => {
+      const urlMatch = match[0].match(/https?:\/\/[^\s"'<>\\]+/i);
+      return urlMatch ? urlMatch[0] : null;
+    })
+    .filter((url): url is string => url !== null);
+
+  // Step 4: Combine included + general URLs and deduplicate
+  const allUrls = Array.from(new Set([...includedKeyMatches, ...generalMatches]));
+
+  // Step 5: Filter out image extension URLs and excluded key URLs
+  const nonImageUrls = allUrls.filter(
+    url => !imageExtensions.test(url) && !excludedKeyMatches.includes(url)
+  );
+
+  return nonImageUrls;
+}
+

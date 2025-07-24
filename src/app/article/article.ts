@@ -67,10 +67,10 @@ export class Article {
       this.isAddedChecked.set(value); // Update the signal when checkbox changes
     });
     this.linkScrapeForm.get('url')?.valueChanges.subscribe((urlValue) => {
+      this.linkURL.set(urlValue);
       this.listurldata = { listname: '', pubauthorslug: '' };
-      if (urlValue.trim().length > 0 && isValidUrl(urlValue.trim())) {
-        console.log('URL changed to:', urlValue);
-        this.linkURL.set(urlValue);
+      if (urlValue.trim().length > 0 && isValidUrl(urlValue.trim())) {      
+        console.log('URL changed to:', this.linkURL());
         this.listurldata = analyzeListedLink(urlValue);
         // console.log('List Name (if):', this.listurldata.listname.trim());
         this.listurldata = analyzeListedLink(urlValue);
@@ -180,6 +180,7 @@ export class Article {
       console.log('Error Scraping data: ', this.scrappedError());
   }
 
+  
   onDragOver(event: DragEvent): void {
     event.preventDefault(); // Allow drop
   }
@@ -252,6 +253,7 @@ export class Article {
       console.error('Error saving scrapped data:', error);
     }
   }
+
 
   // popupConfirm(msg: string) {
   //   this.dlgService

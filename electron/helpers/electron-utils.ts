@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync } from 'fs';
-import { app, dialog } from 'electron';
+import { app, dialog, BrowserWindow } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { listURLData } from '../../shared/projectObjects/varObjects';
@@ -87,16 +87,18 @@ const CONFIG_FILE = path.join(
   'medium-scrapper-app-config.json'
 );
 
-
-
-export async function handleSaveScrappedData(scrappedData: string, urlObj?:listURLData ): Promise<{
+export async function handleSaveScrappedData(
+  scrappedData: string,
+  urlObj?: listURLData
+): Promise<{
   success: boolean;
   message: string;
   error?: string;
 }> {
-
   let fileNameFirstPrefix = 'posts_scrapped_data_';
-  if (urlObj) fileNameFirstPrefix = fileNameFirstPrefix + urlObj.pubauthorslug + '_' + urlObj.listname + '_';
+  if (urlObj)
+    fileNameFirstPrefix =
+      fileNameFirstPrefix + urlObj.pubauthorslug + '_' + urlObj.listname + '_';
 
   try {
     const filenamePrefix =
@@ -146,3 +148,118 @@ function setLastSavedFolder(folderPath: string): void {
   const data = { lastSavedFolder: folderPath };
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(data), 'utf8');
 }
+
+// export async function openAndReadFile(mainWindow) {
+//   const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+//     properties: ['openFile'],
+//     filters: [
+//       { name: 'Text and JSON', extensions: ['txt', 'json'] }
+//     ]
+//   });
+
+//   if (canceled || filePaths.length === 0) {
+//     return null;
+//   }
+
+//   const filePath = filePaths[0];
+//   const data = await fs.readFile(filePath, 'utf-8');
+
+//   return { filePath, data };
+// }
+
+// import { app, dialog, BrowserWindow } from 'electron';
+// import fs from 'fs';
+// import path from 'path';
+
+export async function handleOpenFile(mainWindow: BrowserWindow): Promise<{
+  success: boolean;
+  message: string;
+  filePath?: string;
+  data?: string;
+  error?: string;
+}> {
+  try {
+    const lastFolder = getLastSavedFolder();
+
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+      title: 'Open .txt or .json File',
+      defaultPath: lastFolder || app.getPath('documents'),
+      properties: ['openFile'],
+      filters: [{ name: 'Text and JSON', extensions: ['txt', 'json'] }],
+    });
+
+    if (canceled || !filePaths || filePaths.length === 0) {
+      return { success: false, message: 'Open file canceled' };
+    }
+
+    const filePath = filePaths[0];
+
+    // classic sync read:
+    // const data = fs.readFileSync(filePath, 'utf8'); 
+    // Alternative: async version:
+    const data = await new Promise<string>((resolve, reject) => {
+      fs.readFile(filePath, 'utf8', (err, data) => {
+        if (err) reject(err);
+        else resolve(data);
+      });
+    });
+
+    setLastSavedFolder(path.dirname(filePath));
+
+    return {
+      success: true,
+      message: 'File read successfully',
+      filePath,
+      data,
+    };
+  } catch (error) {
+    console.error('Error opening file:', error);
+    return {
+      success: false,
+      message: 'Error opening file',
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+
+
+
+// export async function handleDroppedFile(droppedFilePath: string): Promise<{
+//   success: boolean;
+//   message: string;
+//   filePath?: string;
+//   data?: string;
+//   error?: string;
+// }> {
+//   try {
+ 
+//     const filePath = droppedFilePath;
+
+//     // classic sync read:
+//     // const data = fs.readFileSync(filePath, 'utf8'); 
+//     // Alternative: async version:
+//     const data = await new Promise<string>((resolve, reject) => {
+//       fs.readFile(filePath, 'utf8', (err, data) => {
+//         if (err) reject(err);
+//         else resolve(data);
+//       });
+//     });
+
+//     setLastSavedFolder(path.dirname(filePath));
+
+//     return {
+//       success: true,
+//       message: 'File droped read successfully',
+//       filePath,
+//       data,
+//     };
+//   } catch (error) {
+//     console.error('Error opening dropped file:', error);
+//     return {
+//       success: false,
+//       message: 'Error opening dropped file',
+//       error: error instanceof Error ? error.message : String(error),
+//     };
+//   }
+// }
