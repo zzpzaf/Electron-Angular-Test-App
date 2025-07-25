@@ -107,7 +107,8 @@ export async function handleSaveScrappedData(
   try {
     const filenamePrefix =
       fileNameFirstPrefix + new Date().toISOString().replace(/:/g, '-');
-    const lastFolder = getLastSavedFolder();
+    // const lastFolder = getLastSavedFolder();
+    const lastFolder = getConfigProperty<string>('lastSavedFolder');
 
     const { filePath, canceled } = await dialog.showSaveDialog({
       title: 'Save Scrapped Data',
@@ -123,7 +124,8 @@ export async function handleSaveScrappedData(
 
     await fs.promises.writeFile(filePath, scrappedData, 'utf8');
 
-    setLastSavedFolder(path.dirname(filePath));
+    // setLastSavedFolder(path.dirname(filePath));
+    setConfigProperties({ lastSavedFolder: path.dirname(filePath)});
 
     return { success: true, message: 'Scrapped data saved' };
   } catch (error) {
@@ -135,89 +137,6 @@ export async function handleSaveScrappedData(
     };
   }
 }
-
-
-// -----------------------------------------------------------------------
-function getLastSavedFolder(): string | null {
-  if (fs.existsSync(CONFIG_FILE)) {
-    try {
-      const data = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
-      return data.lastSavedFolder || null;
-    } catch {
-      return null;
-    }
-  }
-  return null;
-}
-
-// -----------------------------------------------------------------------
-function setLastSavedFolder(folderPath: string): void {
-  const data = { lastSavedFolder: folderPath };
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(data), 'utf8');
-}
-
-// -----------------------------------------------------------------------
-// export async function handleOpenFile1(
-//   mainWindow: BrowserWindow,
-//   options?: Electron.OpenDialogOptions
-// ): Promise<{
-//   success: boolean;
-//   message: string;
-//   filePath?: string;
-//   data?: string;
-//   error?: string;
-// }> {
-//   try {
-//     const lastFolder = getLastSavedFolder();
-
-//     // const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
-//     //   title: 'Open .txt or .json File',
-//     //   defaultPath: lastFolder || app.getPath('documents'),
-//     //   properties: ['openFile'],
-//     //   filters: [{ name: 'Text and JSON', extensions: ['txt', 'json'] }],
-//     // });
-
-//     const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
-//       title: options?.title || 'Select a file',
-//       defaultPath: lastFolder || app.getPath('documents'),
-//       properties: ['openFile'],
-//       filters: options?.filters || [],
-//     });
-
-//     if (canceled || !filePaths || filePaths.length === 0) {
-//       return { success: false, message: 'Open file canceled' };
-//     }
-
-//     const filePath = filePaths[0];
-
-//     // classic sync read:
-//     // const data = fs.readFileSync(filePath, 'utf8');
-//     // Alternative: async version:
-//     const data = await new Promise<string>((resolve, reject) => {
-//       fs.readFile(filePath, 'utf8', (err, data) => {
-//         if (err) reject(err);
-//         else resolve(data);
-//       });
-//     });
-
-//     setLastSavedFolder(path.dirname(filePath));
-
-//     return {
-//       success: true,
-//       message: 'File read successfully',
-//       filePath,
-//       data,
-//     };
-//   } catch (error) {
-//     console.error('Error opening file:', error);
-//     return {
-//       success: false,
-//       message: 'Error opening file',
-//       error: error instanceof Error ? error.message : String(error),
-//     };
-//   }
-// }
-
 
 
 
@@ -232,7 +151,10 @@ export async function getFileFullPathName(
   error?: string;
 }> {
   try {
-    const lastFolder = getLastSavedFolder();
+    // const lastFolder = getLastSavedFolder();
+
+    const lastFullPathName = getConfigProperty<string>('lastObtainedFullPathname');
+    const lastFolder = path.dirname(lastFullPathName ?? app.getPath('documents'));
 
     // const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
     //   title: 'Open .txt or .json File',
@@ -254,7 +176,8 @@ export async function getFileFullPathName(
 
     const filePath = filePaths[0];
 
-    setLastSavedFolder(path.dirname(filePath));
+    // setLastSavedFolder(path.dirname(filePath));
+    setConfigProperties({ lastObtainedFullPathname: filePath});
 
     return {
       success: true,
@@ -299,3 +222,96 @@ export async function getFileData(fileFullPathName: string): Promise<string> {
   return data;
 }
 
+
+
+
+
+
+// -----------------------------------------------------------------------
+// function getLastSavedFolder(): string | null {
+//   if (fs.existsSync(CONFIG_FILE)) {
+//     try {
+//       const data = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+//       return data.lastSavedFolder || null;
+//     } catch {
+//       return null;
+//     }
+//   }
+//   return null;
+// }
+
+// -----------------------------------------------------------------------
+export function getConfigProperty<T = any>(key: string): T | null {
+  if (fs.existsSync(CONFIG_FILE)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+      return data[key] ?? null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+// -----------------------------------------------------------------------
+// function setLastSavedFolder(folderPath: string): void {
+//   const data = { lastSavedFolder: folderPath };
+//   fs.writeFileSync(CONFIG_FILE, JSON.stringify(data), 'utf8');
+// }
+
+// -----------------------------------------------------------------------
+export function setConfigProperties(newProps: Record<string, any>): void {
+  let data = {};
+  
+  // Load existing data
+  if (fs.existsSync(CONFIG_FILE)) {
+    try {
+      data = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+    } catch {
+      data = {};
+    }
+  }
+
+  // Merge new properties
+  const updatedData = { ...data, ...newProps };
+
+  // Save back to file
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(updatedData, null, 2), 'utf8');
+}
+
+
+
+// --------------------------------------------------------------------------
+export function getPropertiesBySubstring(substring: string): Record<string, any> {
+  if (!fs.existsSync(CONFIG_FILE)) return {};
+
+  try {
+    const data = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+    const results: Record<string, any> = {};
+
+    for (const [key, value] of Object.entries(data)) {
+      if (typeof value === 'string' && value.includes(substring)) {
+        results[key] = value;
+      }
+    }
+    return results;
+  } catch {
+    return {};
+  }
+}
+
+
+// --------------------------------------------------------------------------
+export function propertyContains(key: string, substring: string): boolean {
+  const value = getConfigProperty<string>(key);
+  return typeof value === 'string' && value.includes(substring);
+}
+
+
+// --------------------------------------------------------------------------
+export function getPropertyValueBySubstring(key: string, substring: string): string {
+  let retValue = ''; 
+  const value = getConfigProperty<string>(key);
+  if (typeof value === 'string' && value.includes(substring)) retValue = value;
+  return retValue;
+}

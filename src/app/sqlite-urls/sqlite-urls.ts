@@ -8,6 +8,7 @@ import { StyleDrct } from '../shared/style-drct';
 import { DlgService } from '../shared/services/dlg-service';
 import { Articlebasicscraper } from '../shared/services/articlebasicscraper';
 import { LinkRow, PostData } from '../../../shared/projectObjects/varObjects';
+import { BackEnd } from '../shared/services/back-end';
 
 @Component({
   selector: 'sqlite-urls',
@@ -44,18 +45,34 @@ export class SqliteUrls {
   private dlgService = inject(DlgService);
   private scrapper = inject(Articlebasicscraper);
 
-  // private fileDropService = inject(FikeDrop);
-  // filePath = this.fileDropService.$filePath;
+  private backService = inject(BackEnd);
+  private sqliteFullPathName: string = '';
 
   constructor() {
-    // effect(() => {
-    //   const path = this.filePath();
-    //   if (path) {
-    //     console.log('📂 Component sees dropped path:', path);
-    //     // you can read file, parse JSON, etc
-    //   }
-    // });
+    this.loaSqliteFullPathName();
   }
+
+
+  async loaSqliteFullPathName() {
+    try {
+      this.sqliteFullPathName = await this.backService.getPropertyValueBySubstring(
+        'lastObtainedFullPathname',
+        'places.sqlite'
+      );
+      console.log('Property value:', this.sqliteFullPathName);
+      if (this.sqliteFullPathName.length > 0)
+      this.sqliteFileName.set(this.sqliteFullPathName);
+    } catch (err) {
+      console.error('Error retrieving property:', err);
+    }
+  }
+
+
+
+
+
+
+
 
   async onScrape(): Promise<void> {
     let loading = true;

@@ -6,7 +6,7 @@ import {
   scrapeList,
   collectPostsFromUrlTabs,
 } from './processes/scrappers/scrape-functions';
-import { getFileData, handleSaveScrappedData } from './helpers/electron-utils';
+import { getFileData, getPropertyValueBySubstring, handleSaveScrappedData } from './helpers/electron-utils';
 import { listURLData } from '../shared/projectObjects/varObjects';
 import { getFileFullPathName } from './helpers/electron-utils';
 import { getSubfoldersByParentFolderName, getFolderContentsByParentFolderName } from './dbs/sqlite/queries';
@@ -209,5 +209,10 @@ ipcMain.handle(
   (event: any, sqliteFilePatName: string, field1Name: string, field1Value: string) => {
     const qryResult = getFolderContentsByParentFolderName(sqliteFilePatName, field1Name);
     return qryResult;
-  }
+  }  
 );
+
+
+ipcMain.handle('get-property-by-substring', (event: any, key: string, substring: string) => {
+  return getPropertyValueBySubstring(key, substring);
+});
