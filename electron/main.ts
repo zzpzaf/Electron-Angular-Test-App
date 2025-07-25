@@ -6,20 +6,16 @@ import {
   scrapeList,
   collectPostsFromUrlTabs,
 } from './processes/scrappers/scrape-functions';
-import { handleSaveScrappedData } from './helpers/electron-utils';
+import { getFileData, handleSaveScrappedData } from './helpers/electron-utils';
 import { listURLData } from '../shared/projectObjects/varObjects';
-import { handleOpenFile } from './helpers/electron-utils';
+import { getFileFullPathName } from './helpers/electron-utils';
+import { getSubfoldersByParentFolderName, getFolderContentsByParentFolderName } from './dbs/sqlite/queries';
 // import { handleOpenFile, handleDroppedFile } from './helpers/electron-utils';
 
 const isDev = require('electron-is-dev');
 
 const { app, BrowserWindow, ipcMain } = require('electron');
 
-// const fs = require('fs');
-// const path = require('path');
-// const {
-//   scrapeArticleBasic,
-// } = require('./processes/scrappers/scrape-article-basic');
 
 let mainAppWin: any;
 
@@ -28,16 +24,16 @@ function createWindow() {
 
   mainAppWin = new BrowserWindow({
     width: 1000,
-    height: 700,
+    height: 800,
     // icon: path.join(__dirname, 'assets/icon.png'),
     // title: 'MEDIUM Scrapper',
     show: false, // show only when ready
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      // nodeIntegration: false,  // ✅ Recommended
+      // nodeIntegration: false,  // Recommended
       // enableRemoteModule: false,
-      // sandbox: false,          // ✅ Must be false to expose `file.path`
+      // sandbox: false,          // Must be false to expose `file.path`
     },
   });
 
@@ -114,23 +110,6 @@ ipcMain.handle(
   }
 );
 
-// ipcMain.handle(
-//   'scrape-multi-articles',
-//   async (event: IpcMainInvokeEvent, urls: string[]) => {
-//     console.log(`Received scrape-article request for URLs: ${urls}`);
-//     try {
-//       const result = await scrapeMultiArticesleBasic(urls);
-//       console.log('Scraping successful');
-//       return { success: true, data: result };
-//     } catch (error: unknown) {
-//       console.error('Scraping error:', error);
-//       return {
-//         success: false,
-//         error: error instanceof Error ? error.message : String(error),
-//       };
-//     }
-//   }
-// );
 
 ipcMain.handle(
   'read-markdown',
@@ -187,28 +166,48 @@ ipcMain.handle(
   }
 );
 
-// ipcMain.handle('open-file-dialog', async () => {
-//   const result = await handleOpenFile(mainAppWin);
-//   return result;
-// });
-// ipcMain.handle('open-file-dialog', async () => {
+// ipcMain.handle('open-file-dialog', () => {
 //   if (mainAppWin) {
-//     return await handleOpenFile(mainAppWin);
+//     return handleOpenFile(mainAppWin); // return the promise directly
 //   }
 //   return { success: false, message: 'Main window not available' };
 // });
-ipcMain.handle('open-file-dialog', () => {
+ipcMain.handle('open-file-dialog', (_event: any, options: any) => {
   if (mainAppWin) {
-    return handleOpenFile(mainAppWin); // return the promise directly
+    return getFileFullPathName(mainAppWin, options); // pass options to the handler
   }
   return { success: false, message: 'Main window not available' };
 });
 
-// ipcMain.handle('file-dropped', async (_event: any, filePath: string) => {
-//   console.log('Received dropped file path:', filePath);
-//   if (mainAppWin) {
-//     return handleDroppedFile(filePath);
-//   }
-//   return { success: false, message: 'Main window not available' };
+ipcMain.handle('read-file-data', async (event: any, filePathName: string) => {
+  console.log('>===>> (read-file-data) - Reading Data from File: filePathName', filePathName);
+  // return getFileData(filePathName); // pass options to the handler
+  const data = await getFileData(filePathName);
+  // console.log('>===>> (read-file-data) - Data obtained from File: ', data);
+  return data; // return value sent back to renderer
+});
 
+
+
+
+// ipcMain.handle('sqlite:open-connection1', (event: any, filePath: string) => {
+//   return getConnection1(filePath);
 // });
+
+
+ipcMain.handle(
+  'sqlite:get-subfolders',
+  (event: any, sqliteFilePatName: string, field1Name: string, field1Value: string) => {
+    const qryResult = getSubfoldersByParentFolderName(sqliteFilePatName, field1Name);
+    return qryResult;
+  }
+);
+
+
+ipcMain.handle(
+  'sqlite:get-folder-contents',
+  (event: any, sqliteFilePatName: string, field1Name: string, field1Value: string) => {
+    const qryResult = getFolderContentsByParentFolderName(sqliteFilePatName, field1Name);
+    return qryResult;
+  }
+);

@@ -1,17 +1,16 @@
-import { Component, effect, inject, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzCheckboxModule } from 'ng-zorro-antd/checkbox';
 import { NzFormModule } from 'ng-zorro-antd/form';
 import { NzInputModule } from 'ng-zorro-antd/input';
 import { StyleDrct } from '../shared/style-drct';
-import { extractAllNonImageUrls } from '../../../shared/utils/shared-utils';
 import { DlgService } from '../shared/services/dlg-service';
 import { Articlebasicscraper } from '../shared/services/articlebasicscraper';
-import { PostData } from '../../../shared/projectObjects/varObjects';
+import { LinkRow, PostData } from '../../../shared/projectObjects/varObjects';
 
 @Component({
-  selector: 'urls-file',
+  selector: 'sqlite-urls',
   imports: [
     FormsModule,
     NzFormModule,
@@ -20,19 +19,21 @@ import { PostData } from '../../../shared/projectObjects/varObjects';
     NzButtonModule,
     StyleDrct,
   ],
-  templateUrl: './urls-file.html',
-  styleUrl: './urls-file.scss',
+  templateUrl: './sqlite-urls.html',
+  styleUrl: './sqlite-urls.scss',
 })
-export class UrlsFile {
+export class SqliteUrls {
   public importedUrlsArrayString = signal<string>('');
 
   public urlsArray = signal<string[]>([]);
+  public queryResponseData: any;
   public urlsArrayString = signal<string>('');
 
   public scrappedDataArray = signal<PostData[]>([]);
   public scrappedDataArrayString = signal<string>('');
 
-  public fileName: string = '';
+  public sqliteFileName = signal<string>('');
+  public bookmarkFolder: string = '';
   // public mycond: boolean = false;
   public customStyles = {
     color: 'dimgray',
@@ -47,6 +48,13 @@ export class UrlsFile {
   // filePath = this.fileDropService.$filePath;
 
   constructor() {
+    // effect(() => {
+    //   const path = this.filePath();
+    //   if (path) {
+    //     console.log('📂 Component sees dropped path:', path);
+    //     // you can read file, parse JSON, etc
+    //   }
+    // });
   }
 
   async onScrape(): Promise<void> {
@@ -79,16 +87,21 @@ export class UrlsFile {
     }
   }
 
-  onGetFileUrls() {
+  onGetSqliteFile() {
     this.getFileFromElectron().catch((err) =>
       console.error('Unexpected error calling Electron:', err)
     );
   }
 
+  onGetBookmarkFolderUrls() {
+    if (this.bookmarkFolder.length === 0) return;
+    this.getContentsFromBookmarksFolder(this.sqliteFileName());
+  }
+
   private async getFileFromElectron(): Promise<void> {
     const dlgOptions = {
-      title: 'Open .txt or .json Files',
-      filters: [{ name: 'Text and JSON', extensions: ['txt', 'json'] }],
+      title: 'Open .sqlite Files',
+      filters: [{ name: 'SQLite Files', extensions: ['sqlite'] }],
     };
     try {
       const result = (await window.electronAPI.invoke(
@@ -104,38 +117,38 @@ export class UrlsFile {
       console.log('>===>> File selected: ', result.filePath);
 
       if (result.success && result.filePath) {
-        this.fileName = result.filePath!;
-        this.getDataFromFile(this.fileName);
+        this.sqliteFileName.set(result.filePath!);
       }
     } catch (err) {
       console.error('IPC open-file-dialog invoke failed:', err);
     }
   }
 
-  private async getDataFromFile(filePathName: string) {
-    console.log('>===>> File to be read: ', filePathName);
+  private async getContentsFromBookmarksFolder(sqliteFilePathName: string) {
+    const bookmarksFolderName: string = this.bookmarkFolder; //'Reactive-Material';
 
-    let data: string = '';
+    const qRes = (await window.electronAPI.invoke(
+      'sqlite:get-folder-contents',
+      sqliteFilePathName,
+      bookmarksFolderName
+    )) as { success: boolean; data?: any; error?: string };
 
-    try {
-      // Read Data
-      data = (await window.electronAPI.invoke(
-        'read-file-data',
-        filePathName
-      )) as string;
-      if (data.length === 0) {
-        console.log('No Data read from File!');
-        return;
+    if (qRes.success) {
+      console.log('Bookmarks Folder Contents: ', qRes.data);
+      this.queryResponseData = qRes.data as LinkRow[];
+
+      let urls: string[] = [];
+      for (const row of qRes.data as LinkRow[]) {
+        let link: string | null = row.link;
+        if (link) {
+          urls.push(link);
+        }
       }
-      console.log('Data read from File: ', data);
-
-      //Extract URLs
-      const urls = extractAllNonImageUrls(data);
       const uniqueURLs = Array.from(new Set(urls));
       this.urlsArray.set(uniqueURLs);
 
       // Show message in modal dialog
-      const msg: string = this.urlsArray().length + ' URLs found in total!';
+      const msg: string = this.urlsArray().length + ' unique URLs found in total!';
       this.dlgService
         .popup({
           token: 'succ',
@@ -147,11 +160,14 @@ export class UrlsFile {
         .subscribe((result) => {
           console.log('Dialog closed with:', result);
         });
-
       const lbStringUrls = this.urlsArray().join('\n');
       this.importedUrlsArrayString.set(lbStringUrls);
-    } catch (error) {
-      console.log('Error reading Data from File:', error);
+
+    } else {
+      console.error(
+        'IPC sqlite:get-folder-contents - Bookmarks Folder Contents Query failed:',
+        qRes.error
+      );
     }
   }
 
@@ -159,7 +175,7 @@ export class UrlsFile {
     this.scrappedDataArray.set([]); // Clear the Scraped Data array
     this.scrappedDataArrayString.set(''); // Clear the string representation of the Scraped Data array
     this.importedUrlsArrayString.set(''); // Clear the imported URLs
-    this.fileName = '';
+    this.sqliteFileName.set('');
   }
 
   onCopyScrapedData() {

@@ -7,7 +7,8 @@ export interface SiderMenuItem {
 export const SiderMenuItems: SiderMenuItem[] = [
     { label: 'Home', icon: '', route: '/home' },
     { label: 'URL', icon: '', route: '/article' },
-    { label: 'URLs File', icon: '', route: '/urlsfile' },
+    { label: 'File URLs', icon: '', route: '/urlsfile' },
+    { label: 'SQLite URLs', icon: '', route: '/sqliteurls' },
     { label: 'Help', icon: '', route: '/help' }
 ];
 

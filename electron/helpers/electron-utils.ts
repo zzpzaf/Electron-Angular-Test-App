@@ -4,6 +4,12 @@ import fs from 'fs';
 import path from 'path';
 import { listURLData } from '../../shared/projectObjects/varObjects';
 
+const CONFIG_FILE = path.join(
+  app.getPath('userData'),
+  'medium-scrapper-app-config.json'
+);
+
+// -----------------------------------------------------------------------
 export function ensureFolderExists(folderPath: string): void {
   if (!existsSync(folderPath)) {
     try {
@@ -16,6 +22,7 @@ export function ensureFolderExists(folderPath: string): void {
   }
 }
 
+// -----------------------------------------------------------------------
 export function formatDate(input: string): string {
   console.log(`formatDate(${input})`);
 
@@ -78,15 +85,12 @@ export function formatDate(input: string): string {
   return 'Unknown';
 }
 
+// -----------------------------------------------------------------------
 function pad(n: number): string {
   return n.toString().padStart(2, '0');
 }
 
-const CONFIG_FILE = path.join(
-  app.getPath('userData'),
-  'medium-scrapper-app-config.json'
-);
-
+// -----------------------------------------------------------------------
 export async function handleSaveScrappedData(
   scrappedData: string,
   urlObj?: listURLData
@@ -132,6 +136,8 @@ export async function handleSaveScrappedData(
   }
 }
 
+
+// -----------------------------------------------------------------------
 function getLastSavedFolder(): string | null {
   if (fs.existsSync(CONFIG_FILE)) {
     try {
@@ -144,88 +150,17 @@ function getLastSavedFolder(): string | null {
   return null;
 }
 
+// -----------------------------------------------------------------------
 function setLastSavedFolder(folderPath: string): void {
   const data = { lastSavedFolder: folderPath };
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(data), 'utf8');
 }
 
-// export async function openAndReadFile(mainWindow) {
-//   const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
-//     properties: ['openFile'],
-//     filters: [
-//       { name: 'Text and JSON', extensions: ['txt', 'json'] }
-//     ]
-//   });
-
-//   if (canceled || filePaths.length === 0) {
-//     return null;
-//   }
-
-//   const filePath = filePaths[0];
-//   const data = await fs.readFile(filePath, 'utf-8');
-
-//   return { filePath, data };
-// }
-
-// import { app, dialog, BrowserWindow } from 'electron';
-// import fs from 'fs';
-// import path from 'path';
-
-export async function handleOpenFile(mainWindow: BrowserWindow): Promise<{
-  success: boolean;
-  message: string;
-  filePath?: string;
-  data?: string;
-  error?: string;
-}> {
-  try {
-    const lastFolder = getLastSavedFolder();
-
-    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
-      title: 'Open .txt or .json File',
-      defaultPath: lastFolder || app.getPath('documents'),
-      properties: ['openFile'],
-      filters: [{ name: 'Text and JSON', extensions: ['txt', 'json'] }],
-    });
-
-    if (canceled || !filePaths || filePaths.length === 0) {
-      return { success: false, message: 'Open file canceled' };
-    }
-
-    const filePath = filePaths[0];
-
-    // classic sync read:
-    // const data = fs.readFileSync(filePath, 'utf8'); 
-    // Alternative: async version:
-    const data = await new Promise<string>((resolve, reject) => {
-      fs.readFile(filePath, 'utf8', (err, data) => {
-        if (err) reject(err);
-        else resolve(data);
-      });
-    });
-
-    setLastSavedFolder(path.dirname(filePath));
-
-    return {
-      success: true,
-      message: 'File read successfully',
-      filePath,
-      data,
-    };
-  } catch (error) {
-    console.error('Error opening file:', error);
-    return {
-      success: false,
-      message: 'Error opening file',
-      error: error instanceof Error ? error.message : String(error),
-    };
-  }
-}
-
-
-
-
-// export async function handleDroppedFile(droppedFilePath: string): Promise<{
+// -----------------------------------------------------------------------
+// export async function handleOpenFile1(
+//   mainWindow: BrowserWindow,
+//   options?: Electron.OpenDialogOptions
+// ): Promise<{
 //   success: boolean;
 //   message: string;
 //   filePath?: string;
@@ -233,11 +168,30 @@ export async function handleOpenFile(mainWindow: BrowserWindow): Promise<{
 //   error?: string;
 // }> {
 //   try {
- 
-//     const filePath = droppedFilePath;
+//     const lastFolder = getLastSavedFolder();
+
+//     // const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+//     //   title: 'Open .txt or .json File',
+//     //   defaultPath: lastFolder || app.getPath('documents'),
+//     //   properties: ['openFile'],
+//     //   filters: [{ name: 'Text and JSON', extensions: ['txt', 'json'] }],
+//     // });
+
+//     const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+//       title: options?.title || 'Select a file',
+//       defaultPath: lastFolder || app.getPath('documents'),
+//       properties: ['openFile'],
+//       filters: options?.filters || [],
+//     });
+
+//     if (canceled || !filePaths || filePaths.length === 0) {
+//       return { success: false, message: 'Open file canceled' };
+//     }
+
+//     const filePath = filePaths[0];
 
 //     // classic sync read:
-//     // const data = fs.readFileSync(filePath, 'utf8'); 
+//     // const data = fs.readFileSync(filePath, 'utf8');
 //     // Alternative: async version:
 //     const data = await new Promise<string>((resolve, reject) => {
 //       fs.readFile(filePath, 'utf8', (err, data) => {
@@ -250,16 +204,98 @@ export async function handleOpenFile(mainWindow: BrowserWindow): Promise<{
 
 //     return {
 //       success: true,
-//       message: 'File droped read successfully',
+//       message: 'File read successfully',
 //       filePath,
 //       data,
 //     };
 //   } catch (error) {
-//     console.error('Error opening dropped file:', error);
+//     console.error('Error opening file:', error);
 //     return {
 //       success: false,
-//       message: 'Error opening dropped file',
+//       message: 'Error opening file',
 //       error: error instanceof Error ? error.message : String(error),
 //     };
 //   }
 // }
+
+
+
+
+// --------------------------------------------------------------------------
+export async function getFileFullPathName(
+  mainWindow: BrowserWindow,
+  options?: Electron.OpenDialogOptions
+): Promise<{
+  success: boolean;
+  message: string;
+  filePath?: string;
+  error?: string;
+}> {
+  try {
+    const lastFolder = getLastSavedFolder();
+
+    // const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    //   title: 'Open .txt or .json File',
+    //   defaultPath: lastFolder || app.getPath('documents'),
+    //   properties: ['openFile'],
+    //   filters: [{ name: 'Text and JSON', extensions: ['txt', 'json'] }],
+    // });
+
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+      title: options?.title || 'Select a file',
+      defaultPath: lastFolder || app.getPath('documents'),
+      properties: ['openFile'],
+      filters: options?.filters || [],
+    });
+
+    if (canceled || !filePaths || filePaths.length === 0) {
+      return { success: false, message: 'Open file dialog canceled' };
+    }
+
+    const filePath = filePaths[0];
+
+    setLastSavedFolder(path.dirname(filePath));
+
+    return {
+      success: true,
+      message: 'File Path Name obtained successfully',
+      filePath,
+    };
+  } catch (error) {
+    console.error('Error opening file dialog - Error: ', error);
+    return {
+      success: false,
+      message: 'Error opening file dialog',
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+
+// -----------------------------------------------------------------------------
+export async function getFileData(fileFullPathName: string): Promise<string> {
+  console.log('Attempting to read:', fileFullPathName);
+  let data: string = '';
+  try {
+    const exists = fs.existsSync(fileFullPathName);
+    console.log('File exists:', exists);
+    if (!exists) throw new Error('File does not exist');
+
+    data = await new Promise<string>((resolve, reject) => {
+      fs.readFile(fileFullPathName, 'utf8', (err, fileData) => {
+        if (err) {
+          console.error('Read error:', err);
+          reject(err);
+        } else {
+          console.log('Successfully read file.');
+          resolve(fileData);
+        }
+      });
+    });
+  } catch (error) {
+    console.error('Error in getFileData():', error);
+  }
+  // console.log('>===>> ( getFileData() ) - Data obtained from File: ', data);
+  return data;
+}
+

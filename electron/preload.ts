@@ -19,7 +19,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on(channel, (_event: IpcRendererEvent, data: any) =>
       callback(data)
     ),
-  // Generic invoke for all channels, returns Promise<unknown> e.g.: window.electronAPI.invoke('collect-posts', urls);
+  // Generic invoker for all channels, returns Promise<unknown> e.g.: window.electronAPI.invoke('collect-posts', urls);
   invoke: (channel: string, ...args: unknown[]) =>
     ipcRenderer.invoke(channel, ...args),
 

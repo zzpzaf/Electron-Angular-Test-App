@@ -17,3 +17,15 @@ export interface PostData extends listURLData{
   likes: number;
   comments: number;
 }
+
+
+export type SubfolderRow = {
+  folder_id: number;
+  folder_name: string | null;
+  parent_id: number | null;
+};
+
+export type LinkRow = {
+  title: string | null;
+  link: string | null;
+};
