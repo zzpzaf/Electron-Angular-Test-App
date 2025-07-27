@@ -15,39 +15,60 @@
       SQLite File...
     </button>
   </div>
+
+
   <!-- -------------------------------------------------- -->
 
-  <label class="textarea-label">Bookmark Folder Name:</label>
 
-  <div class="input-button-row">
-    <input
-      type="text"
-      nz-input
-      [(ngModel)]="bookmarkFolder"
-      placeholder="Bookmark folder-name"
-      class="text-input-field"
-    />
+
+  <div class="simple-label-row">
+    <!-- <label class="textarea-label">Bookmark Folder Name:</label> -->
+    <label class="textarea-label">{{fullSelectedNodePathLabel()}}</label>
   </div>
+ 
 
-  <div class="solo-button-row">
+
+  <!-- -------------------------------------------------- -->
+
+<div class="simple-input-row">
+  <nz-tree-select
+    style="width: 100%"
+    [nzNodes]="treeNodes"
+    nzPlaceHolder="Select a folder"
+    [(ngModel)]="selectedFolderId"
+    (ngModelChange)="onTreeSelectFolderChange($event)">
+  </nz-tree-select>
+
+  <!-- <input
+    type="text"
+    nz-input
+    [(ngModel)]="fullSelectedNodePath"
+    placeholder="Bookmark folder-name"
+    class="text-input-field"
+  /> -->
+</div>
+
+  <!-- -------------------------------------------------- -->
+
+  <!-- <div class="solo-button-row">
     <button nz-button 
     nzType="primary" 
     [disabled]="sqliteFileName().length === 0 || bookmarkFolder.length === 0"
     (click)="onGetBookmarkFolderUrls()">
       Get Bookmark Folder URLs...
     </button>
-  </div>
+  </div> -->
 
   <!-- -------------------------------------------------- -->
-  <div class="login-form-separator"></div>
+  <!-- <div class="login-form-separator"></div> -->
   <!-- -------------------------------------------------- -->
 
   @if (importedUrlsArrayString().length === 0) {
   <label [styleDrct]="customStyles" class="textarea-label"
-    >Imported URLs:
+    >{{imoprtedUrlsLabel()}}:
   </label>
   } @else {
-  <label class="textarea-label">Imported URLs: </label>
+  <label class="textarea-label">{{imoprtedUrlsLabel()}}: </label>
   }
 
   <textarea
