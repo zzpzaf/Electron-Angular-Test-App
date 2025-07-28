@@ -71,10 +71,10 @@ export class SqliteUrls {
   private sqliteFullPathName: string = '';
 
   public treeNodes: NzTreeNodeOptions[] = [];
-  public selectedFolderId?: string;
+  public selectedFolderId: string = '';
   public fullSelectedNodePathLabel = signal<string>('Bookmark Folder Name');
   private selectedfolderNodeId: number = -1;
-  private countedUniqueLinks = signal<number>(-1);
+  // private countedUniqueLinks = signal<number>(-1);
   public imoprtedUrlsLabel = signal<string>('Imported URLs');
 
 
@@ -134,6 +134,7 @@ export class SqliteUrls {
 
 
 onTreeSelectFolderChange(selectedId: string) {
+  this.selectedFolderId = selectedId;
   const result = this.findTreeSelectNodeWithAncestors(this.treeNodes, selectedId);
 
   if (!result) {
@@ -399,11 +400,11 @@ private findTreeSelectNodeWithAncestors(
 
 
 
-  onClearScrapedData() {
+  onClearAll() {
     this.scrappedDataArray.set([]); // Clear the Scraped Data array
     this.scrappedDataArrayString.set(''); // Clear the string representation of the Scraped Data array
     this.importedUrlsArrayString.set(''); // Clear the imported URLs
-    this.sqliteFileName.set('');
+    this.selectedFolderId = '';
   }
 
   onCopyScrapedData() {

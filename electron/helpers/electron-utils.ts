@@ -125,7 +125,7 @@ export async function handleSaveScrappedData(
     await fs.promises.writeFile(filePath, scrappedData, 'utf8');
 
     // setLastSavedFolder(path.dirname(filePath));
-    setConfigProperties({ lastSavedFolder: path.dirname(filePath)});
+    setConfigProperties({ lastSavedFolder: path.dirname(filePath) });
 
     return { success: true, message: 'Scrapped data saved' };
   } catch (error) {
@@ -137,8 +137,6 @@ export async function handleSaveScrappedData(
     };
   }
 }
-
-
 
 // --------------------------------------------------------------------------
 export async function getFileFullPathName(
@@ -153,8 +151,12 @@ export async function getFileFullPathName(
   try {
     // const lastFolder = getLastSavedFolder();
 
-    const lastFullPathName = getConfigProperty<string>('lastObtainedFullPathname');
-    const lastFolder = path.dirname(lastFullPathName ?? app.getPath('documents'));
+    const lastFullPathName = getConfigProperty<string>(
+      'lastObtainedFullPathname'
+    );
+    const lastFolder = path.dirname(
+      lastFullPathName ?? app.getPath('documents')
+    );
 
     // const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
     //   title: 'Open .txt or .json File',
@@ -177,7 +179,7 @@ export async function getFileFullPathName(
     const filePath = filePaths[0];
 
     // setLastSavedFolder(path.dirname(filePath));
-    setConfigProperties({ lastObtainedFullPathname: filePath});
+    setConfigProperties({ lastObtainedFullPathname: filePath });
 
     return {
       success: true,
@@ -193,7 +195,6 @@ export async function getFileFullPathName(
     };
   }
 }
-
 
 // -----------------------------------------------------------------------------
 export async function getFileData(fileFullPathName: string): Promise<string> {
@@ -222,6 +223,32 @@ export async function getFileData(fileFullPathName: string): Promise<string> {
   return data;
 }
 
+
+
+// -----------------------------------------------------------------------
+export async function selectFolder(
+  mainWindow: BrowserWindow,
+  initPath?: string
+): Promise<{ 
+  success: boolean; 
+  filePath?: string[]; 
+  message?: string }> {
+  try {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Select a folder',
+      defaultPath: initPath?.trim() ? initPath : app.getPath('documents'), // Use provided path if any
+      properties: ['openDirectory'],  // key for selecting directories
+    });
+
+    if (result.canceled) {
+      return { success: false, message: 'User canceled' };
+    }
+
+    return { success: true, filePath: result.filePaths };
+  } catch (error) {
+    return { success: false, message: (error as Error).message };
+  }
+}
 
 
 
@@ -262,7 +289,7 @@ export function getConfigProperty<T = any>(key: string): T | null {
 // -----------------------------------------------------------------------
 export function setConfigProperties(newProps: Record<string, any>): void {
   let data = {};
-  
+
   // Load existing data
   if (fs.existsSync(CONFIG_FILE)) {
     try {
@@ -279,10 +306,10 @@ export function setConfigProperties(newProps: Record<string, any>): void {
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(updatedData, null, 2), 'utf8');
 }
 
-
-
 // --------------------------------------------------------------------------
-export function getPropertiesBySubstring(substring: string): Record<string, any> {
+export function getPropertiesBySubstring(
+  substring: string
+): Record<string, any> {
   if (!fs.existsSync(CONFIG_FILE)) return {};
 
   try {
@@ -300,17 +327,18 @@ export function getPropertiesBySubstring(substring: string): Record<string, any>
   }
 }
 
-
 // --------------------------------------------------------------------------
 export function propertyContains(key: string, substring: string): boolean {
   const value = getConfigProperty<string>(key);
   return typeof value === 'string' && value.includes(substring);
 }
 
-
 // --------------------------------------------------------------------------
-export function getPropertyValueBySubstring(key: string, substring: string): string {
-  let retValue = ''; 
+export function getPropertyValueBySubstring(
+  key: string,
+  substring: string
+): string {
+  let retValue = '';
   const value = getConfigProperty<string>(key);
   if (typeof value === 'string' && value.includes(substring)) retValue = value;
   return retValue;

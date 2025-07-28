@@ -6,7 +6,7 @@ import {
   scrapeList,
   collectPostsFromUrlTabs,
 } from './processes/scrappers/scrape-functions';
-import { getFileData, getPropertyValueBySubstring, handleSaveScrappedData } from './helpers/electron-utils';
+import { getConfigProperty, getFileData, getPropertyValueBySubstring, handleSaveScrappedData, selectFolder } from './helpers/electron-utils';
 import { listURLData } from '../shared/projectObjects/varObjects';
 import { getFileFullPathName } from './helpers/electron-utils';
 import { getSubfoldersByParentFolderName, getFolderContentsByParentFolderName, findFoldersByTitle, getFolderContentsByParentFolderNameAndOccurence, getFolderContentsById, countUniqueLinksByFolderId } from './dbs/sqlite/queries';
@@ -91,6 +91,17 @@ app.on('window-all-closed', () => {
 
 // Custom IPC handlers
 // -----------------------------------------------------------------
+
+
+ipcMain.handle('app:quit', (event: any) => {
+  // Close all windows first (usually app.quit() will do it anyway)
+  BrowserWindow.getAllWindows().forEach((w: InstanceType<typeof BrowserWindow>) => w.close());
+  app.quit();            // emits before-quit / will-quit, lets you clean up
+  // If you really must force it (not recommended normally):
+  // app.exit(0);
+});
+
+
 
 ipcMain.handle(
   'scrape-article',
@@ -188,7 +199,26 @@ ipcMain.handle('read-file-data', async (event: any, filePathName: string) => {
 });
 
 
+ipcMain.handle('select-folder', async (event: any, defaultPath?: string) => {
+  if (mainAppWin) {
+    return await selectFolder(mainAppWin, defaultPath);
+  }
+  return { success: false, message: 'Main window not available' };
+});
 
+ipcMain.handle('get-property-by-substring', (event: any, key: string, substring: string) => {
+  return getPropertyValueBySubstring(key, substring);
+});
+
+ipcMain.handle('get-config-property-by-key', async (event: any, key: string) => {
+  try {
+    const value: string | null = getConfigProperty(key);
+    return value ;
+  } catch (err) {
+    console.log('Error getting property by key: ', err);
+    return null;
+  }
+});
 
 // ipcMain.handle('sqlite:open-connection1', (event: any, filePath: string) => {
 //   return getConnection1(filePath);
@@ -202,7 +232,6 @@ ipcMain.handle(
     return qryResult;
   }
 );
-
 
 ipcMain.handle(
   'sqlite:get-folder-contents',
@@ -220,7 +249,6 @@ ipcMain.handle(
   }  
 );
 
-
 ipcMain.handle(
   'sqlite:get-number-unique-links-from-folder-by-id',
   (event: any, sqliteFilePatName: string, id: number) => {
@@ -228,8 +256,6 @@ ipcMain.handle(
     return qryResult;
   }  
 );
-
-
 
 ipcMain.handle(
   'sqlite:find-folders-by-title', (event: any, sqliteFilePathName: string, ftitle: string) => {
@@ -245,6 +271,3 @@ ipcMain.handle(
 );
 
 
-ipcMain.handle('get-property-by-substring', (event: any, key: string, substring: string) => {
-  return getPropertyValueBySubstring(key, substring);
-});

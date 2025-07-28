@@ -3,25 +3,63 @@
   margin: 16px;
   color:aquamarine
 }
-
 nz-header {
+  height: 40px !important;
   display: flex;
   align-items: center;
   padding: 0 24px;
+  background: #001529; // optional: match Ant Design default
 }
 
-nz-header h1 {
+/* First header (nzh1) */
+#nzh1 h1 {
   margin: 0;
   font-size: 20px;
-  color:aquamarine
+  color: aquamarine;
 }
+
+/* Second header (nzh2) */
+#nzh2 {
+  display: flex;
+  justify-content: space-between; /* left text & right icons */
+  align-items: center;
+  padding: 0 24px;
+  font-size: 14px;
+  color: rgb(167, 199, 188);
+}
+
+#nzh2 .header-left {
+  font-size: 14px;
+  color: rgb(167, 199, 188);
+}
+
+#nzh2 .header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* spacing between icons */
+}
+
+.icon-btn {
+  padding: 0;
+  border: none;
+  color: rgb(167, 199, 188);
+  font-size: 16px;
+  background: transparent;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.icon-btn:hover {
+  color: #ffffff; /* highlight on hover */
+}
+
+
 
 
 ::ng-deep .ant-layout-sider-trigger {
   background: #001529;
   color: aquamarine
 }
-
 
 
 ::ng-deep .ant-layout-sider-children {

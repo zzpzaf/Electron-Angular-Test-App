@@ -1,8 +1,9 @@
 <!-- -------------------------------------------------- -->
 <div class="text-area-container">
   <label class="textarea-label">SQLite File Name:</label>
+  <label class="text-label">{{sqliteFileName()}}</label>
 
-  <div class="input-button-row">
+  <!-- <div class="input-button-row">
     <input
       type="text"
       nz-input
@@ -14,7 +15,7 @@
     <button nz-button nzType="primary" (click)="onGetSqliteFile()">
       SQLite File...
     </button>
-  </div>
+  </div> -->
 
 
   <!-- -------------------------------------------------- -->
@@ -111,11 +112,11 @@
       nz-button
       nzType="primary"
       [disabled]="
-        scrappedDataArray().length === 0 &&
-        scrappedDataArrayString().length === 0 &&
-        sqliteFileName.length === 0
+        selectedFolderId.length === 0 &&
+        importedUrlsArrayString().length === 0 &&
+        scrappedDataArrayString().length === 0 
       "
-      (click)="onClearScrapedData()"
+      (click)="onClearAll()"
     >
       Clear All
     </button>

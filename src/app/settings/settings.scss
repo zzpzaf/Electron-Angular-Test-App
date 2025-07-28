@@ -1,0 +1,95 @@
+:host {
+  display: flex;
+  flex-direction: column; // stack items vertically
+  background-color: #011e39;
+  justify-content: flex-start; // align at the top
+  align-items: center; // center horizontally
+  padding-top: 32px; // <--- top gap (adjust as needed)
+  height: 100%;
+  width: 100%;
+}
+
+.config-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 95%;
+}
+
+.config-content {
+  flex: 1; /* Takes all available space */
+  overflow-y: auto; /* Scroll if content is too large */
+
+    form {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+}
+
+.config-footer {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end; /* Buttons to the right */
+  padding: 1rem 0;
+  border-top: 1px solid #7996c7;
+  margin-top: auto; // 👈 Pushes footer to the bottom
+}
+
+h2 {
+  margin-bottom: 1.5rem;
+  color: #7996c7;
+  border-bottom: 1px solid #7996c7;
+}
+.form-group {
+  margin-bottom: 1rem;
+}
+
+label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-weight: 200;
+  color: #9bd1f3;
+}
+
+// .input-button-row {
+//   display: flex;
+//   width: 100%;
+//   gap: 8px;
+//   margin-bottom: 16px;
+
+//   input[nz-input] {
+//     flex: 1 1 auto;
+//   }
+
+//   button[nz-button] {
+//     flex: 0 0 auto;
+//   }
+// }
+.input-button-row {
+  display: flex;
+  width: 100%;
+  gap: 8px;
+  margin-bottom: 16px;
+
+  input[nz-input] {
+    flex-grow: 1;
+    width: auto;
+  }
+
+  button[nz-button] {
+    width: 120px; /* 👈 Fixed width ensures alignment */
+    flex-shrink: 0;
+  }
+}
+
+// input[nz-input] {
+//   width: 100%;
+// }
+
+.buttons {
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.5rem;
+}

@@ -1,31 +1,64 @@
 <!-- <p>layout works!</p> -->
-<nz-layout>
-  <nz-sider nzCollapsible [nzWidth]="120" [nzCollapsedWidth]="40">
-    <div class="logo">PZ</div>
-    <ul nz-menu nzTheme="dark" nzMode="inline">
-      @for (item of siderMenuItems; track item.label) {
-      <li nz-menu-item>
-        <a [routerLink]="item.route">
-          <span nz-icon [nzType]="item.icon"></span>
-          <span>{{ item.label }}</span>
-        </a>
-      </li>
-      }
-    </ul>
-  </nz-sider>
 
+<nz-layout>
+  @if (!showSettings()) {
+    <nz-sider nzCollapsible [nzWidth]="120" [nzCollapsedWidth]="40">
+      <div class="logo">PZ</div>
+      <ul nz-menu nzTheme="dark" nzMode="inline">
+        @for (item of siderMenuItems; track item.label) {
+        <li nz-menu-item>
+          <a [routerLink]="item.route">
+            <span nz-icon [nzType]="item.icon"></span>
+            <span>{{ item.label }}</span>
+          </a>
+        </li>
+        }
+      </ul>
+    </nz-sider>
+  }
   <nz-layout>
-    <nz-header>
-      <h1> 
+    <nz-header id="nzh1">
+      <h1>
         {{ headerTitle }}
       </h1>
     </nz-header>
+    <nz-header id="nzh2">
+      <div class="header-left">Test Test Test</div>
+      <div class="header-right">
+        <button
+          nz-button
+          nzType="link"
+          nzShape="circle"
+          class="icon-btn"
+          nz-tooltip
+          nzTooltipTitle="Settings"
+          (click)="onSettingsClick()"
+        >
+          <span nz-icon nzType="setting" nzTheme="outline"></span>
+        </button>
+        <button
+          nz-button
+          nzType="link"
+          nzShape="circle"
+          class="icon-btn"
+          nz-tooltip
+          nzTooltipTitle="Exit"
+          (click)="onExitClick()"
+        >
+          <span nz-icon nzType="logout" nzTheme="outline"></span>
+        </button>
+      </div>
+    </nz-header>
     <nz-content>
       <!-- <div>Main Content Goes Here</div> -->
-       <router-outlet /> 
+      @if (showSettings()) {
+      <settings (closed)="onSettingsClosed()" />
+      } @else {
+      <router-outlet />
+      }
     </nz-content>
     <nz-footer>
-        {{ footerContent }}
+      {{ footerContent }}
     </nz-footer>
   </nz-layout>
 </nz-layout>

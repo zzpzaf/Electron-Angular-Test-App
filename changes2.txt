@@ -1,0 +1,649 @@
+diff --git a/electron/helpers/electron-utils.ts b/electron/helpers/electron-utils.ts
+index a5fa7a8..405d4db 100644
+--- a/electron/helpers/electron-utils.ts
++++ b/electron/helpers/electron-utils.ts
+@@ -125,7 +125,7 @@ export async function handleSaveScrappedData(
+     await fs.promises.writeFile(filePath, scrappedData, 'utf8');
+ 
+     // setLastSavedFolder(path.dirname(filePath));
+-    setConfigProperties({ lastSavedFolder: path.dirname(filePath)});
++    setConfigProperties({ lastSavedFolder: path.dirname(filePath) });
+ 
+     return { success: true, message: 'Scrapped data saved' };
+   } catch (error) {
+@@ -138,8 +138,6 @@ export async function handleSaveScrappedData(
+   }
+ }
+ 
+-
+-
+ // --------------------------------------------------------------------------
+ export async function getFileFullPathName(
+   mainWindow: BrowserWindow,
+@@ -153,8 +151,12 @@ export async function getFileFullPathName(
+   try {
+     // const lastFolder = getLastSavedFolder();
+ 
+-    const lastFullPathName = getConfigProperty<string>('lastObtainedFullPathname');
+-    const lastFolder = path.dirname(lastFullPathName ?? app.getPath('documents'));
++    const lastFullPathName = getConfigProperty<string>(
++      'lastObtainedFullPathname'
++    );
++    const lastFolder = path.dirname(
++      lastFullPathName ?? app.getPath('documents')
++    );
+ 
+     // const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+     //   title: 'Open .txt or .json File',
+@@ -177,7 +179,7 @@ export async function getFileFullPathName(
+     const filePath = filePaths[0];
+ 
+     // setLastSavedFolder(path.dirname(filePath));
+-    setConfigProperties({ lastObtainedFullPathname: filePath});
++    setConfigProperties({ lastObtainedFullPathname: filePath });
+ 
+     return {
+       success: true,
+@@ -194,7 +196,6 @@ export async function getFileFullPathName(
+   }
+ }
+ 
+-
+ // -----------------------------------------------------------------------------
+ export async function getFileData(fileFullPathName: string): Promise<string> {
+   console.log('Attempting to read:', fileFullPathName);
+@@ -224,6 +225,32 @@ export async function getFileData(fileFullPathName: string): Promise<string> {
+ 
+ 
+ 
++// -----------------------------------------------------------------------
++export async function selectFolder(
++  mainWindow: BrowserWindow,
++  initPath?: string
++): Promise<{ 
++  success: boolean; 
++  filePath?: string[]; 
++  message?: string }> {
++  try {
++    const result = await dialog.showOpenDialog(mainWindow, {
++      title: 'Select a folder',
++      defaultPath: initPath?.trim() ? initPath : app.getPath('documents'), // Use provided path if any
++      properties: ['openDirectory'],  // key for selecting directories
++    });
++
++    if (result.canceled) {
++      return { success: false, message: 'User canceled' };
++    }
++
++    return { success: true, filePath: result.filePaths };
++  } catch (error) {
++    return { success: false, message: (error as Error).message };
++  }
++}
++
++
+ 
+ 
+ 
+@@ -262,7 +289,7 @@ export function getConfigProperty<T = any>(key: string): T | null {
+ // -----------------------------------------------------------------------
+ export function setConfigProperties(newProps: Record<string, any>): void {
+   let data = {};
+-  
++
+   // Load existing data
+   if (fs.existsSync(CONFIG_FILE)) {
+     try {
+@@ -279,10 +306,10 @@ export function setConfigProperties(newProps: Record<string, any>): void {
+   fs.writeFileSync(CONFIG_FILE, JSON.stringify(updatedData, null, 2), 'utf8');
+ }
+ 
+-
+-
+ // --------------------------------------------------------------------------
+-export function getPropertiesBySubstring(substring: string): Record<string, any> {
++export function getPropertiesBySubstring(
++  substring: string
++): Record<string, any> {
+   if (!fs.existsSync(CONFIG_FILE)) return {};
+ 
+   try {
+@@ -300,18 +327,19 @@ export function getPropertiesBySubstring(substring: string): Record<string, any>
+   }
+ }
+ 
+-
+ // --------------------------------------------------------------------------
+ export function propertyContains(key: string, substring: string): boolean {
+   const value = getConfigProperty<string>(key);
+   return typeof value === 'string' && value.includes(substring);
+ }
+ 
+-
+ // --------------------------------------------------------------------------
+-export function getPropertyValueBySubstring(key: string, substring: string): string {
+-  let retValue = ''; 
++export function getPropertyValueBySubstring(
++  key: string,
++  substring: string
++): string {
++  let retValue = '';
+   const value = getConfigProperty<string>(key);
+   if (typeof value === 'string' && value.includes(substring)) retValue = value;
+   return retValue;
+-}
+\ No newline at end of file
++}
+diff --git a/electron/main.ts b/electron/main.ts
+index 19095e3..2422486 100644
+--- a/electron/main.ts
++++ b/electron/main.ts
+@@ -6,7 +6,7 @@ import {
+   scrapeList,
+   collectPostsFromUrlTabs,
+ } from './processes/scrappers/scrape-functions';
+-import { getFileData, getPropertyValueBySubstring, handleSaveScrappedData } from './helpers/electron-utils';
++import { getConfigProperty, getFileData, getPropertyValueBySubstring, handleSaveScrappedData, selectFolder } from './helpers/electron-utils';
+ import { listURLData } from '../shared/projectObjects/varObjects';
+ import { getFileFullPathName } from './helpers/electron-utils';
+ import { getSubfoldersByParentFolderName, getFolderContentsByParentFolderName, findFoldersByTitle, getFolderContentsByParentFolderNameAndOccurence, getFolderContentsById, countUniqueLinksByFolderId } from './dbs/sqlite/queries';
+@@ -92,6 +92,17 @@ app.on('window-all-closed', () => {
+ // Custom IPC handlers
+ // -----------------------------------------------------------------
+ 
++
++ipcMain.handle('app:quit', (event: any) => {
++  // Close all windows first (usually app.quit() will do it anyway)
++  BrowserWindow.getAllWindows().forEach((w: InstanceType<typeof BrowserWindow>) => w.close());
++  app.quit();            // emits before-quit / will-quit, lets you clean up
++  // If you really must force it (not recommended normally):
++  // app.exit(0);
++});
++
++
++
+ ipcMain.handle(
+   'scrape-article',
+   async (event: IpcMainInvokeEvent, url: string) => {
+@@ -188,7 +199,26 @@ ipcMain.handle('read-file-data', async (event: any, filePathName: string) => {
+ });
+ 
+ 
++ipcMain.handle('select-folder', async (event: any, defaultPath?: string) => {
++  if (mainAppWin) {
++    return await selectFolder(mainAppWin, defaultPath);
++  }
++  return { success: false, message: 'Main window not available' };
++});
+ 
++ipcMain.handle('get-property-by-substring', (event: any, key: string, substring: string) => {
++  return getPropertyValueBySubstring(key, substring);
++});
++
++ipcMain.handle('get-config-property-by-key', async (event: any, key: string) => {
++  try {
++    const value: string | null = getConfigProperty(key);
++    return value ;
++  } catch (err) {
++    console.log('Error getting property by key: ', err);
++    return null;
++  }
++});
+ 
+ // ipcMain.handle('sqlite:open-connection1', (event: any, filePath: string) => {
+ //   return getConnection1(filePath);
+@@ -203,7 +233,6 @@ ipcMain.handle(
+   }
+ );
+ 
+-
+ ipcMain.handle(
+   'sqlite:get-folder-contents',
+   (event: any, sqliteFilePatName: string, rootFolder1Name: string) => {
+@@ -220,7 +249,6 @@ ipcMain.handle(
+   }  
+ );
+ 
+-
+ ipcMain.handle(
+   'sqlite:get-number-unique-links-from-folder-by-id',
+   (event: any, sqliteFilePatName: string, id: number) => {
+@@ -229,8 +257,6 @@ ipcMain.handle(
+   }  
+ );
+ 
+-
+-
+ ipcMain.handle(
+   'sqlite:find-folders-by-title', (event: any, sqliteFilePathName: string, ftitle: string) => {
+   return findFoldersByTitle(sqliteFilePathName, ftitle);
+@@ -245,6 +271,3 @@ ipcMain.handle(
+ );
+ 
+ 
+-ipcMain.handle('get-property-by-substring', (event: any, key: string, substring: string) => {
+-  return getPropertyValueBySubstring(key, substring);
+-});
+\ No newline at end of file
+diff --git a/package-lock.json b/package-lock.json
+index 5dd0414..e2c3880 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -14,6 +14,7 @@
+         "@angular/forms": "^20.1.0",
+         "@angular/platform-browser": "^20.1.0",
+         "@angular/router": "^20.1.0",
++        "@ant-design/icons-angular": "^20.0.0",
+         "better-sqlite3": "^12.2.0",
+         "electron-is-dev": "^3.0.1",
+         "marked": "^16.1.0",
+diff --git a/package.json b/package.json
+index 151f838..1674a01 100644
+--- a/package.json
++++ b/package.json
+@@ -35,6 +35,7 @@
+     "@angular/forms": "^20.1.0",
+     "@angular/platform-browser": "^20.1.0",
+     "@angular/router": "^20.1.0",
++    "@ant-design/icons-angular": "^20.0.0",
+     "better-sqlite3": "^12.2.0",
+     "electron-is-dev": "^3.0.1",
+     "marked": "^16.1.0",
+diff --git a/src/app/layout/layout.html b/src/app/layout/layout.html
+index 2d03c4b..1b1fe2c 100644
+--- a/src/app/layout/layout.html
++++ b/src/app/layout/layout.html
+@@ -1,31 +1,64 @@
+ <!-- <p>layout works!</p> -->
+-<nz-layout>
+-  <nz-sider nzCollapsible [nzWidth]="120" [nzCollapsedWidth]="40">
+-    <div class="logo">PZ</div>
+-    <ul nz-menu nzTheme="dark" nzMode="inline">
+-      @for (item of siderMenuItems; track item.label) {
+-      <li nz-menu-item>
+-        <a [routerLink]="item.route">
+-          <span nz-icon [nzType]="item.icon"></span>
+-          <span>{{ item.label }}</span>
+-        </a>
+-      </li>
+-      }
+-    </ul>
+-  </nz-sider>
+ 
++<nz-layout>
++  @if (!showSettings()) {
++    <nz-sider nzCollapsible [nzWidth]="120" [nzCollapsedWidth]="40">
++      <div class="logo">PZ</div>
++      <ul nz-menu nzTheme="dark" nzMode="inline">
++        @for (item of siderMenuItems; track item.label) {
++        <li nz-menu-item>
++          <a [routerLink]="item.route">
++            <span nz-icon [nzType]="item.icon"></span>
++            <span>{{ item.label }}</span>
++          </a>
++        </li>
++        }
++      </ul>
++    </nz-sider>
++  }
+   <nz-layout>
+-    <nz-header>
+-      <h1> 
++    <nz-header id="nzh1">
++      <h1>
+         {{ headerTitle }}
+       </h1>
+     </nz-header>
++    <nz-header id="nzh2">
++      <div class="header-left">Test Test Test</div>
++      <div class="header-right">
++        <button
++          nz-button
++          nzType="link"
++          nzShape="circle"
++          class="icon-btn"
++          nz-tooltip
++          nzTooltipTitle="Settings"
++          (click)="onSettingsClick()"
++        >
++          <span nz-icon nzType="setting" nzTheme="outline"></span>
++        </button>
++        <button
++          nz-button
++          nzType="link"
++          nzShape="circle"
++          class="icon-btn"
++          nz-tooltip
++          nzTooltipTitle="Exit"
++          (click)="onExitClick()"
++        >
++          <span nz-icon nzType="logout" nzTheme="outline"></span>
++        </button>
++      </div>
++    </nz-header>
+     <nz-content>
+       <!-- <div>Main Content Goes Here</div> -->
+-       <router-outlet /> 
++      @if (showSettings()) {
++      <settings (closed)="onSettingsClosed()" />
++      } @else {
++      <router-outlet />
++      }
+     </nz-content>
+     <nz-footer>
+-        {{ footerContent }}
++      {{ footerContent }}
+     </nz-footer>
+   </nz-layout>
+ </nz-layout>
+diff --git a/src/app/layout/layout.scss b/src/app/layout/layout.scss
+index a83f64f..647a0e7 100644
+--- a/src/app/layout/layout.scss
++++ b/src/app/layout/layout.scss
+@@ -3,19 +3,58 @@
+   margin: 16px;
+   color:aquamarine
+ }
+-
+ nz-header {
++  height: 40px !important;
+   display: flex;
+   align-items: center;
+   padding: 0 24px;
++  background: #001529; // optional: match Ant Design default
+ }
+ 
+-nz-header h1 {
++/* First header (nzh1) */
++#nzh1 h1 {
+   margin: 0;
+   font-size: 20px;
+-  color:aquamarine
++  color: aquamarine;
+ }
+ 
++/* Second header (nzh2) */
++#nzh2 {
++  display: flex;
++  justify-content: space-between; /* left text & right icons */
++  align-items: center;
++  padding: 0 24px;
++  font-size: 14px;
++  color: rgb(167, 199, 188);
++}
++
++#nzh2 .header-left {
++  font-size: 14px;
++  color: rgb(167, 199, 188);
++}
++
++#nzh2 .header-right {
++  display: flex;
++  align-items: center;
++  gap: 8px; /* spacing between icons */
++}
++
++.icon-btn {
++  padding: 0;
++  border: none;
++  color: rgb(167, 199, 188);
++  font-size: 16px;
++  background: transparent;
++  cursor: pointer;
++  transition: color 0.2s ease;
++}
++
++.icon-btn:hover {
++  color: #ffffff; /* highlight on hover */
++}
++
++
++
+ 
+ ::ng-deep .ant-layout-sider-trigger {
+   background: #001529;
+@@ -23,7 +62,6 @@ nz-header h1 {
+ }
+ 
+ 
+-
+ ::ng-deep .ant-layout-sider-children {
+   padding: 0 !important;
+ }
+diff --git a/src/app/layout/layout.ts b/src/app/layout/layout.ts
+index eb26868..70acee9 100644
+--- a/src/app/layout/layout.ts
++++ b/src/app/layout/layout.ts
+@@ -1,31 +1,62 @@
+-import { Component } from '@angular/core';
+-import { NzLayoutModule } from 'ng-zorro-antd/layout';
+-import { NzMenuModule } from 'ng-zorro-antd/menu';
+-import { NzIconModule } from 'ng-zorro-antd/icon';
+-import { SiderMenuItems } from '../appObjects/angObjects';
++import { Component, inject, signal, ViewChild } from '@angular/core';
+ import { RouterModule } from '@angular/router';
++import { SiderMenuItems } from '../appObjects/angObjects';
++import { BackEnd } from '../shared/services/back-end';
++import { Settings } from '../settings/settings';
+ 
+ 
++import { NzLayoutModule } from 'ng-zorro-antd/layout';
++import { NzMenuModule } from 'ng-zorro-antd/menu';
++import { NzButtonModule } from 'ng-zorro-antd/button';
++import { NzIconModule, provideNzIcons } from 'ng-zorro-antd/icon';
+ 
+ @Component({
+   selector: 'app-layout',
+   imports: [
+     RouterModule,
+-    NzLayoutModule, 
+-    NzMenuModule, 
+-    NzIconModule],
++    Settings,
++    NzLayoutModule,
++    NzMenuModule,
++    NzIconModule,
++    NzButtonModule,
++  ],
+   templateUrl: './layout.html',
+-  styleUrl: './layout.scss'
++  styleUrl: './layout.scss',
+ })
+ export class Layout {
+-
+   public siderMenuItems = SiderMenuItems;
+   public headerTitle = 'MEDIUM Scrapper';
+   public footerContent = '© 2025 Panos Zafiropoulos. All rights reserved.';
+-  
++
++  private backService = inject(BackEnd);
++  public showSettings = signal(false);
+   ngOnInit(): void {
+     document.title = this.headerTitle;
+   }
+ 
++  onSettingsClick(): void {
++    // this.showSettings.set(true);
++    this.showSettings.set(!this.showSettings());
++    console.log('⚙️ Settings button clicked');
++    // Add your logic, e.g., open settings modal
++  }
++
++
++  onSettingsClosed() {
++    this.showSettings.set(false);
++  }
++
++
++  onExitClick(): void {
++    console.log('🚪 Exit button clicked');
++    this.backService.quitApp();
++    // Add your logic, e.g., call logout service
++  }
++
++
++  aaa() {
++    console.log('Sider Menu Item clicked!');
++  }
++
+ 
+ }
+diff --git a/src/app/shared/services/back-end.ts b/src/app/shared/services/back-end.ts
+index 6f7c5a9..e702465 100644
+--- a/src/app/shared/services/back-end.ts
++++ b/src/app/shared/services/back-end.ts
+@@ -12,11 +12,9 @@ export class BackEnd {
+   //   ) as Promise<string>;
+   // }
+ 
+-  getPropertyValueBySubstring(key: string, substring: string): Promise<string> {
+-    return this.ipcInvoke<string>('get-property-by-substring', key, substring);
+-  }
+ 
+-  // Generic invoke wrapper (helper function) to avoid repeating 
++
++  // Generic invoke wrapper (helper function) to avoid repeating
+   // the '... as Promise<string>' adition in return commands, everywhere
+   //-------------------------------------------------------------------------
+   // function ipcInvoke<T>(channel: string, ...args: unknown[]): Promise<T> {
+@@ -25,4 +23,21 @@ export class BackEnd {
+   private ipcInvoke<T>(channel: string, ...args: unknown[]): Promise<T> {
+     return window.electronAPI.invoke(channel, ...args) as Promise<T>;
+   }
++
++
++
++  getPropertyValueBySubstring(key: string, substring: string): Promise<string> {
++    return this.ipcInvoke<string>('get-property-by-substring', key, substring);
++  }
++
++
++
++  getPropertyValueByKey(key: string): Promise<string | null> {
++    const result = this.ipcInvoke<string>('get-config-property-by-key', key);
++    return result;
++  }
++
++  quitApp() {
++    return this.ipcInvoke('app:quit');
++  }
+ }
+diff --git a/src/app/sqlite-urls/sqlite-urls.html b/src/app/sqlite-urls/sqlite-urls.html
+index 0bc6746..17bcf25 100644
+--- a/src/app/sqlite-urls/sqlite-urls.html
++++ b/src/app/sqlite-urls/sqlite-urls.html
+@@ -1,8 +1,9 @@
+ <!-- -------------------------------------------------- -->
+ <div class="text-area-container">
+   <label class="textarea-label">SQLite File Name:</label>
++  <label class="text-label">{{sqliteFileName()}}</label>
+ 
+-  <div class="input-button-row">
++  <!-- <div class="input-button-row">
+     <input
+       type="text"
+       nz-input
+@@ -14,7 +15,7 @@
+     <button nz-button nzType="primary" (click)="onGetSqliteFile()">
+       SQLite File...
+     </button>
+-  </div>
++  </div> -->
+ 
+ 
+   <!-- -------------------------------------------------- -->
+@@ -111,11 +112,11 @@
+       nz-button
+       nzType="primary"
+       [disabled]="
+-        scrappedDataArray().length === 0 &&
+-        scrappedDataArrayString().length === 0 &&
+-        sqliteFileName.length === 0
++        selectedFolderId.length === 0 &&
++        importedUrlsArrayString().length === 0 &&
++        scrappedDataArrayString().length === 0 
+       "
+-      (click)="onClearScrapedData()"
++      (click)="onClearAll()"
+     >
+       Clear All
+     </button>
+diff --git a/src/app/sqlite-urls/sqlite-urls.scss b/src/app/sqlite-urls/sqlite-urls.scss
+index 645b425..0de284f 100644
+--- a/src/app/sqlite-urls/sqlite-urls.scss
++++ b/src/app/sqlite-urls/sqlite-urls.scss
+@@ -37,6 +37,13 @@
+   // margin-bottom: 8px;
+ }
+ 
++.text-label {
++  color:cornflowerblue;
++  // font-size: 0.9rem;
++  font-size: small;
++  margin-bottom: 12px;
++  // border: .1px solid #4da6ff;
++}
+ 
+ .simple-input-row {
+   display: flex;
+diff --git a/src/app/sqlite-urls/sqlite-urls.ts b/src/app/sqlite-urls/sqlite-urls.ts
+index 9812a6e..b0da5a0 100644
+--- a/src/app/sqlite-urls/sqlite-urls.ts
++++ b/src/app/sqlite-urls/sqlite-urls.ts
+@@ -71,10 +71,10 @@ export class SqliteUrls {
+   private sqliteFullPathName: string = '';
+ 
+   public treeNodes: NzTreeNodeOptions[] = [];
+-  public selectedFolderId?: string;
++  public selectedFolderId: string = '';
+   public fullSelectedNodePathLabel = signal<string>('Bookmark Folder Name');
+   private selectedfolderNodeId: number = -1;
+-  private countedUniqueLinks = signal<number>(-1);
++  // private countedUniqueLinks = signal<number>(-1);
+   public imoprtedUrlsLabel = signal<string>('Imported URLs');
+ 
+ 
+@@ -134,6 +134,7 @@ export class SqliteUrls {
+ 
+ 
+ onTreeSelectFolderChange(selectedId: string) {
++  this.selectedFolderId = selectedId;
+   const result = this.findTreeSelectNodeWithAncestors(this.treeNodes, selectedId);
+ 
+   if (!result) {
+@@ -399,11 +400,11 @@ private findTreeSelectNodeWithAncestors(
+ 
+ 
+ 
+-  onClearScrapedData() {
++  onClearAll() {
+     this.scrappedDataArray.set([]); // Clear the Scraped Data array
+     this.scrappedDataArrayString.set(''); // Clear the string representation of the Scraped Data array
+     this.importedUrlsArrayString.set(''); // Clear the imported URLs
+-    this.sqliteFileName.set('');
++    this.selectedFolderId = '';
+   }
+ 
+   onCopyScrapedData() {
+diff --git a/src/main.ts b/src/main.ts
+index 532fff0..e0c2ea6 100644
+--- a/src/main.ts
++++ b/src/main.ts
+@@ -6,6 +6,8 @@ import { appRoutes } from './app/app.routes';
+ 
+ import { NzModalModule } from 'ng-zorro-antd/modal';
+ import { importProvidersFrom } from '@angular/core';
++import { provideNzIcons } from 'ng-zorro-antd/icon';
++import { LogoutOutline, SettingOutline } from '@ant-design/icons-angular/icons';
+ 
+ 
+ // bootstrapApplication(App, appConfig)
+@@ -17,6 +19,7 @@ bootstrapApplication(App, {
+     ...(appConfig.providers || []),
+     provideRouter(appRoutes, withHashLocation()),
+     importProvidersFrom(NzModalModule),
++    provideNzIcons([SettingOutline, LogoutOutline])
+ 
+   ]
+ }).catch((err) => console.error(err));
+\ No newline at end of file
