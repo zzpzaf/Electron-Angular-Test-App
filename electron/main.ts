@@ -1,4 +1,4 @@
-import { type IpcMainInvokeEvent, dialog } from 'electron';
+import { HandlerDetails, type IpcMainInvokeEvent, dialog } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import {
@@ -26,6 +26,7 @@ import {
 } from './dbs/sqlite/queries';
 import { htmlToMarkdown } from './processes/scrappers/page-converters';
 // import { handleOpenFile, handleDroppedFile } from './helpers/electron-utils';
+import { shell } from 'electron';
 
 const isDev = require('electron-is-dev');
 
@@ -50,6 +51,30 @@ function createWindow() {
       // sandbox: false,          // Must be false to expose `file.path`
     },
   });
+
+
+
+
+  // Intercept an external link (https://...) and open it, in user’s default browser instead
+  mainAppWin.webContents.setWindowOpenHandler((details: HandlerDetails) => {
+    const { url } = details;
+    // Open all non-local URLs in the default browser
+    if (!url.startsWith('file://') && !url.startsWith('http://localhost')) {
+      shell.openExternal(url);
+      return { action: 'deny' };
+    }
+    return { action: 'allow' };
+  });
+  mainAppWin.webContents.on('will-navigate', (event: any, url: string) => {
+    if (!url.startsWith('file://') && !url.startsWith('http://localhost')) {
+      event.preventDefault();
+      shell.openExternal(url);
+    }
+  });
+
+
+
+
 
   const angularDistPath = path.join(
     process.cwd(),
@@ -338,14 +363,12 @@ ipcMain.handle('open-component-window', (event: any, data: any) => {
   });
 
   // Always load from dist folder since we are using Option 1 (no dev server)
-  newWin.loadFile(
-    path.join(__dirname, '../electronang1/browser/index.html'), 
-    { hash: '/popup-preview' }
-  );
+  newWin.loadFile(path.join(__dirname, '../electronang1/browser/index.html'), {
+    hash: '/popup-preview',
+  });
 
   // Send markdown data to popup after load
   newWin.webContents.once('did-finish-load', () => {
     newWin.webContents.send('mark-data', data);
   });
 });
-
