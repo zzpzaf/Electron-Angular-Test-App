@@ -6,16 +6,30 @@ import {
   scrapeList,
   collectPostsFromUrlTabs,
 } from './processes/scrappers/scrape-functions';
-import { getConfigProperty, getFileData, getPropertyValueBySubstring, handleSaveScrappedData, selectFolder } from './helpers/electron-utils';
+import {
+  getConfigProperty,
+  getFileData,
+  getPropertyValueBySubstring,
+  handleSaveMDFile,
+  handleSaveScrappedData,
+  selectFolder,
+} from './helpers/electron-utils';
 import { listURLData } from '../shared/projectObjects/varObjects';
 import { getFileFullPathName } from './helpers/electron-utils';
-import { getSubfoldersByParentFolderName, getFolderContentsByParentFolderName, findFoldersByTitle, getFolderContentsByParentFolderNameAndOccurence, getFolderContentsById, countUniqueLinksByFolderId } from './dbs/sqlite/queries';
+import {
+  getSubfoldersByParentFolderName,
+  getFolderContentsByParentFolderName,
+  findFoldersByTitle,
+  getFolderContentsByParentFolderNameAndOccurence,
+  getFolderContentsById,
+  countUniqueLinksByFolderId,
+} from './dbs/sqlite/queries';
+import { htmlToMarkdown } from './processes/scrappers/page-converters';
 // import { handleOpenFile, handleDroppedFile } from './helpers/electron-utils';
 
 const isDev = require('electron-is-dev');
 
 const { app, BrowserWindow, ipcMain } = require('electron');
-
 
 let mainAppWin: any;
 
@@ -92,16 +106,15 @@ app.on('window-all-closed', () => {
 // Custom IPC handlers
 // -----------------------------------------------------------------
 
-
 ipcMain.handle('app:quit', (event: any) => {
   // Close all windows first (usually app.quit() will do it anyway)
-  BrowserWindow.getAllWindows().forEach((w: InstanceType<typeof BrowserWindow>) => w.close());
-  app.quit();            // emits before-quit / will-quit, lets you clean up
+  BrowserWindow.getAllWindows().forEach(
+    (w: InstanceType<typeof BrowserWindow>) => w.close()
+  );
+  app.quit(); // emits before-quit / will-quit, lets you clean up
   // If you really must force it (not recommended normally):
   // app.exit(0);
 });
-
-
 
 ipcMain.handle(
   'scrape-article',
@@ -121,12 +134,25 @@ ipcMain.handle(
   }
 );
 
-
 ipcMain.handle(
   'read-markdown',
   async (event: IpcMainInvokeEvent, fileName: string) => {
     const filePath = path.join(__dirname, 'resources', 'markdown', fileName);
     return await fs.promises.readFile(filePath, 'utf8');
+  }
+);
+
+ipcMain.handle(
+  'convert-html-to-markdown',
+  async (event: any, args: { input: string; isRawHtml: boolean }) => {
+    const { input, isRawHtml } = args;
+
+    try {
+      const markdown = await htmlToMarkdown(input, isRawHtml);
+      return { success: true, markdown };
+    } catch (error: any) {
+      return { success: false, error: error.message || 'Unknown error' };
+    }
   }
 );
 
@@ -138,6 +164,13 @@ ipcMain.handle(
     urlObj?: listURLData
   ) => {
     return await handleSaveScrappedData(scrappedData, urlObj);
+  }
+);
+
+ipcMain.handle(
+  'save-md-file',
+  async (_event: IpcMainInvokeEvent, scrappedData: string, title?: string) => {
+    return await handleSaveMDFile(scrappedData, title);
   }
 );
 
@@ -191,13 +224,15 @@ ipcMain.handle('open-file-dialog', (_event: any, options: any) => {
 });
 
 ipcMain.handle('read-file-data', async (event: any, filePathName: string) => {
-  console.log('>===>> (read-file-data) - Reading Data from File: filePathName', filePathName);
+  console.log(
+    '>===>> (read-file-data) - Reading Data from File: filePathName',
+    filePathName
+  );
   // return getFileData(filePathName); // pass options to the handler
   const data = await getFileData(filePathName);
   // console.log('>===>> (read-file-data) - Data obtained from File: ', data);
   return data; // return value sent back to renderer
 });
-
 
 ipcMain.handle('select-folder', async (event: any, defaultPath?: string) => {
   if (mainAppWin) {
@@ -206,29 +241,37 @@ ipcMain.handle('select-folder', async (event: any, defaultPath?: string) => {
   return { success: false, message: 'Main window not available' };
 });
 
-ipcMain.handle('get-property-by-substring', (event: any, key: string, substring: string) => {
-  return getPropertyValueBySubstring(key, substring);
-});
-
-ipcMain.handle('get-config-property-by-key', async (event: any, key: string) => {
-  try {
-    const value: string | null = getConfigProperty(key);
-    return value ;
-  } catch (err) {
-    console.log('Error getting property by key: ', err);
-    return null;
+ipcMain.handle(
+  'get-property-by-substring',
+  (event: any, key: string, substring: string) => {
+    return getPropertyValueBySubstring(key, substring);
   }
-});
+);
+
+ipcMain.handle(
+  'get-config-property-by-key',
+  async (event: any, key: string) => {
+    try {
+      const value: string | null = getConfigProperty(key);
+      return value;
+    } catch (err) {
+      console.log('Error getting property by key: ', err);
+      return null;
+    }
+  }
+);
 
 // ipcMain.handle('sqlite:open-connection1', (event: any, filePath: string) => {
 //   return getConnection1(filePath);
 // });
 
-
 ipcMain.handle(
   'sqlite:get-subfolders-tree',
-  (event: any, sqliteFilePatName: string, field1Name: string,  ) => {
-    const qryResult = getSubfoldersByParentFolderName(sqliteFilePatName, field1Name);
+  (event: any, sqliteFilePatName: string, field1Name: string) => {
+    const qryResult = getSubfoldersByParentFolderName(
+      sqliteFilePatName,
+      field1Name
+    );
     return qryResult;
   }
 );
@@ -236,9 +279,12 @@ ipcMain.handle(
 ipcMain.handle(
   'sqlite:get-folder-contents',
   (event: any, sqliteFilePatName: string, rootFolder1Name: string) => {
-    const qryResult = getFolderContentsByParentFolderName(sqliteFilePatName, rootFolder1Name);
+    const qryResult = getFolderContentsByParentFolderName(
+      sqliteFilePatName,
+      rootFolder1Name
+    );
     return qryResult;
-  }  
+  }
 );
 
 ipcMain.handle(
@@ -246,7 +292,7 @@ ipcMain.handle(
   (event: any, sqliteFilePatName: string, id: number) => {
     const qryResult = getFolderContentsById(sqliteFilePatName, id);
     return qryResult;
-  }  
+  }
 );
 
 ipcMain.handle(
@@ -254,20 +300,52 @@ ipcMain.handle(
   (event: any, sqliteFilePatName: string, id: number) => {
     const qryResult = countUniqueLinksByFolderId(sqliteFilePatName, id);
     return qryResult;
-  }  
+  }
 );
 
 ipcMain.handle(
-  'sqlite:find-folders-by-title', (event: any, sqliteFilePathName: string, ftitle: string) => {
-  return findFoldersByTitle(sqliteFilePathName, ftitle);
-});
+  'sqlite:find-folders-by-title',
+  (event: any, sqliteFilePathName: string, ftitle: string) => {
+    return findFoldersByTitle(sqliteFilePathName, ftitle);
+  }
+);
 
 ipcMain.handle(
   'sqlite:get-folder-contents-by-folderName-and-occurence',
-  (event: any, sqliteFilePatName: string, rootFolder1Name: string, occurence: number) => {
-    const qryResult = getFolderContentsByParentFolderNameAndOccurence(sqliteFilePatName, rootFolder1Name, occurence);
+  (
+    event: any,
+    sqliteFilePatName: string,
+    rootFolder1Name: string,
+    occurence: number
+  ) => {
+    const qryResult = getFolderContentsByParentFolderNameAndOccurence(
+      sqliteFilePatName,
+      rootFolder1Name,
+      occurence
+    );
     return qryResult;
-  }  
+  }
 );
 
+// Not-used so far ....
+ipcMain.handle('open-component-window', (event: any, data: any) => {
+  const newWin = new BrowserWindow({
+    width: 750,
+    height: 800,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+    },
+  });
+
+  // Always load from dist folder since we are using Option 1 (no dev server)
+  newWin.loadFile(
+    path.join(__dirname, '../electronang1/browser/index.html'), 
+    { hash: '/popup-preview' }
+  );
+
+  // Send markdown data to popup after load
+  newWin.webContents.once('did-finish-load', () => {
+    newWin.webContents.send('mark-data', data);
+  });
+});
 

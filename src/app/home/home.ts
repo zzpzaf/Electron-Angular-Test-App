@@ -1,22 +1,6 @@
-import { Component, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { marked } from 'marked';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
-
-// declare global {
-//   interface Window {
-//     electronAPI: {
-//       readMarkdownFile(fileName: string): string;
-//     };
-//   }
-// }
-
-// declare global {
-//   interface Window {
-//     electronAPI: {
-//       readMarkdownFile(fileName: string): Promise<string>;
-//     };
-//   }
-// }
 
 @Component({
   selector: 'app-home',
@@ -29,8 +13,9 @@ export class Home {
 
 
   public safeHtmlContent = signal<SafeHtml | null>(null);
+  private sanitizer = inject(DomSanitizer);
 
-  constructor(private sanitizer: DomSanitizer) {}
+  // constructor(private sanitizer: DomSanitizer) {}
   
 
   async ngOnInit() {
@@ -57,4 +42,4 @@ export class Home {
 
 
 
-// Use the electronAPI to read a markdown file
+

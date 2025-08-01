@@ -138,6 +138,58 @@ export async function handleSaveScrappedData(
   }
 }
 
+
+// --------------------------------------------------------------------------
+
+export async function handleSaveMDFile(
+  data: string,
+  title?: string
+): Promise<{
+  success: boolean;
+  message: string;
+  error?: string;
+}> {
+  let fileNameFirstPrefix = 'post_markdown_file_';
+  if (title && title.length > 0) fileNameFirstPrefix = title + '_';
+
+  try {
+    const filenamePrefix =
+      fileNameFirstPrefix + new Date().toISOString().replace(/:/g, '-');
+    // const lastFolder = getLastSavedFolder();
+    const lastFolder = getConfigProperty<string>('lastSavedFolder');
+
+    const { filePath, canceled } = await dialog.showSaveDialog({
+      title: 'Save Markdown File',
+      defaultPath: lastFolder
+        ? path.join(lastFolder, `${filenamePrefix}.md`)
+        : path.join(app.getPath('documents'), `${filenamePrefix}.md`),
+      filters: [{ name: 'Markdown (MD) Files', extensions: ['md'] }],
+    });
+
+    if (canceled || !filePath) {
+      return { success: false, message: 'Save canceled' };
+    }
+
+    await fs.promises.writeFile(filePath, data, 'utf8');
+
+    // setLastSavedFolder(path.dirname(filePath));
+    setConfigProperties({ lastSavedFolder: path.dirname(filePath) });
+
+    return { success: true, message: 'Markdown File saved' };
+  } catch (error) {
+    console.error('Error saving Markdown File:', error);
+    return {
+      success: false,
+      message: 'Error saving Markdown File',
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+
+
+
+
 // --------------------------------------------------------------------------
 export async function getFileFullPathName(
   mainWindow: BrowserWindow,

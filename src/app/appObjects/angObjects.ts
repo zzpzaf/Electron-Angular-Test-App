@@ -9,6 +9,7 @@ export const SiderMenuItems: SiderMenuItem[] = [
     { label: 'URL', icon: '', route: '/article' },
     { label: 'File URLs', icon: '', route: '/urlsfile' },
     { label: 'SQLite URLs', icon: '', route: '/sqliteurls' },
+    { label: 'Markdown URLs', icon: '', route: '/markdown' },
     { label: 'Help', icon: '', route: '/help' }
 ];
 

@@ -12,25 +12,10 @@ import { extractFirstPathPart } from '../../../shared/utils/shared-utils';
 import { BrowserWindow } from 'electron';
 
 import pLimit from 'p-limit';
+import { BROWSER_URLPORT, MAX_ARTICLES_NUMBER, SCROLL_DELAY } from '../constants';
 
 // Apply stealth plugin
 puppeteer.use(StealthPlugin());
-
-// ******************************************************************
-// Constants
-// ******************************************************************
-const BROWSER_URLPORT = 'http://127.0.0.1:9222';
-// Delay between clicks (in ms)
-const DELAY_BETWEEN_CLICKS = 1000;
-// Number of retry attempts for clicks
-const RETRY_COUNT = 3;
-// Auto-scroll delay between scrolls (in ms)
-const SCROLL_DELAY = 1500;
-// Max attempts to scroll with no new articles (stops if no new articles after N tries)
-const MAX_ATTEMPTS_WITHOUT_NEW = 5;
-// Maximum number of articles to load on the page (prevents infinite scroll)
-const MAX_ARTICLES_NUMBER = 250;
-
 
 
 // ========================================================================================================
@@ -42,6 +27,7 @@ const MAX_ARTICLES_NUMBER = 250;
 // ========================================================================================================
 
 export async function scrapeArticleBasic(url: string): Promise<PostData> {
+ 
   // Connect to an already running Chrome instance with remote debugging enabled
   const browser = await puppeteer.connect({
     browserURL: BROWSER_URLPORT,
@@ -462,6 +448,40 @@ async function autoScrollToEnd(
 async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+
+
+
+/**
+ * 250731
+ * Automatically scrolls the page to the bottom to trigger lazy-loading
+ * @param page Puppeteer Page instance
+ * @param distance Pixels to scroll each step
+ * @param delay Delay (ms) between each scroll step
+ */
+export async function autoScrollArticlePage(page: import('puppeteer').Page, distance = 200, delay = 100): Promise<void> {
+  await page.evaluate(
+    async (scrollDistance: number, stepDelay: number) => {
+      await new Promise<void>((resolve) => {
+        let totalHeight = 0;
+        const timer = setInterval(() => {
+          const { scrollHeight } = document.body;
+          window.scrollBy(0, scrollDistance);
+          totalHeight += scrollDistance;
+
+          if (totalHeight >= scrollHeight) {
+            clearInterval(timer);
+            resolve();
+          }
+        }, stepDelay);
+      });
+    },
+    distance,
+    delay
+  );
+}
+
+
 
 // -----------------------------------------------------------------------------------------
 // Helper Function to wait for user input

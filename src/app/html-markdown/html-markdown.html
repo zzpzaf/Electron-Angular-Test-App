@@ -1,0 +1,91 @@
+<form
+  nz-form
+  nzLayout="inline"
+  [formGroup]="linkScrapeForm"
+  class="login-form"
+  (ngSubmit)="submitForm()"
+>
+  <nz-form-item class="login-form-spacer"></nz-form-item>
+
+  <nz-form-item class="login-form-input">
+    <nz-form-control
+      nzErrorTip="Please input the URL"
+      nzExtra="Enter/type, paste or drop an Article or List URL here"
+    >
+      <nz-input-group>
+        <input
+          type="text"
+          nz-input
+          formControlName="url"
+          placeholder="URL"
+          (drop)="onDrop($event)"
+          (dragover)="onDragOver($event)"
+        />
+      </nz-input-group>
+    </nz-form-control>
+  </nz-form-item>
+
+  <nz-form-item>
+    <label nz-checkbox formControlName="add">
+      <span>Add</span>
+    </label>
+  </nz-form-item>
+
+  <nz-form-item>
+    <button nz-button [nzType]="'primary'">Convert</button>
+  </nz-form-item>
+</form>
+
+<!-- Separator -->
+<div class="login-form-separator"></div>
+
+<!-- Textarea / Preview container -->
+<div class="text-area-container">
+  @if (preview) {
+    <div class="markdown-container" [innerHTML]="safeHtmlContent()"></div>
+  } @else {
+    <textarea
+      nz-input
+      [(ngModel)]="markdownString"
+      class="stretch-textarea"
+    ></textarea>
+  }
+
+  <div class="button-container">
+    <button
+      nz-button
+      nzType="primary"
+      [disabled]="markdownString.length === 0 && linkURL().length === 0"
+      (click)="onPreview()"
+    >
+      {{ preview ? 'Markdown' : 'Preview' }}
+    </button>
+
+    <button
+      nz-button
+      nzType="primary"
+      [disabled]="markdownString.length === 0 && linkURL().length === 0"
+      (click)="onClear()"
+    >
+      Clear
+    </button>
+
+    <button
+      nz-button
+      nzType="primary"
+      [disabled]="markdownString().length === 0"
+      (click)="onCopy()"
+    >
+      Copy
+    </button>
+
+    <button
+      nz-button
+      nzType="primary"
+      [disabled]="markdownString().length === 0"
+      (click)="onSave()"
+    >
+      Save
+    </button>
+  </div>
+</div>
