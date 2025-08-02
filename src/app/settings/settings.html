@@ -5,27 +5,52 @@
 
   <div class="config-content">
     <form [formGroup]="settingsForm" (ngSubmit)="onSave()">
+
       <!-- 🔹 Field 1: sqliteFullPathName -->
       <div class="form-group">
-        <label for="sqliteFullPathName">
-          Full Path Name of the FireFox/Floorp 'places.sqlite' file:
+        <label for="orgFloorpsqliteFullPathName">
+          Full Path Name of the org/default profile FireFox/Floorp 'places.sqlite' file:
         </label>
 
         <div class="input-button-row">
           <input
             nz-input
-            id="sqliteFullPathName"
-            formControlName="sqliteFullPathName"
+            id="orgFloorpsqliteFullPathName"
+            formControlName="orgFloorpsqliteFullPathName"
             placeholder="Enter/Get Full pathname"
           />
 
-          <button nz-button nzType="primary" type="button" (click)="onGetFile()">
+          <button nz-button nzType="primary" type="button" (click)="onGetOrgSqliteFile()">
             Get File...
           </button>
         </div>
       </div>
 
-      <!-- 🔹 Field 2: outputFolder -->
+      <!-- 🔹 Field 2: sqliteFullPathName -->
+      <div class="form-group">
+        <label for="workingSqliteFullPathName">
+          Full Path Name of the working copy of the FireFox/Floorp 'places.sqlite' file:
+        </label>
+
+        <div class="input-button-row">
+          <input
+            nz-input
+            id="workingSqliteFullPathName"
+            formControlName="workingSqliteFullPathName"
+            placeholder="Enter/Get Full pathname"
+          />
+
+          <button nz-button nzType="primary" type="button" (click)="onGetWorkingSqliteFile()">
+            Get File...
+          </button>
+
+          <button nz-button nzType="primary" type="button" (click)="onCopyOrgSqliteFile()">
+            Copy Org...
+          </button>
+        </div>
+      </div>
+
+      <!-- 🔹 Field 3: outputFolder -->
       <div class="form-group">
         <label for="outputFolder">
           Output Folder for File(s) Saving:
@@ -69,7 +94,7 @@
             [disabled]="settingsForm.invalid"
             type="submit"
           >
-            Submit
+            Save
           </button>
         </div>
       </div>

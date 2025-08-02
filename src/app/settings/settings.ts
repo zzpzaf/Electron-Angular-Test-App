@@ -30,32 +30,66 @@ export class Settings {
   public closed = output<void>(); // Output signal
   public fileName: string = '';
   private backService = inject(BackEnd);
-  private sqliteFullPathName: string = '';
+  private workingPlacesSqliteFullPathName: string = '';
   // public sqliteFileName = signal<string>('');
   private lastSavedFolder: string = '';
 
   constructor(private fb: FormBuilder) {
-    this.getSqliteFullPathNameProperty();
+    this.getSqliteFullPathNameProperty('orgFloorpProfilePlacesSqliteFile');
+    this.getSqliteFullPathNameProperty(
+      'workingCopyOfFloorpProfilePlacesSqliteFile'
+    );
     this.getLastSavedFolderProperty();
     this.formInitialization();
   }
 
   formInitialization(): void {
     this.settingsForm = this.fb.group({
-      sqliteFullPathName: ['', Validators.required],
+      orgFloorpsqliteFullPathName: ['', Validators.required],
+      workingSqliteFullPathName: ['', Validators.required],
       outputFolder: ['', Validators.required],
     });
   }
 
-  onGetFile() {
-    const fullPathName = this.settingsForm.get('sqliteFullPathName')?.value;
+  onGetOrgSqliteFile() {
+    const fullPathName = this.settingsForm.get(
+      'orgFloorpsqliteFullPathName'
+    )?.value;
     console.log(
-      'Full Path Name: ',
-      this.settingsForm.get('sqliteFullPathName')?.value
+      'Original places.sqlite Full Path Name: ',
+      this.settingsForm.get('orgFloorpsqliteFullPathName')?.value
     );
-    this.getFullPathNameOfSqliteFile().catch((err: any) =>
+    this.getFullPathNameOfSqliteFile('orgFloorpProfilePlacesSqliteFile').catch(
+      (err: any) => console.error('Unexpected error calling Electron:', err)
+    );
+  }
+
+  onGetWorkingSqliteFile() {
+    const fullPathName = this.settingsForm.get(
+      'workingSqliteFullPathName'
+    )?.value;
+    console.log(
+      'Working copy of the places.sqlite Full Path Name: ',
+      this.settingsForm.get('workingSqliteFullPathName')?.value
+    );
+    this.getFullPathNameOfSqliteFile(
+      'workingCopyOfFloorpProfilePlacesSqliteFile'
+    ).catch((err: any) =>
       console.error('Unexpected error calling Electron:', err)
     );
+  }
+
+  async onCopyOrgSqliteFile() {
+    try {
+      const source = this.settingsForm.get('orgFloorpsqliteFullPathName')?.value;   //'/Users/me/source/file.md';
+      const destination = this.settingsForm.get('workingSqliteFullPathName')?.value;   //'/Users/me/destination/file.md';
+      if (!source || !destination) return;
+
+      const result = await this.backService.copyFile(source, destination);
+      console.log('Copy result:', result);
+    } catch (error) {
+      console.error('Error copying file:', error);
+    }
   }
 
   onGetFolder() {
@@ -72,7 +106,9 @@ export class Settings {
 
   get isFormFieldsEmpty(): boolean {
     const values = this.settingsForm.value;
-    return Object.values(values).every((val) => !val || (typeof val === 'string' && val.trim() === ''));
+    return Object.values(values).every(
+      (val) => !val || (typeof val === 'string' && val.trim() === '')
+    );
   }
 
   onSave() {
@@ -89,21 +125,24 @@ export class Settings {
     this.closed.emit(); // Tell parent (layout component) to close
   }
 
-  async getSqliteFullPathNameProperty() {
+  async getSqliteFullPathNameProperty(filePathProperty: string) {
     try {
-      this.sqliteFullPathName =
-        await this.backService.getPropertyValueBySubstring(
-          'lastObtainedFullPathname',
-          'places.sqlite'
-        );
-      console.log(
-        'lastObtainedFullPathname Property value:',
-        this.sqliteFullPathName
+      const placeSsqlitePath = await this.backService.getPropertyValueByKey(
+        // 'workingCopyOfFloorpProfilePlacesSqliteFile'
+        filePathProperty
       );
-      if (this.sqliteFullPathName.length > 0)
+      if (placeSsqlitePath)
+        console.log(filePathProperty, ' Property value: ', placeSsqlitePath);
+
+      if (filePathProperty === 'orgFloorpProfilePlacesSqliteFile')
         this.settingsForm
-          .get('sqliteFullPathName')
-          ?.setValue(this.sqliteFullPathName);
+          .get('orgFloorpsqliteFullPathName')
+          ?.setValue(placeSsqlitePath);
+
+      if (filePathProperty === 'workingCopyOfFloorpProfilePlacesSqliteFile')
+        this.settingsForm
+          .get('workingSqliteFullPathName')
+          ?.setValue(placeSsqlitePath);
     } catch (err) {
       console.error('Error retrieving property:', err);
     }
@@ -124,7 +163,9 @@ export class Settings {
     }
   }
 
-  private async getFullPathNameOfSqliteFile(): Promise<void> {
+  private async getFullPathNameOfSqliteFile(
+    pathProperty: string
+  ): Promise<void> {
     const dlgOptions = {
       title: 'Open .sqlite Files',
       filters: [{ name: 'SQLite Files', extensions: ['sqlite'] }],
@@ -132,6 +173,8 @@ export class Settings {
     try {
       const result = (await window.electronAPI.invoke(
         'open-file-dialog',
+        // 'workingCopyOfFloorpProfilePlacesSqliteFile',
+        pathProperty,
         dlgOptions
       )) as {
         success: boolean;
@@ -144,7 +187,14 @@ export class Settings {
 
       if (result.success && result.filePath) {
         // this.sqliteFileName.set(result.filePath!);
-        this.settingsForm.get('sqliteFullPathName')?.setValue(result.filePath!);
+        if (pathProperty === 'orgFloorpProfilePlacesSqliteFile')
+          this.settingsForm
+            .get('orgFloorpsqliteFullPathName')
+            ?.setValue(result.filePath!);
+        if (pathProperty === 'workingCopyOfFloorpProfilePlacesSqliteFile')
+          this.settingsForm
+            .get('workingSqliteFullPathName')
+            ?.setValue(result.filePath!);
       }
     } catch (err) {
       console.error('IPC open-file-dialog invoke failed:', err);

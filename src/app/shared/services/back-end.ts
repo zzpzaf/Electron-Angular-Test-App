@@ -25,17 +25,21 @@ export class BackEnd {
   }
 
 
+  copyFile(source: string, destination: string): Promise<{ success: boolean }> {
+    return this.ipcInvoke<{ success: boolean }>('copy-file', source, destination);
+  }
+
 
   getPropertyValueBySubstring(key: string, substring: string): Promise<string> {
     return this.ipcInvoke<string>('get-property-by-substring', key, substring);
   }
 
-
-
   getPropertyValueByKey(key: string): Promise<string | null> {
     const result = this.ipcInvoke<string>('get-config-property-by-key', key);
     return result;
   }
+
+
 
   quitApp() {
     return this.ipcInvoke('app:quit');

@@ -7,6 +7,7 @@ import {
   collectPostsFromUrlTabs,
 } from './processes/scrappers/scrape-functions';
 import {
+  copyFileAsync,
   getConfigProperty,
   getFileData,
   getPropertyValueBySubstring,
@@ -235,15 +236,11 @@ ipcMain.handle(
   }
 );
 
-// ipcMain.handle('open-file-dialog', () => {
-//   if (mainAppWin) {
-//     return handleOpenFile(mainAppWin); // return the promise directly
-//   }
-//   return { success: false, message: 'Main window not available' };
-// });
-ipcMain.handle('open-file-dialog', (_event: any, options: any) => {
+
+
+ipcMain.handle('open-file-dialog', (_event: any, defPathProperty: string, fdOptions: any) => {
   if (mainAppWin) {
-    return getFileFullPathName(mainAppWin, options); // pass options to the handler
+    return getFileFullPathName(mainAppWin, defPathProperty, fdOptions); // pass options to the handler
   }
   return { success: false, message: 'Main window not available' };
 });
@@ -264,6 +261,11 @@ ipcMain.handle('select-folder', async (event: any, defaultPath?: string) => {
     return await selectFolder(mainAppWin, defaultPath);
   }
   return { success: false, message: 'Main window not available' };
+});
+
+ipcMain.handle('copy-file', async (event: any, source: string, destination: string) => {
+  await copyFileAsync(source, destination);
+  return { success: true };
 });
 
 ipcMain.handle(

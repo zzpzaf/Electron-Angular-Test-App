@@ -16,16 +16,16 @@ import { BackEnd } from '../shared/services/back-end';
 import { NzTreeNodeOptions } from 'ng-zorro-antd/tree';
 import { NzTreeSelectModule } from 'ng-zorro-antd/tree-select';
 
-
 const rootFolderName = 'unfiled';
 
 function mapFolderNodesToTree(nodes: FolderNode[]): NzTreeNodeOptions[] {
   return nodes.map((n) => ({
     key: String(n.folder_id),
     // title: n.folder_name ?? '(untitled)',
-    title: (n.folder_name !== null && n.folder_name !== undefined)
-      ? n.folder_name + '-' + String(n.folder_id) 
-      : '(untitled)',
+    title:
+      n.folder_name !== null && n.folder_name !== undefined
+        ? n.folder_name + '-' + String(n.folder_id)
+        : '(untitled)',
     children: n.children ? mapFolderNodesToTree(n.children) : [],
     isLeaf: !n.children || n.children.length === 0,
   }));
@@ -68,7 +68,7 @@ export class SqliteUrls {
   private scrapper = inject(Articlebasicscraper);
 
   private backService = inject(BackEnd);
-  private sqliteFullPathName: string = '';
+  private workingPlacesSqliteFullPathName: string = '';
 
   public treeNodes: NzTreeNodeOptions[] = [];
   public selectedFolderId: string = '';
@@ -77,32 +77,31 @@ export class SqliteUrls {
   // private countedUniqueLinks = signal<number>(-1);
   public imoprtedUrlsLabel = signal<string>('Imported URLs');
 
-
   constructor() {
     this.getSqliteFullPathName();
     //this.showBookmarksFolderTree();
   }
 
-
-
-
   async getSqliteFullPathName() {
     try {
-      this.sqliteFullPathName =
-        await this.backService.getPropertyValueBySubstring(
-          'lastObtainedFullPathname',
-          'places.sqlite'
-        );
-      console.log('Property value:', this.sqliteFullPathName);
-      if (this.sqliteFullPathName.length > 0)
-        this.sqliteFileName.set(this.sqliteFullPathName);
+      // this.workingPlacesSqliteFullPathName =
+      //   await this.backService.getPropertyValueBySubstring(
+      //     'lastObtainedFullPathname',
+      //     'places.sqlite'
+      //   );
+      const workplacessqlite = await this.backService.getPropertyValueByKey(
+        'workingCopyOfFloorpProfilePlacesSqliteFile'
+      );
+      if (workplacessqlite)
+        this.workingPlacesSqliteFullPathName = workplacessqlite;
+      console.log('Property value:', this.workingPlacesSqliteFullPathName);
+      if (this.workingPlacesSqliteFullPathName.length > 0)
+        this.sqliteFileName.set(this.workingPlacesSqliteFullPathName);
       this.showBookmarksFolderTree();
     } catch (err) {
       console.error('Error retrieving property:', err);
     }
   }
-
-
 
   async showBookmarksFolderTree() {
     // const rootFolderName = 'Other Bookmarks';
@@ -131,60 +130,72 @@ export class SqliteUrls {
     ) as Promise<{ success: boolean; data?: FolderNode[]; error?: string }>;
   }
 
+  onTreeSelectFolderChange(selectedId: string) {
+    this.selectedFolderId = selectedId;
+    const result = this.findTreeSelectNodeWithAncestors(
+      this.treeNodes,
+      selectedId
+    );
 
+    if (!result) {
+      this.bookmarkFolder = '';
+      console.warn('Selected folder not found');
+      return;
+    }
 
-onTreeSelectFolderChange(selectedId: string) {
-  this.selectedFolderId = selectedId;
-  const result = this.findTreeSelectNodeWithAncestors(this.treeNodes, selectedId);
+    const { node, ancestors } = result;
+    const selectedNodeTitle = node.title ?? '';
+    this.bookmarkFolder = selectedNodeTitle;
+    this.selectedfolderNodeId = node.key as unknown as number;
+    const ancestorTitles = ancestors.map((a) => a.title).filter(Boolean);
+    console.log('Selected folder:', node.title);
+    const ansectorsString = ancestorTitles.join(' > ');
+    console.log('Ancestor path:', ansectorsString); // or use array directly
+    const fsnp =
+      ansectorsString.length > 0
+        ? ansectorsString + ' > ' + selectedNodeTitle
+        : selectedNodeTitle;
 
-  if (!result) {
-    this.bookmarkFolder = '';
-    console.warn('Selected folder not found');
-    return;
+    this.fullSelectedNodePathLabel.set(
+      'Bookmark Folder Name' + '  (' + fsnp + ')'
+    );
+
+    this.getNumberOfUniqueLinksOfFolder(
+      this.sqliteFileName(),
+      this.selectedfolderNodeId
+    );
+    this.getFolderLinksContentsById(this.sqliteFileName());
+
+    if (this.fullSelectedNodePathLabel.length > 0) {
+      this.importedUrlsArrayString.set('');
+      this.scrappedDataArray.set([]);
+      this.scrappedDataArrayString.set('');
+    }
   }
 
-  const { node, ancestors } = result;
-  const selectedNodeTitle  = node.title ?? '';
-  this.bookmarkFolder = selectedNodeTitle;
-  this.selectedfolderNodeId =  node.key as unknown as number;
-  const ancestorTitles = ancestors.map(a => a.title).filter(Boolean);
-  console.log('Selected folder:', node.title);
-  const ansectorsString = ancestorTitles.join(' > ');
-  console.log('Ancestor path:', ansectorsString); // or use array directly
-  const fsnp = (ansectorsString.length > 0 ? ansectorsString  + ' > ' +  selectedNodeTitle : selectedNodeTitle);
-  
-  this.fullSelectedNodePathLabel.set('Bookmark Folder Name' + '  (' + fsnp + ')' );
-
-  this.getNumberOfUniqueLinksOfFolder(this.sqliteFileName(),  this.selectedfolderNodeId)
-  this.getFolderLinksContentsById(this.sqliteFileName());
-
-  if (this.fullSelectedNodePathLabel.length > 0) {
-    this.importedUrlsArrayString.set('');
-    this.scrappedDataArray.set([]);
-    this.scrappedDataArrayString.set('');
-  }
-  
-}
-
-  private async getNumberOfUniqueLinksOfFolder(sqliteFile: string, folderId: number) {
+  private async getNumberOfUniqueLinksOfFolder(
+    sqliteFile: string,
+    folderId: number
+  ) {
     try {
-      const result = await window.electronAPI.invoke(
+      const result = (await window.electronAPI.invoke(
         'sqlite:get-number-unique-links-from-folder-by-id',
         sqliteFile,
         folderId
-      ) as { success: boolean; count?: number; error?: string };
+      )) as { success: boolean; count?: number; error?: string };
 
       if (result.success && result.count && result.count > 0) {
-          // this.countedUniqueLinks.set(result.count);
-          console.log('Number of Unique Links: ', result.count );
-          // this.fullSelectedNodePath.set(this.fullSelectedNodePath() + ' ( links: ' + result.count + ')');
-          this.imoprtedUrlsLabel.set('Imported URLs ' + ' (links: ' + result.count + ')');
+        // this.countedUniqueLinks.set(result.count);
+        console.log('Number of Unique Links: ', result.count);
+        // this.fullSelectedNodePath.set(this.fullSelectedNodePath() + ' ( links: ' + result.count + ')');
+        this.imoprtedUrlsLabel.set(
+          'Imported URLs ' + ' (links: ' + result.count + ')'
+        );
       }
     } catch (err) {
       console.error('IPC open-file-dialog invoke failed:', err);
     }
   }
-
 
   private findTreeSelectNodeByKey(
     nodes: NzTreeNodeOptions[],
@@ -200,35 +211,27 @@ onTreeSelectFolderChange(selectedId: string) {
     return undefined;
   }
 
-private findTreeSelectNodeWithAncestors(
-  nodes: NzTreeNodeOptions[],
-  key: string,
-  path: NzTreeNodeOptions[] = []
-): { node: NzTreeNodeOptions; ancestors: NzTreeNodeOptions[] } | undefined {
-  for (const n of nodes) {
-    const newPath = [...path, n];
-    if (n.key === key) {
-      return { node: n, ancestors: path };
+  private findTreeSelectNodeWithAncestors(
+    nodes: NzTreeNodeOptions[],
+    key: string,
+    path: NzTreeNodeOptions[] = []
+  ): { node: NzTreeNodeOptions; ancestors: NzTreeNodeOptions[] } | undefined {
+    for (const n of nodes) {
+      const newPath = [...path, n];
+      if (n.key === key) {
+        return { node: n, ancestors: path };
+      }
+      if (n.children) {
+        const result = this.findTreeSelectNodeWithAncestors(
+          n.children,
+          key,
+          newPath
+        );
+        if (result) return result;
+      }
     }
-    if (n.children) {
-      const result = this.findTreeSelectNodeWithAncestors(n.children, key, newPath);
-      if (result) return result;
-    }
+    return undefined;
   }
-  return undefined;
-}
-
-
-
-
-
-
-
-
-
-
-
-
 
   async onScrape(): Promise<void> {
     let loading = true;
@@ -260,13 +263,11 @@ private findTreeSelectNodeWithAncestors(
     }
   }
 
-
   // onGetBookmarkFolderUrls() {
   //   if (this.bookmarkFolder.length === 0) return;
   //   //this.getContentsFromBookmarksFolder(this.sqliteFileName());
   //   this.getFolderLinksContentsById(this.sqliteFileName());
   // }
-
 
   onGetSqliteFile() {
     this.getFileFromElectron().catch((err) =>
@@ -347,8 +348,6 @@ private findTreeSelectNodeWithAncestors(
     }
   }
 
-
-
   private async getFolderLinksContentsById(sqliteFilePathName: string) {
     // const bookmarksFolderName: string = this.bookmarkFolder; //'Reactive-Material';
 
@@ -395,10 +394,6 @@ private findTreeSelectNodeWithAncestors(
       );
     }
   }
-
-
-
-
 
   onClearAll() {
     this.scrappedDataArray.set([]); // Clear the Scraped Data array

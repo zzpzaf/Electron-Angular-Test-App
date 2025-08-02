@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync } from 'fs';
+import { promises as fsPromises } from 'fs';
 import { app, dialog, BrowserWindow } from 'electron';
 import fs from 'fs';
 import path from 'path';
@@ -193,7 +194,8 @@ export async function handleSaveMDFile(
 // --------------------------------------------------------------------------
 export async function getFileFullPathName(
   mainWindow: BrowserWindow,
-  options?: Electron.OpenDialogOptions
+  defPathProperty: string,
+  fileDialogOptions?: Electron.OpenDialogOptions
 ): Promise<{
   success: boolean;
   message: string;
@@ -203,40 +205,39 @@ export async function getFileFullPathName(
   try {
     // const lastFolder = getLastSavedFolder();
 
-    const lastFullPathName = getConfigProperty<string>(
-      'lastObtainedFullPathname'
-    );
-    const lastFolder = path.dirname(
-      lastFullPathName ?? app.getPath('documents')
+    const fullPathName = getConfigProperty<string>(
+      // 'lastObtainedFullPathname'
+      defPathProperty
     );
 
-    // const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
-    //   title: 'Open .txt or .json File',
-    //   defaultPath: lastFolder || app.getPath('documents'),
-    //   properties: ['openFile'],
-    //   filters: [{ name: 'Text and JSON', extensions: ['txt', 'json'] }],
-    // });
+    console.log('>===>> Property Obtained:', defPathProperty, ' value:', fullPathName);
+
+    const folderName = path.dirname(
+      fullPathName ?? app.getPath('documents')
+    );
+
+    console.log('>===>> Folder Name: ', folderName);
 
     const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
-      title: options?.title || 'Select a file',
-      defaultPath: lastFolder || app.getPath('documents'),
+      title: fileDialogOptions?.title || 'Select a file',
+      defaultPath: folderName || app.getPath('documents'),
       properties: ['openFile'],
-      filters: options?.filters || [],
+      filters: fileDialogOptions?.filters || [],
     });
 
     if (canceled || !filePaths || filePaths.length === 0) {
       return { success: false, message: 'Open file dialog canceled' };
     }
 
-    const filePath = filePaths[0];
+    const newFilePath = filePaths[0];
 
     // setLastSavedFolder(path.dirname(filePath));
-    setConfigProperties({ lastObtainedFullPathname: filePath });
+    setConfigProperties({ [defPathProperty]: newFilePath });
 
     return {
       success: true,
       message: 'File Path Name obtained successfully',
-      filePath,
+      filePath: newFilePath,
     };
   } catch (error) {
     console.error('Error opening file dialog - Error: ', error);
@@ -247,6 +248,8 @@ export async function getFileFullPathName(
     };
   }
 }
+
+
 
 // -----------------------------------------------------------------------------
 export async function getFileData(fileFullPathName: string): Promise<string> {
@@ -303,21 +306,32 @@ export async function selectFolder(
 }
 
 
-
-
-
 // -----------------------------------------------------------------------
-// function getLastSavedFolder(): string | null {
-//   if (fs.existsSync(CONFIG_FILE)) {
-//     try {
-//       const data = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
-//       return data.lastSavedFolder || null;
-//     } catch {
-//       return null;
-//     }
-//   }
-//   return null;
-// }
+/**
+ * Async copy of a file from source to destination
+ * - Creates destination folder if it doesn't exist
+ * - Overwrites existing file by default
+ */
+export async function copyFileAsync(source: string, destination: string): Promise<void> {
+  try {
+    // Ensure destination directory exists
+    const destDir = path.dirname(destination);
+    if (!existsSync(destDir)) {
+      mkdirSync(destDir, { recursive: true });
+    }
+
+    // Perform async copy
+    await fsPromises.copyFile(source, destination);
+    console.log(`✅ >===>> Copied file from "${source}" to "${destination}"`);
+  } catch (error) {
+    console.error(`❌ >===>> Failed to copy file from "${source}" to "${destination}":`, error);
+    throw error; // Re-throw so the caller can handle it
+  }
+}
+
+
+
+
 
 // -----------------------------------------------------------------------
 export function getConfigProperty<T = any>(key: string): T | null {
@@ -331,12 +345,6 @@ export function getConfigProperty<T = any>(key: string): T | null {
   }
   return null;
 }
-
-// -----------------------------------------------------------------------
-// function setLastSavedFolder(folderPath: string): void {
-//   const data = { lastSavedFolder: folderPath };
-//   fs.writeFileSync(CONFIG_FILE, JSON.stringify(data), 'utf8');
-// }
 
 // -----------------------------------------------------------------------
 export function setConfigProperties(newProps: Record<string, any>): void {
