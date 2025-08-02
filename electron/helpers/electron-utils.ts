@@ -4,6 +4,7 @@ import { app, dialog, BrowserWindow } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { listURLData } from '../../shared/projectObjects/varObjects';
+import { glob } from 'glob';
 
 const CONFIG_FILE = path.join(
   app.getPath('userData'),
@@ -329,6 +330,132 @@ export async function copyFileAsync(source: string, destination: string): Promis
   }
 }
 
+
+// -----------------------------------------------------------------------
+/**
+ * Copies one or more files, supporting wildcards in the source paths array elements.
+ *
+ * @param sourceFilePaths - Array of source paths (wildcards allowed)
+ * @param destDir - Destination folder (files will be placed here) (if it is a file, then the destination will be its containing folder)
+ */
+export async function copyWildFiles(
+  sourcePatterns: string[],
+  destPath: string
+): Promise<void> {
+  // Expand all patterns
+  let allMatches: string[] = [];
+  for (const pattern of sourcePatterns) {
+    allMatches = allMatches.concat(glob.sync(pattern));
+  }
+
+  // Remove duplicates
+  const matchedFiles = [...new Set(allMatches)];
+  if (matchedFiles.length === 0) {
+    console.warn("No matching files found for:", sourcePatterns);
+    return;
+  }
+
+  let destDir: string;
+  const destIsFilePath = path.extname(destPath) !== "";
+
+  if (matchedFiles.length > 1) {
+    // Multiple matches → if dest is file path, use its parent folder
+    destDir = destIsFilePath ? path.dirname(destPath) : destPath;
+  } else {
+    // Single match
+    if (destIsFilePath) {
+      // Single match → copy directly to file path
+      await fsPromises.copyFile(matchedFiles[0], destPath);
+      console.log(`Copied: ${matchedFiles[0]} → ${destPath}`);
+      return;
+    } else {
+      destDir = destPath;
+    }
+  }
+
+  // Ensure destination directory exists
+  try {
+    const stat = await fsPromises.stat(destDir);
+    if (!stat.isDirectory()) {
+      throw new Error(`Destination exists but is not a directory: ${destDir}`);
+    }
+  } catch (err: any) {
+    if (err.code === "ENOENT") {
+      await fsPromises.mkdir(destDir, { recursive: true });
+    } else {
+      throw err;
+    }
+  }
+
+  // Copy each matched file into destination directory
+  for (const file of matchedFiles) {
+    const stat = await fsPromises.stat(file);
+    if (!stat.isFile()) {
+      console.log(`Skipping non-file: ${file}`);
+      continue;
+    }
+    const fileName = path.basename(file);
+    const finalDest = path.join(destDir, fileName);
+    await fsPromises.copyFile(file, finalDest);
+    console.log(`Copied: ${file} → ${finalDest}`);
+  }
+}
+
+
+
+
+
+// -----------------------------------------------------------------------
+/**
+ * Deletes multiple files by full absolute path.
+ * @param filePaths Array of full file paths to delete.
+ * @returns {Promise<{ deleted: string[], failed: string[] }>}
+ */
+export async function deleteFiles1(filePaths: string[]) {
+  const deleted: string[] = [];
+  const failed: string[] = [];
+
+  for (const filePath of filePaths) {
+    try {
+      await fsPromises.unlink(filePath);
+      deleted.push(filePath);
+    } catch (err) {
+      console.error(`Failed to delete file: ${filePath}`, err);
+      failed.push(filePath);
+    }
+  }
+
+  return { deleted, failed };
+}
+
+
+// -----------------------------------------------------------------------
+/**
+ * Expands wildcards and deletes matching files
+ * @param patterns Array of file paths or wildcard patterns
+ * @returns {Promise<{ deleted: string[], failed: string[] }>}
+ */
+export async function deleteFiles(patterns: string[]) {
+  const deleted: string[] = [];
+  const failed: string[] = [];
+
+  // Expand each pattern into actual file paths
+  for (const pattern of patterns) {
+    const matches = await glob(pattern, { nodir: true });
+
+    for (const filePath of matches) {
+      try {
+        await fsPromises.unlink(filePath);
+        deleted.push(filePath);
+      } catch (err) {
+        console.error(`Failed to delete file: ${filePath}`, err);
+        failed.push(filePath);
+      }
+    }
+  }
+
+  return { deleted, failed };
+}
 
 
 

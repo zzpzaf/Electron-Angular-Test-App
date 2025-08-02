@@ -1,5 +1,12 @@
 import { Injectable } from '@angular/core';
 
+
+interface DeleteFilesResult {
+  deleted: string[];
+  failed: string[];
+}
+
+
 @Injectable({
   providedIn: 'root',
 })
@@ -26,9 +33,33 @@ export class BackEnd {
 
 
   copyFile(source: string, destination: string): Promise<{ success: boolean }> {
-    return this.ipcInvoke<{ success: boolean }>('copy-file', source, destination);
+    return this.ipcInvoke<{success: boolean }>('copy-file', source, destination);
   }
 
+  copyMultiFiles(sourceFilePaths: string[], destinationFolder: string): Promise<{ success: boolean }> {
+    return this.ipcInvoke<{success: boolean }>('copy-wild-files', sourceFilePaths, destinationFolder);
+  }
+
+  deleteFiles(filePaths: string[]): Promise<DeleteFilesResult> {
+    return this.ipcInvoke<DeleteFilesResult>('delete-files', filePaths);
+  }
+
+
+
+  /**
+   * Copy the original places.sqlite database to a backup location.
+   * @param sourcePath Path to the original places.sqlite file
+   * @param targetPath Path to the backup file location
+   */
+  // copyOrgPlacesSQLite(sourcePath: string, targetPath: string) {
+  //   return this.ipcInvoke<{ success: boolean; message?: string; error?: string }>(
+  //     'sqlite:backup-places',
+  //     sourcePath,
+  //     targetPath
+  //   );
+  // }
+
+ 
 
   getPropertyValueBySubstring(key: string, substring: string): Promise<string> {
     return this.ipcInvoke<string>('get-property-by-substring', key, substring);

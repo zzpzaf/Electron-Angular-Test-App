@@ -8,6 +8,8 @@ import {
 } from './processes/scrappers/scrape-functions';
 import {
   copyFileAsync,
+  copyWildFiles,
+  deleteFiles,
   getConfigProperty,
   getFileData,
   getPropertyValueBySubstring,
@@ -25,6 +27,7 @@ import {
   getFolderContentsById,
   countUniqueLinksByFolderId,
 } from './dbs/sqlite/queries';
+import {backupOrgPlacesSQLite} from './dbs/sqlite/sqlite3-utils';
 import { htmlToMarkdown } from './processes/scrappers/page-converters';
 // import { handleOpenFile, handleDroppedFile } from './helpers/electron-utils';
 import { shell } from 'electron';
@@ -245,6 +248,7 @@ ipcMain.handle('open-file-dialog', (_event: any, defPathProperty: string, fdOpti
   return { success: false, message: 'Main window not available' };
 });
 
+
 ipcMain.handle('read-file-data', async (event: any, filePathName: string) => {
   console.log(
     '>===>> (read-file-data) - Reading Data from File: filePathName',
@@ -256,6 +260,7 @@ ipcMain.handle('read-file-data', async (event: any, filePathName: string) => {
   return data; // return value sent back to renderer
 });
 
+
 ipcMain.handle('select-folder', async (event: any, defaultPath?: string) => {
   if (mainAppWin) {
     return await selectFolder(mainAppWin, defaultPath);
@@ -263,9 +268,24 @@ ipcMain.handle('select-folder', async (event: any, defaultPath?: string) => {
   return { success: false, message: 'Main window not available' };
 });
 
+
 ipcMain.handle('copy-file', async (event: any, source: string, destination: string) => {
   await copyFileAsync(source, destination);
   return { success: true };
+});
+
+ipcMain.handle('copy-wild-files', async (event: any, sourceFilePaths: string[], destinationFolder: string) => {
+  await copyWildFiles(sourceFilePaths, destinationFolder);
+  return { success: true };
+});
+
+
+
+ipcMain.handle('delete-files', async (event: any, filePaths: string[]) => {
+  if (!Array.isArray(filePaths)) {
+    throw new Error('delete-files: Input must be an array of file paths');
+  }
+  return await deleteFiles(filePaths);
 });
 
 ipcMain.handle(
@@ -291,6 +311,20 @@ ipcMain.handle(
 // ipcMain.handle('sqlite:open-connection1', (event: any, filePath: string) => {
 //   return getConnection1(filePath);
 // });
+
+
+ipcMain.handle('sqlite:backup-places', async (event: any, sourcePath: string, targetPath: string) => {
+  try {
+    const result = await backupOrgPlacesSQLite(sourcePath, targetPath);
+    return { success: true, message: result };
+  } catch (err: any) {
+    console.error('Error backing up places.sqlite:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+
+
 
 ipcMain.handle(
   'sqlite:get-subfolders-tree',

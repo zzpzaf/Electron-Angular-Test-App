@@ -79,18 +79,23 @@ export class Settings {
     );
   }
 
-  async onCopyOrgSqliteFile() {
+  async onCopyOrgSqliteFiles() {
     try {
-      const source = this.settingsForm.get('orgFloorpsqliteFullPathName')?.value;   //'/Users/me/source/file.md';
-      const destination = this.settingsForm.get('workingSqliteFullPathName')?.value;   //'/Users/me/destination/file.md';
+      const source = [this.settingsForm.get('orgFloorpsqliteFullPathName')?.value + '*'];  
+      const destination = this.settingsForm.get('workingSqliteFullPathName')?.value ;   
       if (!source || !destination) return;
 
-      const result = await this.backService.copyFile(source, destination);
+      const result = await this.backService.copyMultiFiles(source, destination);
       console.log('Copy result:', result);
     } catch (error) {
       console.error('Error copying file:', error);
     }
   }
+
+
+
+
+
 
   onGetFolder() {
     const currentValue = this.settingsForm.get('outputFolder')?.value;
