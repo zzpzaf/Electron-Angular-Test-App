@@ -6,7 +6,7 @@ import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import TurndownService from 'turndown';
 
-import { BROWSER_URLPORT } from '../constants';
+import { BROWSER_URLPORT } from '../../../shared/constants';
 import { Browser, Page } from 'puppeteer';
 
 import fetch from 'node-fetch';

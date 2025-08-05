@@ -5,11 +5,19 @@ import fs from 'fs';
 import path from 'path';
 import { listURLData } from '../../shared/projectObjects/varObjects';
 import { glob } from 'glob';
+import { APP_MAIN_CONFIG_FILE, APP_SUPPORT_FOLDER } from '../../shared/constants';
 
+// const CONFIG_FILE = path.join(
+//   app.getPath('userData'),
+//   '/' + APP_SUPPORT_FOLDER + '/' + APP_MAIN_CONFIG_FILE
+// );
 const CONFIG_FILE = path.join(
   app.getPath('userData'),
-  'medium-scrapper-app-config.json'
+  APP_SUPPORT_FOLDER,
+  APP_MAIN_CONFIG_FILE
 );
+
+
 
 // -----------------------------------------------------------------------
 export function ensureFolderExists(folderPath: string): void {
@@ -465,6 +473,7 @@ export function getConfigProperty<T = any>(key: string): T | null {
   if (fs.existsSync(CONFIG_FILE)) {
     try {
       const data = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+      console.log(`>===>> getConfigProperty(${key}) - Data: `, data);
       return data[key] ?? null;
     } catch {
       return null;

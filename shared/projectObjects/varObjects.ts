@@ -18,6 +18,11 @@ export interface PostData extends listURLData{
   comments: number;
 }
 
+export interface MarkedPostData extends PostData {
+  content: string;
+}
+
+
 
 // export type SubfolderRow = {
 //   folder_id: number;

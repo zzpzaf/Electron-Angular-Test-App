@@ -25,7 +25,7 @@ import { NzIconModule, provideNzIcons } from 'ng-zorro-antd/icon';
 })
 export class Layout {
   public siderMenuItems = SiderMenuItems;
-  public headerTitle = 'MEDIUM Scrapper';
+  public headerTitle = 'PBM - Personal Bookmarks Manager';
   public footerContent = '© 2025 Panos Zafiropoulos. All rights reserved.';
 
   private backService = inject(BackEnd);

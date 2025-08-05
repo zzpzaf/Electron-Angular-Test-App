@@ -223,8 +223,10 @@ export class HtmlMarkdown {
   }
 
   async markdownPreview(markdata: string) {
-    const rawHtml = await marked.parse(markdata);
+    let rawHtml = await marked.parse(markdata);
+    if (rawHtml.trim().length === 0) rawHtml = "# No Markdown!"; 
     const safeHtml = this.sanitizer.bypassSecurityTrustHtml(rawHtml);
+    
 
     this.safeHtmlContent.set(safeHtml);
   }

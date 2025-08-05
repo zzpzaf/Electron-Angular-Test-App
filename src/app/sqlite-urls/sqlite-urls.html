@@ -36,7 +36,7 @@
     style="width: 100%"
     [nzNodes]="treeNodes"
     nzPlaceHolder="Select a folder"
-    [(ngModel)]="selectedFolderId"
+    [(ngModel)]="selectedFolderName"
     (ngModelChange)="onTreeSelectFolderChange($event)">
   </nz-tree-select>
 
@@ -112,7 +112,7 @@
       nz-button
       nzType="primary"
       [disabled]="
-        selectedFolderId.length === 0 &&
+        selectedFolderName.length === 0 &&
         importedUrlsArrayString().length === 0 &&
         scrappedDataArrayString().length === 0 
       "

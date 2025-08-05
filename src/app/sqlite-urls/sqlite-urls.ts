@@ -16,7 +16,7 @@ import { BackEnd } from '../shared/services/back-end';
 import { NzTreeNodeOptions } from 'ng-zorro-antd/tree';
 import { NzTreeSelectModule } from 'ng-zorro-antd/tree-select';
 
-const rootFolderName = 'unfiled';
+const rootFolderName = 'unfiled';  // id = 5
 
 function mapFolderNodesToTree(nodes: FolderNode[]): NzTreeNodeOptions[] {
   return nodes.map((n) => ({
@@ -67,41 +67,41 @@ export class SqliteUrls {
   private dlgService = inject(DlgService);
   private scrapper = inject(Articlebasicscraper);
 
-  private backService = inject(BackEnd);
-  private workingPlacesSqliteFullPathName: string = '';
+  // private backService = inject(BackEnd);
+  // private workingPlacesSqliteFullPathName: string = '';
 
   public treeNodes: NzTreeNodeOptions[] = [];
-  public selectedFolderId: string = '';
+  public selectedFolderName: string = '';
   public fullSelectedNodePathLabel = signal<string>('Bookmark Folder Name');
   private selectedfolderNodeId: number = -1;
   // private countedUniqueLinks = signal<number>(-1);
   public imoprtedUrlsLabel = signal<string>('Imported URLs');
 
   constructor() {
-    this.getSqliteFullPathName();
-    //this.showBookmarksFolderTree();
+    // this.getSqliteFullPathName();
+    this.showBookmarksFolderTree();
   }
 
-  async getSqliteFullPathName() {
-    try {
-      // this.workingPlacesSqliteFullPathName =
-      //   await this.backService.getPropertyValueBySubstring(
-      //     'lastObtainedFullPathname',
-      //     'places.sqlite'
-      //   );
-      const workplacessqlite = await this.backService.getPropertyValueByKey(
-        'workingCopyOfFloorpProfilePlacesSqliteFile'
-      );
-      if (workplacessqlite)
-        this.workingPlacesSqliteFullPathName = workplacessqlite;
-      console.log('Property value:', this.workingPlacesSqliteFullPathName);
-      if (this.workingPlacesSqliteFullPathName.length > 0)
-        this.sqliteFileName.set(this.workingPlacesSqliteFullPathName);
-      this.showBookmarksFolderTree();
-    } catch (err) {
-      console.error('Error retrieving property:', err);
-    }
-  }
+  // async getSqliteFullPathName() {
+  //   try {
+  //     // this.workingPlacesSqliteFullPathName =
+  //     //   await this.backService.getPropertyValueBySubstring(
+  //     //     'lastObtainedFullPathname',
+  //     //     'places.sqlite'
+  //     //   );
+  //     const workplacessqlite = await this.backService.getPropertyValueByKey(
+  //       'workingCopyOfFloorpProfilePlacesSqliteFile'
+  //     );
+  //     if (workplacessqlite)
+  //       this.workingPlacesSqliteFullPathName = workplacessqlite;
+  //     console.log('Property value:', this.workingPlacesSqliteFullPathName);
+  //     if (this.workingPlacesSqliteFullPathName.length > 0)
+  //       this.sqliteFileName.set(this.workingPlacesSqliteFullPathName);
+  //     this.showBookmarksFolderTree();
+  //   } catch (err) {
+  //     console.error('Error retrieving property:', err);
+  //   }
+  // }
 
   async showBookmarksFolderTree() {
     // const rootFolderName = 'Other Bookmarks';
@@ -131,7 +131,7 @@ export class SqliteUrls {
   }
 
   onTreeSelectFolderChange(selectedId: string) {
-    this.selectedFolderId = selectedId;
+    this.selectedFolderName = selectedId;
     const result = this.findTreeSelectNodeWithAncestors(
       this.treeNodes,
       selectedId
@@ -161,10 +161,11 @@ export class SqliteUrls {
     );
 
     this.getNumberOfUniqueLinksOfFolder(
-      this.sqliteFileName(),
       this.selectedfolderNodeId
     );
-    this.getFolderLinksContentsById(this.sqliteFileName());
+    this.getFolderLinksContentsById(
+       this.selectedfolderNodeId
+    );
 
     if (this.fullSelectedNodePathLabel.length > 0) {
       this.importedUrlsArrayString.set('');
@@ -173,14 +174,14 @@ export class SqliteUrls {
     }
   }
 
+  
+
   private async getNumberOfUniqueLinksOfFolder(
-    sqliteFile: string,
     folderId: number
   ) {
     try {
       const result = (await window.electronAPI.invoke(
         'sqlite:get-number-unique-links-from-folder-by-id',
-        sqliteFile,
         folderId
       )) as { success: boolean; count?: number; error?: string };
 
@@ -306,7 +307,6 @@ export class SqliteUrls {
 
     const qRes = (await window.electronAPI.invoke(
       'sqlite:get-folder-contents',
-      sqliteFilePathName,
       bookmarksFolderName
     )) as { success: boolean; data?: any; error?: string };
 
@@ -348,17 +348,18 @@ export class SqliteUrls {
     }
   }
 
-  private async getFolderLinksContentsById(sqliteFilePathName: string) {
+  private async getFolderLinksContentsById(folderId: number) {
     // const bookmarksFolderName: string = this.bookmarkFolder; //'Reactive-Material';
+
+    console.log('>===>> Getting contents of folder with ID:', folderId);
 
     const qRes = (await window.electronAPI.invoke(
       'sqlite:get-folder-contents-by-id',
-      sqliteFilePathName,
-      this.selectedfolderNodeId
+      folderId
     )) as { success: boolean; data?: any; error?: string };
 
     if (qRes.success) {
-      console.log('Bookmarks Folder Contents: ', qRes.data);
+      console.log('>===>> Bookmarks Folder Contents: ', qRes.data);
       this.queryResponseData = qRes.data as LinkRow[];
 
       let urls: string[] = [];
@@ -399,7 +400,7 @@ export class SqliteUrls {
     this.scrappedDataArray.set([]); // Clear the Scraped Data array
     this.scrappedDataArrayString.set(''); // Clear the string representation of the Scraped Data array
     this.importedUrlsArrayString.set(''); // Clear the imported URLs
-    this.selectedFolderId = '';
+    this.selectedFolderName = '';
   }
 
   onCopyScrapedData() {

@@ -6,95 +6,39 @@ import {
   LinkRow,
   SubfolderRow,
 } from '../../../shared/projectObjects/varObjects';
-import { getConnection1 } from './connections';
+import { getWorkingConnection, getMainConnection } from './connections';
+
+
+const mainDb = getMainConnection();
 
 
 
 
-// function getSubfoldersByParentFolderName_old1(
-//   sqliteFilePatName: string,
-//   rootTitle: string
-// ): {
-//   success: boolean;
-//   data?: SubfolderRow[];
-//   error?: string;
-// } {
-//   const db = getConnection1(sqliteFilePatName);
-//   if (!db) {
-//     console.log('>===>> Error - Unable to create DB Connection!');
-//     return { success: false, error: 'No DB connection' };
-//   }
-
-//   try {
-//     const sqlQuery = `
-//       WITH RECURSIVE subfolders(id, title, parent) AS (
-//           SELECT id, title, parent
-//           FROM moz_bookmarks
-//           WHERE title = ? AND type = 2
-//           UNION ALL
-//           SELECT b.id, b.title, b.parent
-//           FROM moz_bookmarks b
-//           JOIN subfolders sf ON b.parent = sf.id
-//           WHERE b.type = 2
-//       )
-//       SELECT id AS folder_id, title AS folder_name, parent AS parent_id
-//       FROM subfolders
-//       WHERE id != (SELECT id FROM moz_bookmarks WHERE title = ? AND type = 2);
-//       `;
-
-//     const stmt = db.prepare(sqlQuery);
-//     // Same parameter twice => pass it twice
-//     const rows = stmt.all(rootTitle, rootTitle) as SubfolderRow[];
-//     return { success: true, data: rows };
-//   } catch (err: any) {
-//     return { success: false, error: err.message };
-//   }
-// }
 
 
-// function buildFolderTree_old1(rows: SubfolderRow[]): FolderNode[] {
-//   const map: Record<number, FolderNode> = {};
-//   const roots: FolderNode[] = [];
+/* --------------------------------------------------------------------------------------------------
+ * Queries for Floorp/Firefox SQLite working (copied) DB to retrieve folder structures and contents
+ * --------------------------------------------------------------------------------------------------
+ * - getSubfoldersByParentFolderName: Retrieves subfolders by parent folder name
+ * - buildFolderTree: Builds a tree structure from folder rows
+ * - pruneEmptyFolders: Removes empty folders from the tree
+ * - getFolderContentsByParentFolderName: Retrieves links in a folder by parent folder name
+ * - getFolderContentsByParentFolderNameAndOccurence: Retrieves links in a folder by parent folder name and occurrence
+ * - findFoldersByTitle: Finds folders by title
+ * - getFolderContentsById: Retrieves links in a folder by folder ID
+ * - countUniqueLinksByFolderId: Counts unique links in a folder by folder ID
+*/
 
-//   // Initialize all nodes in a map
-//   rows.forEach((row) => {
-//     map[row.folder_id] = {
-//       ...row,
-//       folder_name: row.folder_name ?? '', // Ensure string, not null
-//       children: [],
-//     };
-//   });
-
-//   // Link children to parents
-//   rows.forEach((row) => {
-//     if (row.parent_id && map[row.parent_id]) {
-//       map[row.parent_id].children!.push(map[row.folder_id]);
-//     } else {
-//       roots.push(map[row.folder_id]); // root-level folder
-//     }
-//   });
-
-//   return roots;
-// }
-
-
+const fdb = getWorkingConnection();
 
 // ========================================================================================
-export function getSubfoldersByParentFolderName(
-  sqliteFilePathName: string,
-  rootTitle: string
-): {
+export function getSubfoldersByParentFolderName(rootTitle: string): {
   success: boolean;
   data?: FolderNode[];
   error?: string;
 } {
-  console.log(
-    '>===>> SQLite file Path Name for DB Connection',
-    sqliteFilePathName
-  );
-
-  const db = getConnection1(sqliteFilePathName);
-  if (!db) {
+  
+  if (!fdb) {
     console.log('>===>> Error - Unable to create DB Connection!');
     return { success: false, error: 'No DB connection' };
   }
@@ -142,7 +86,7 @@ export function getSubfoldersByParentFolderName(
 
   try {
 
-    const stmt = db.prepare(sqlQuery);
+    const stmt = fdb.prepare(sqlQuery);
     const rows = stmt.all(rootTitle, rootTitle) as SubfolderRow[];
 
     // Convert to tree
@@ -219,16 +163,12 @@ function pruneEmptyFolders(nodes: FolderNode[]): FolderNode[] {
 
 
 // ========================================================================================
-export function getFolderContentsByParentFolderName(
-  sqliteFilePathName: string,
-  rootTitle: string
-): {
+export function getFolderContentsByParentFolderName(rootTitle: string): {
   success: boolean;
   data?: LinkRow[];
   error?: string;
 } {
-  const db = getConnection1(sqliteFilePathName);
-  if (!db) {
+  if (!fdb) {
     console.log('>===>> Error - Unable to create DB Connection!');
     return { success: false, error: 'No DB connection' };
   }
@@ -243,7 +183,7 @@ export function getFolderContentsByParentFolderName(
     )
     AND b.type = 1;
     `;
-    const stmt = db.prepare(sqlQuery);
+    const stmt = fdb.prepare(sqlQuery);
     const rows = stmt.all(rootTitle) as LinkRow[];
     return { success: true, data: rows };
   } catch (err: any) {
@@ -254,7 +194,6 @@ export function getFolderContentsByParentFolderName(
 
 
 export function getFolderContentsByParentFolderNameAndOccurence(
-  sqliteFilePathName: string,
   rootTitle: string,
   occurence: number // 1, 2, 3...
 ): {
@@ -262,8 +201,8 @@ export function getFolderContentsByParentFolderNameAndOccurence(
   data?: LinkRow[];
   error?: string;
 } {
-  const db = getConnection1(sqliteFilePathName);
-  if (!db) return { success: false, error: 'No DB connection' };
+
+  if (!fdb) return { success: false, error: 'No DB connection' };
 
   if (occurence < 1) return { success: false, error: '`which` must be >= 1' };
 
@@ -284,7 +223,7 @@ export function getFolderContentsByParentFolderNameAndOccurence(
       ORDER BY b.id;
     `;
 
-    const rows = db.prepare(sqlQuery).all(rootTitle, occurence) as LinkRow[];
+    const rows = fdb.prepare(sqlQuery).all(rootTitle, occurence) as LinkRow[];
 
     return { success: true, data: rows };
   } catch (err: any) {
@@ -299,17 +238,14 @@ export function getFolderContentsByParentFolderNameAndOccurence(
 
 
 // ----------------------------------------------------------------------------------------
-export function findFoldersByTitle(
-  sqliteFilePathName: string,
-  folderTitle: string
-): {
+export function findFoldersByTitle(folderTitle: string): {
   success: boolean;
   count?: number;
   data?: FolderMatch[];
   error?: string;
 } {
-  const db = getConnection1(sqliteFilePathName);
-  if (!db) return { success: false, error: 'No DB connection' };
+
+  if (!fdb) return { success: false, error: 'No DB connection' };
 
   try {
     const sql = `
@@ -318,7 +254,7 @@ export function findFoldersByTitle(
       WHERE type = 2 AND title = ?
       ORDER BY id
     `;
-    const rows = db.prepare(sql).all(folderTitle) as FolderMatch[];
+    const rows = fdb.prepare(sql).all(folderTitle) as FolderMatch[];
     return { success: true, count: rows.length, data: rows };
   } catch (err: any) {
     return { success: false, error: err.message };
@@ -329,16 +265,15 @@ export function findFoldersByTitle(
 
 
 // ========================================================================================
-export function getFolderContentsById(
-  sqliteFilePathName: string,
-  folder_id: number
-): {
+export function getFolderContentsById(folder_id: number): {
   success: boolean;
   data?: LinkRow[];
   error?: string;
 } {
-  const db = getConnection1(sqliteFilePathName);
-  if (!db) {
+
+  console.log('>===>> getFolderContentsById - folder_id:', folder_id);
+
+  if (!fdb) {
     console.log('>===>> Error - Unable to create DB Connection!');
     return { success: false, error: 'No DB connection' };
   }
@@ -351,7 +286,7 @@ export function getFolderContentsById(
       WHERE b.parent = ?
       AND b.type = 1;
     `;
-    const stmt = db.prepare(sqlQuery);
+    const stmt = fdb.prepare(sqlQuery);
     const rows = stmt.all(folder_id) as LinkRow[];
     return { success: true, data: rows };
   } catch (err: any) {
@@ -361,16 +296,13 @@ export function getFolderContentsById(
 
 
 // ========================================================================================
-export function countUniqueLinksByFolderId(
-  sqliteFilePathName: string,
-  folderId: number
-): {
+export function countUniqueLinksByFolderId(folderId: number): {
   success: boolean;
   count?: number;
   error?: string;
 } {
-  const db = getConnection1(sqliteFilePathName);
-  if (!db) {
+
+  if (!fdb) {
     return { success: false, error: 'No DB connection' };
   }
 
@@ -382,7 +314,7 @@ export function countUniqueLinksByFolderId(
       WHERE b.parent = ?
         AND b.type = 1
     `;
-    const row = db.prepare(sql).get(folderId) as { cnt: number } | undefined;
+    const row = fdb.prepare(sql).get(folderId) as { cnt: number } | undefined;
     return { success: true, count: row?.cnt ?? 0 };
   } catch (err: any) {
     return { success: false, error: err.message };

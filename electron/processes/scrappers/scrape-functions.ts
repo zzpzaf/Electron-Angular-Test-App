@@ -12,7 +12,7 @@ import { extractFirstPathPart } from '../../../shared/utils/shared-utils';
 import { BrowserWindow } from 'electron';
 
 import pLimit from 'p-limit';
-import { BROWSER_URLPORT, MAX_ARTICLES_NUMBER, SCROLL_DELAY } from '../constants';
+import { BROWSER_URLPORT, MAX_ARTICLES_NUMBER, SCROLL_DELAY } from '../../../shared/constants';
 
 // Apply stealth plugin
 puppeteer.use(StealthPlugin());
@@ -135,15 +135,21 @@ export async function collectPostsFromUrlTabs(
       })
     );
 
-    const results = await Promise.all(pagePromises);
-    results.filter((r): r is PostData => r !== null);
+    // const results = await Promise.all(pagePromises);
+    // results.filter((r): r is PostData => r !== null);
+    let results = await Promise.all(pagePromises);
+    results = results.filter((r): r is PostData => r !== null);
 
     let retPosts = results as PostData[];
+    console.log('>===> Total Number of tried Posts: ', retPosts.length )
     let i = 0;
     for (const post of retPosts) {
-      i = i + 1;
-      post.counter = i;
+      if (post) {
+        i = i + 1;
+        post.counter = i;
+      }
     }
+    console.log('>===> Total Number of fetched Posts: ', i )
 
     return retPosts; // results.filter((r): r is PostData => r !== null);
   } finally {
@@ -167,8 +173,11 @@ async function scrapeMediumArticle(page: Puppeteer.Page): Promise<PostData> {
     const pubEl = document.querySelector('h2 > div');
     const pubname = pubEl && pubEl.textContent ? pubEl.textContent.trim() : '';
     const titleEl = document.querySelector('h1[data-testid="storyTitle"]');
-    const title =
-      titleEl && titleEl.textContent ? titleEl.textContent.trim() : '';
+    let title = titleEl && titleEl.textContent ? titleEl.textContent.trim() : '';
+    // If empty, fallback to the page <title> tag
+    if (!title) {
+      title = document.title ? document.title.trim() : '';
+    }
     const imgEl = document.querySelector('figure img');
     const image = imgEl ? imgEl.getAttribute('src') || '' : '';
     const authorEl = document.querySelector('a[data-testid="authorName"]');

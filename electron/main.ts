@@ -328,9 +328,8 @@ ipcMain.handle('sqlite:backup-places', async (event: any, sourcePath: string, ta
 
 ipcMain.handle(
   'sqlite:get-subfolders-tree',
-  (event: any, sqliteFilePatName: string, field1Name: string) => {
+  (event: any, field1Name: string) => {
     const qryResult = getSubfoldersByParentFolderName(
-      sqliteFilePatName,
       field1Name
     );
     return qryResult;
@@ -339,35 +338,33 @@ ipcMain.handle(
 
 ipcMain.handle(
   'sqlite:get-folder-contents',
-  (event: any, sqliteFilePatName: string, rootFolder1Name: string) => {
+  (event: any, rootFolder1Name: string) => {
     const qryResult = getFolderContentsByParentFolderName(
-      sqliteFilePatName,
       rootFolder1Name
     );
     return qryResult;
   }
 );
 
-ipcMain.handle(
-  'sqlite:get-folder-contents-by-id',
-  (event: any, sqliteFilePatName: string, id: number) => {
-    const qryResult = getFolderContentsById(sqliteFilePatName, id);
+ipcMain.handle('sqlite:get-folder-contents-by-id',
+  (event: any, id: number) => {
+    const qryResult = getFolderContentsById(id);
     return qryResult;
   }
 );
 
 ipcMain.handle(
   'sqlite:get-number-unique-links-from-folder-by-id',
-  (event: any, sqliteFilePatName: string, id: number) => {
-    const qryResult = countUniqueLinksByFolderId(sqliteFilePatName, id);
+  (event: any, id: number) => {
+    const qryResult = countUniqueLinksByFolderId(id);
     return qryResult;
   }
 );
 
 ipcMain.handle(
   'sqlite:find-folders-by-title',
-  (event: any, sqliteFilePathName: string, ftitle: string) => {
-    return findFoldersByTitle(sqliteFilePathName, ftitle);
+  (event: any, ftitle: string) => {
+    return findFoldersByTitle(ftitle);
   }
 );
 
@@ -375,12 +372,10 @@ ipcMain.handle(
   'sqlite:get-folder-contents-by-folderName-and-occurence',
   (
     event: any,
-    sqliteFilePatName: string,
     rootFolder1Name: string,
     occurence: number
   ) => {
     const qryResult = getFolderContentsByParentFolderNameAndOccurence(
-      sqliteFilePatName,
       rootFolder1Name,
       occurence
     );
