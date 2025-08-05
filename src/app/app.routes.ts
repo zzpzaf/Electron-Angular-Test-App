@@ -4,18 +4,18 @@
 // import { provideRouter, Routes } from '@angular/router';
 import { Routes } from '@angular/router';
 import { Home } from './home/home';
-import { Article } from './article/article';
+import { Links } from './links/links';
 import { UrlsFile } from './urls-file/urls-file';
-import { SqliteUrls } from './sqlite-urls/sqlite-urls';
+import { Bookmarks } from './bookmarks/bookmarks';
 import { HtmlMarkdown } from './html-markdown/html-markdown';
 
 
 export const appRoutes: Routes = [
 
   { path: 'home', component: Home },
-  { path: 'article', component: Article },
+  { path: 'links', component: Links },
   { path: 'urlsfile', component: UrlsFile },
-  { path: 'sqliteurls', component: SqliteUrls },
+  { path: 'bookmarks', component: Bookmarks },
   { path: 'markdown', component: HtmlMarkdown },
   { path: '', redirectTo: '/home', pathMatch: 'full' },
 

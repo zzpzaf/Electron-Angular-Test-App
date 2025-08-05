@@ -31,6 +31,7 @@ import {backupOrgPlacesSQLite} from './dbs/sqlite/sqlite3-utils';
 import { htmlToMarkdown } from './processes/scrappers/page-converters';
 // import { handleOpenFile, handleDroppedFile } from './helpers/electron-utils';
 import { shell } from 'electron';
+import { closeDBConnections } from './dbs/sqlite/connections';
 
 const isDev = require('electron-is-dev');
 
@@ -322,6 +323,19 @@ ipcMain.handle('sqlite:backup-places', async (event: any, sourcePath: string, ta
     return { success: false, error: err.message };
   }
 });
+
+
+// Handle DB close request from Angular
+ipcMain.handle('sqlite:close-db-connections', async () => {
+  try {
+    closeDBConnections();
+    return { success: true };
+  } catch (err: any) {
+    console.error('Error closing DB connections:', err);
+    return { success: false, error: err.message };
+  }
+});
+
 
 
 

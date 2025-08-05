@@ -84,11 +84,17 @@ export function getMainConnection(readOnly = false): Database.Database {
   );
   return dbInstance;
 }
-// Close Main Connection
-export function closeMainConnection() {
+
+// Close DB Connections
+export function closeDBConnections() {
+  if (fdb) {
+    fdb.close();
+    fdb = null;
+    console.log('>===>> Working SQLite connection closed.');
+  }
   if (dbInstance) {
     dbInstance.close();
     dbInstance = null;
-    console.log('MAIN SQLite connection closed.');
+    console.log('>===>> MAIN SQLite connection closed.');
   }
 }

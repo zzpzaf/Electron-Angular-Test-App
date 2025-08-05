@@ -49,6 +49,7 @@ export class Layout {
 
   onExitClick(): void {
     console.log('🚪 Exit button clicked');
+    this.backService.closeDbConnections();
     this.backService.quitApp();
     // Add your logic, e.g., call logout service
   }

@@ -6,10 +6,10 @@ export interface SiderMenuItem {
 
 export const SiderMenuItems: SiderMenuItem[] = [
     { label: 'Home', icon: '', route: '/home' },
-    { label: 'URL', icon: '', route: '/article' },
+    { label: 'Links', icon: '', route: '/links' },
     { label: 'File URLs', icon: '', route: '/urlsfile' },
-    { label: 'SQLite URLs', icon: '', route: '/sqliteurls' },
-    { label: 'Markdown URLs', icon: '', route: '/markdown' },
+    { label: 'Bookmarks', icon: '', route: '/bookmarks' },
+    { label: 'Markdown', icon: '', route: '/markdown' },
     { label: 'Help', icon: '', route: '/help' }
 ];
 

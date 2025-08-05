@@ -1,11 +1,9 @@
 import { Injectable } from '@angular/core';
 
-
 interface DeleteFilesResult {
   deleted: string[];
   failed: string[];
 }
-
 
 @Injectable({
   providedIn: 'root',
@@ -19,8 +17,6 @@ export class BackEnd {
   //   ) as Promise<string>;
   // }
 
-
-
   // Generic invoke wrapper (helper function) to avoid repeating
   // the '... as Promise<string>' adition in return commands, everywhere
   //-------------------------------------------------------------------------
@@ -31,20 +27,28 @@ export class BackEnd {
     return window.electronAPI.invoke(channel, ...args) as Promise<T>;
   }
 
-
   copyFile(source: string, destination: string): Promise<{ success: boolean }> {
-    return this.ipcInvoke<{success: boolean }>('copy-file', source, destination);
+    return this.ipcInvoke<{ success: boolean }>(
+      'copy-file',
+      source,
+      destination
+    );
   }
 
-  copyMultiFiles(sourceFilePaths: string[], destinationFolder: string): Promise<{ success: boolean }> {
-    return this.ipcInvoke<{success: boolean }>('copy-wild-files', sourceFilePaths, destinationFolder);
+  copyMultiFiles(
+    sourceFilePaths: string[],
+    destinationFolder: string
+  ): Promise<{ success: boolean }> {
+    return this.ipcInvoke<{ success: boolean }>(
+      'copy-wild-files',
+      sourceFilePaths,
+      destinationFolder
+    );
   }
 
   deleteFiles(filePaths: string[]): Promise<DeleteFilesResult> {
     return this.ipcInvoke<DeleteFilesResult>('delete-files', filePaths);
   }
-
-
 
   /**
    * Copy the original places.sqlite database to a backup location.
@@ -59,7 +63,11 @@ export class BackEnd {
   //   );
   // }
 
- 
+  closeDbConnections(): Promise<{ success: boolean; error?: string }> {
+    return this.ipcInvoke<{ success: boolean; error?: string }>(
+      'sqlite:close-db-connections'
+    );
+  }
 
   getPropertyValueBySubstring(key: string, substring: string): Promise<string> {
     return this.ipcInvoke<string>('get-property-by-substring', key, substring);
@@ -69,8 +77,6 @@ export class BackEnd {
     const result = this.ipcInvoke<string>('get-config-property-by-key', key);
     return result;
   }
-
-
 
   quitApp() {
     return this.ipcInvoke('app:quit');

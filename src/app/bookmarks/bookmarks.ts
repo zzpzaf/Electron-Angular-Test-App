@@ -32,7 +32,7 @@ function mapFolderNodesToTree(nodes: FolderNode[]): NzTreeNodeOptions[] {
 }
 
 @Component({
-  selector: 'sqlite-urls',
+  selector: 'bookmarks',
   imports: [
     FormsModule,
     NzFormModule,
@@ -42,10 +42,10 @@ function mapFolderNodesToTree(nodes: FolderNode[]): NzTreeNodeOptions[] {
     NzTreeSelectModule,
     StyleDrct,
   ],
-  templateUrl: './sqlite-urls.html',
-  styleUrl: './sqlite-urls.scss',
+  templateUrl: './bookmarks.html',
+  styleUrl: './bookmarks.scss',
 })
-export class SqliteUrls {
+export class Bookmarks {
   public importedUrlsArrayString = signal<string>('');
 
   public urlsArray = signal<string[]>([]);
@@ -79,29 +79,12 @@ export class SqliteUrls {
 
   constructor() {
     // this.getSqliteFullPathName();
-    this.showBookmarksFolderTree();
+    // this.showBookmarksFolderTree();
   }
 
-  // async getSqliteFullPathName() {
-  //   try {
-  //     // this.workingPlacesSqliteFullPathName =
-  //     //   await this.backService.getPropertyValueBySubstring(
-  //     //     'lastObtainedFullPathname',
-  //     //     'places.sqlite'
-  //     //   );
-  //     const workplacessqlite = await this.backService.getPropertyValueByKey(
-  //       'workingCopyOfFloorpProfilePlacesSqliteFile'
-  //     );
-  //     if (workplacessqlite)
-  //       this.workingPlacesSqliteFullPathName = workplacessqlite;
-  //     console.log('Property value:', this.workingPlacesSqliteFullPathName);
-  //     if (this.workingPlacesSqliteFullPathName.length > 0)
-  //       this.sqliteFileName.set(this.workingPlacesSqliteFullPathName);
-  //     this.showBookmarksFolderTree();
-  //   } catch (err) {
-  //     console.error('Error retrieving property:', err);
-  //   }
-  // }
+  ngOnInit() {
+    this.showBookmarksFolderTree();
+  }
 
   async showBookmarksFolderTree() {
     // const rootFolderName = 'Other Bookmarks';
