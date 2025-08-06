@@ -414,11 +414,36 @@ export class Bookmarks {
       if (this.scrappedDataArray().length > 0) {
         const result = await window.electronAPI.invoke(
           'save-scrapped-data',
-          this.scrappedDataArrayString()
+          this.scrappedDataArrayString(),
+          this.bookmarkFolder + ' - ' + this.selectedFolderName
         );
       }
     } catch (error) {
       console.error('Error saving scrapped data:', error);
     }
   }
+
+  onDBInsert() {
+    if (this.urlsArray().length > 0) {
+      this.runInsertUrlsToDB();
+    }
+  }
+
+  async runInsertUrlsToDB() {
+    try {
+      if (this.urlsArray().length > 0) {
+        const result = await window.electronAPI.invoke(
+          'sqlite:insert-urls-to-db',
+          this.urlsArray()
+        );
+        console.log('>===>> Inserted URLs to DB:', result);
+      }
+    } catch (error) {
+      console.error('Error inserting URLs to DB:', error);
+    }
+  }
+
+
+
+
 }

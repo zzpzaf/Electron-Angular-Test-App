@@ -17,37 +17,33 @@
     </button>
   </div> -->
 
-
   <!-- -------------------------------------------------- -->
-
-
 
   <div class="simple-label-row">
     <!-- <label class="textarea-label">Bookmark Folder Name:</label> -->
-    <label class="textarea-label">{{fullSelectedNodePathLabel()}}</label>
+    <label class="textarea-label">{{ fullSelectedNodePathLabel() }}</label>
   </div>
- 
-
 
   <!-- -------------------------------------------------- -->
 
-<div class="simple-input-row">
-  <nz-tree-select
-    style="width: 100%"
-    [nzNodes]="treeNodes"
-    nzPlaceHolder="Select a folder"
-    [(ngModel)]="selectedFolderName"
-    (ngModelChange)="onTreeSelectFolderChange($event)">
-  </nz-tree-select>
+  <div class="simple-input-row">
+    <nz-tree-select
+      style="width: 100%"
+      [nzNodes]="treeNodes"
+      nzPlaceHolder="Select a folder"
+      [(ngModel)]="selectedFolderName"
+      (ngModelChange)="onTreeSelectFolderChange($event)"
+    >
+    </nz-tree-select>
 
-  <!-- <input
+    <!-- <input
     type="text"
     nz-input
     [(ngModel)]="fullSelectedNodePath"
     placeholder="Bookmark folder-name"
     class="text-input-field"
   /> -->
-</div>
+  </div>
 
   <!-- -------------------------------------------------- -->
 
@@ -66,10 +62,10 @@
 
   @if (importedUrlsArrayString().length === 0) {
   <label [styleDrct]="customStyles" class="textarea-label"
-    >{{imoprtedUrlsLabel()}}:
+    >{{ imoprtedUrlsLabel() }}:
   </label>
   } @else {
-  <label class="textarea-label">{{imoprtedUrlsLabel()}}: </label>
+  <label class="textarea-label">{{ imoprtedUrlsLabel() }}: </label>
   }
 
   <textarea
@@ -114,7 +110,7 @@
       [disabled]="
         selectedFolderName.length === 0 &&
         importedUrlsArrayString().length === 0 &&
-        scrappedDataArrayString().length === 0 
+        scrappedDataArrayString().length === 0
       "
       (click)="onClearAll()"
     >
@@ -137,12 +133,24 @@
       nz-button
       nzType="primary"
       [disabled]="
-        scrappedDataArrayString().length === 0 &&
-        importedUrlsArrayString().length === 0
+        scrappedDataArray().length === 0 &&
+        scrappedDataArrayString().length === 0
       "
       (click)="onSaveScrapedData()"
     >
       Save Scraped
+    </button>
+
+    <button
+      nz-button
+      nzType="primary"
+      [disabled]="
+        scrappedDataArray().length === 0 &&
+        scrappedDataArrayString().length === 0
+      "
+      (click)="onDBInsert()"
+    >
+      DB Insert
     </button>
   </div>
 </div>

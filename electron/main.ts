@@ -191,7 +191,7 @@ ipcMain.handle(
   async (
     _event: IpcMainInvokeEvent,
     scrappedData: string,
-    urlObj?: listURLData
+    urlObj?: listURLData | string
   ) => {
     return await handleSaveScrappedData(scrappedData, urlObj);
   }

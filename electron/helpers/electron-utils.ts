@@ -103,16 +103,19 @@ function pad(n: number): string {
 // -----------------------------------------------------------------------
 export async function handleSaveScrappedData(
   scrappedData: string,
-  urlObj?: listURLData
+  urlObj?: listURLData | string,
 ): Promise<{
   success: boolean;
   message: string;
   error?: string;
 }> {
   let fileNameFirstPrefix = 'posts_scrapped_data_';
-  if (urlObj)
+  if (urlObj && typeof urlObj === 'object') {
     fileNameFirstPrefix =
       fileNameFirstPrefix + urlObj.pubauthorslug + '_' + urlObj.listname + '_';
+  } else if (typeof urlObj === 'string' && urlObj.length > 0) {
+    fileNameFirstPrefix = urlObj + '_';
+  }
 
   try {
     const filenamePrefix =
