@@ -1,4 +1,4 @@
-// electron/dbs/sqlite/queries.ts
+// electron/dbs/sqlite/fdb_queries.ts
 
 import {
   FolderMatch,
@@ -6,10 +6,10 @@ import {
   LinkRow,
   SubfolderRow,
 } from '../../../shared/projectObjects/varObjects';
-import { getWorkingConnection, getMainConnection } from './connections';
+import { getWorkingConnection } from './connections';
 
 
-const mainDb = getMainConnection();
+
 
 
 

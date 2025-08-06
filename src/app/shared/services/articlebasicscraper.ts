@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { ScrapeResult } from '../../appObjects/angObjects';
+import { PostData } from '../../../../shared/projectObjects/varObjects';
 
 const compName = 'Articlebasicscraper Service';
 
@@ -38,49 +39,6 @@ export class Articlebasicscraper {
     }
   }
 
-  // async *scrapeMultiArticles(
-  //   urls: string[]
-  // ): AsyncGenerator<
-  //   { success: boolean; data?: any; error?: string },
-  //   void,
-  //   unknown
-  // > {
-  //   const BATCH_SIZE = 10;
-
-  //   for (let i = 0; i < urls.length; i++) {
-  //     const url = urls[i];
-  //     //-- // 🕒 Start timer
-  //     const start = Date.now();
-  //     console.log('Invoking scrapeArticle with URL:', url);
-
-  //     let response: { success: boolean; data?: any; error?: string };
-
-  //     try {
-  //       response = (await window.electronAPI.invoke('scrape-article', url)) as {
-  //         success: boolean;
-  //         data?: any;
-  //         error?: string;
-  //       };
-  //       //-- // 🕒 Get and display the duration
-  //       const duration = Date.now() - start;
-  //       // console.log(`>===>> ✅ Scraped article (${i + 1}/${urls.length}): ${url} in ${duration} ms`);
-  //       console.log(`>===>> ✅ Scraped article (${i + 1} in ${duration} ms`);
-  //     } catch (err: any) {
-  //       console.error('Error during scrapeArticle invoke:', err);
-  //       response = { success: false, error: err.message || 'Unknown error' };
-  //     }
-
-  //     yield response; // Push result to caller
-
-  //     // Optional: small pause between calls
-  //     await new Promise((res) => setTimeout(res, 100));
-
-  //     // Optionally send batch-complete signals every 10
-  //     if ((i + 1) % BATCH_SIZE === 0) {
-  //       console.log(`Completed batch of ${BATCH_SIZE} articles`);
-  //     }
-  //   }
-  // }
 
   async scrapeList(
     url: string
@@ -104,7 +62,7 @@ export class Articlebasicscraper {
 
   async scrapeTabsList(
     urls: string[]
-  ): Promise<{ success: boolean; data?: any; error?: string }> {
+  ): Promise<{ success: boolean; data?: PostData[]; error?: string }> {
     if (!window?.electronAPI?.invoke) {
       console.error('Electron API is not available.');
       return { success: false, error: 'Electron API not available' };

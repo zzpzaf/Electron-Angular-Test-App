@@ -17,7 +17,7 @@ import {
   handleSaveScrappedData,
   selectFolder,
 } from './helpers/electron-utils';
-import { listURLData } from '../shared/projectObjects/varObjects';
+import { listURLData, PostData } from '../shared/projectObjects/varObjects';
 import { getFileFullPathName } from './helpers/electron-utils';
 import {
   getSubfoldersByParentFolderName,
@@ -26,12 +26,13 @@ import {
   getFolderContentsByParentFolderNameAndOccurence,
   getFolderContentsById,
   countUniqueLinksByFolderId,
-} from './dbs/sqlite/queries';
-import {backupOrgPlacesSQLite} from './dbs/sqlite/sqlite3-utils';
+} from './dbs/sqlite/fdb_queries';
+import { backupOrgPlacesSQLite } from './dbs/sqlite/sqlite3-utils';
 import { htmlToMarkdown } from './processes/scrappers/page-converters';
 // import { handleOpenFile, handleDroppedFile } from './helpers/electron-utils';
 import { shell } from 'electron';
 import { closeDBConnections } from './dbs/sqlite/connections';
+import { insertArticlesFromJson } from './dbs/sqlite/mandb_queries';
 
 const isDev = require('electron-is-dev');
 
@@ -57,9 +58,6 @@ function createWindow() {
     },
   });
 
-
-
-
   // Intercept an external link (https://...) and open it, in user’s default browser instead
   mainAppWin.webContents.setWindowOpenHandler((details: HandlerDetails) => {
     const { url } = details;
@@ -76,10 +74,6 @@ function createWindow() {
       shell.openExternal(url);
     }
   });
-
-
-
-
 
   const angularDistPath = path.join(
     process.cwd(),
@@ -227,7 +221,7 @@ ipcMain.handle(
   async (event: IpcMainInvokeEvent, urls: string[]) => {
     console.log(`Received scrape-tabs request for  ${urls.length}  URLs`);
     try {
-      const result = await collectPostsFromUrlTabs(urls);
+      const result: PostData[] = await collectPostsFromUrlTabs(urls);
       console.log('Scraping successful');
       return { success: true, data: result };
     } catch (error: unknown) {
@@ -240,15 +234,15 @@ ipcMain.handle(
   }
 );
 
-
-
-ipcMain.handle('open-file-dialog', (_event: any, defPathProperty: string, fdOptions: any) => {
-  if (mainAppWin) {
-    return getFileFullPathName(mainAppWin, defPathProperty, fdOptions); // pass options to the handler
+ipcMain.handle(
+  'open-file-dialog',
+  (_event: any, defPathProperty: string, fdOptions: any) => {
+    if (mainAppWin) {
+      return getFileFullPathName(mainAppWin, defPathProperty, fdOptions); // pass options to the handler
+    }
+    return { success: false, message: 'Main window not available' };
   }
-  return { success: false, message: 'Main window not available' };
-});
-
+);
 
 ipcMain.handle('read-file-data', async (event: any, filePathName: string) => {
   console.log(
@@ -261,7 +255,6 @@ ipcMain.handle('read-file-data', async (event: any, filePathName: string) => {
   return data; // return value sent back to renderer
 });
 
-
 ipcMain.handle('select-folder', async (event: any, defaultPath?: string) => {
   if (mainAppWin) {
     return await selectFolder(mainAppWin, defaultPath);
@@ -269,18 +262,21 @@ ipcMain.handle('select-folder', async (event: any, defaultPath?: string) => {
   return { success: false, message: 'Main window not available' };
 });
 
+ipcMain.handle(
+  'copy-file',
+  async (event: any, source: string, destination: string) => {
+    await copyFileAsync(source, destination);
+    return { success: true };
+  }
+);
 
-ipcMain.handle('copy-file', async (event: any, source: string, destination: string) => {
-  await copyFileAsync(source, destination);
-  return { success: true };
-});
-
-ipcMain.handle('copy-wild-files', async (event: any, sourceFilePaths: string[], destinationFolder: string) => {
-  await copyWildFiles(sourceFilePaths, destinationFolder);
-  return { success: true };
-});
-
-
+ipcMain.handle(
+  'copy-wild-files',
+  async (event: any, sourceFilePaths: string[], destinationFolder: string) => {
+    await copyWildFiles(sourceFilePaths, destinationFolder);
+    return { success: true };
+  }
+);
 
 ipcMain.handle('delete-files', async (event: any, filePaths: string[]) => {
   if (!Array.isArray(filePaths)) {
@@ -313,17 +309,18 @@ ipcMain.handle(
 //   return getConnection1(filePath);
 // });
 
-
-ipcMain.handle('sqlite:backup-places', async (event: any, sourcePath: string, targetPath: string) => {
-  try {
-    const result = await backupOrgPlacesSQLite(sourcePath, targetPath);
-    return { success: true, message: result };
-  } catch (err: any) {
-    console.error('Error backing up places.sqlite:', err);
-    return { success: false, error: err.message };
+ipcMain.handle(
+  'sqlite:backup-places',
+  async (event: any, sourcePath: string, targetPath: string) => {
+    try {
+      const result = await backupOrgPlacesSQLite(sourcePath, targetPath);
+      return { success: true, message: result };
+    } catch (err: any) {
+      console.error('Error backing up places.sqlite:', err);
+      return { success: false, error: err.message };
+    }
   }
-});
-
+);
 
 // Handle DB close request from Angular
 ipcMain.handle('sqlite:close-db-connections', async () => {
@@ -336,16 +333,23 @@ ipcMain.handle('sqlite:close-db-connections', async () => {
   }
 });
 
-
-
-
+ipcMain.handle(
+  'sqlite:insert-articles-from-json-array',
+  (event: any, postsData: PostData[]) => {
+    try {
+      const nrOfInsertedRows = insertArticlesFromJson(postsData);
+      return nrOfInsertedRows; // just the number
+    } catch (err) {
+      console.error('Error inserting articles from JSON array:', err);
+      return 0; // if error, return 0
+    }
+  }
+);
 
 ipcMain.handle(
   'sqlite:get-subfolders-tree',
   (event: any, field1Name: string) => {
-    const qryResult = getSubfoldersByParentFolderName(
-      field1Name
-    );
+    const qryResult = getSubfoldersByParentFolderName(field1Name);
     return qryResult;
   }
 );
@@ -353,19 +357,15 @@ ipcMain.handle(
 ipcMain.handle(
   'sqlite:get-folder-contents',
   (event: any, rootFolder1Name: string) => {
-    const qryResult = getFolderContentsByParentFolderName(
-      rootFolder1Name
-    );
+    const qryResult = getFolderContentsByParentFolderName(rootFolder1Name);
     return qryResult;
   }
 );
 
-ipcMain.handle('sqlite:get-folder-contents-by-id',
-  (event: any, id: number) => {
-    const qryResult = getFolderContentsById(id);
-    return qryResult;
-  }
-);
+ipcMain.handle('sqlite:get-folder-contents-by-id', (event: any, id: number) => {
+  const qryResult = getFolderContentsById(id);
+  return qryResult;
+});
 
 ipcMain.handle(
   'sqlite:get-number-unique-links-from-folder-by-id',
@@ -375,20 +375,13 @@ ipcMain.handle(
   }
 );
 
-ipcMain.handle(
-  'sqlite:find-folders-by-title',
-  (event: any, ftitle: string) => {
-    return findFoldersByTitle(ftitle);
-  }
-);
+ipcMain.handle('sqlite:find-folders-by-title', (event: any, ftitle: string) => {
+  return findFoldersByTitle(ftitle);
+});
 
 ipcMain.handle(
   'sqlite:get-folder-contents-by-folderName-and-occurence',
-  (
-    event: any,
-    rootFolder1Name: string,
-    occurence: number
-  ) => {
+  (event: any, rootFolder1Name: string, occurence: number) => {
     const qryResult = getFolderContentsByParentFolderNameAndOccurence(
       rootFolder1Name,
       occurence

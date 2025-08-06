@@ -16,7 +16,7 @@ import { BackEnd } from '../shared/services/back-end';
 import { NzTreeNodeOptions } from 'ng-zorro-antd/tree';
 import { NzTreeSelectModule } from 'ng-zorro-antd/tree-select';
 
-const rootFolderName = 'unfiled';  // id = 5
+const rootFolderName = 'unfiled'; // id = 5
 
 function mapFolderNodesToTree(nodes: FolderNode[]): NzTreeNodeOptions[] {
   return nodes.map((n) => ({
@@ -143,25 +143,18 @@ export class Bookmarks {
       'Bookmark Folder Name' + '  (' + fsnp + ')'
     );
 
-    this.getNumberOfUniqueLinksOfFolder(
-      this.selectedfolderNodeId
-    );
-    this.getFolderLinksContentsById(
-       this.selectedfolderNodeId
-    );
+    this.getNumberOfUniqueLinksOfFolder(this.selectedfolderNodeId);
+    this.getFolderLinksContentsById(this.selectedfolderNodeId);
 
-    if (this.fullSelectedNodePathLabel.length > 0) {
+    if (selectedNodeTitle.length > 0) {
       this.importedUrlsArrayString.set('');
       this.scrappedDataArray.set([]);
       this.scrappedDataArrayString.set('');
     }
   }
 
-  
 
-  private async getNumberOfUniqueLinksOfFolder(
-    folderId: number
-  ) {
+  private async getNumberOfUniqueLinksOfFolder(folderId: number) {
     try {
       const result = (await window.electronAPI.invoke(
         'sqlite:get-number-unique-links-from-folder-by-id',
@@ -229,14 +222,13 @@ export class Bookmarks {
     try {
       const response = await this.scrapper.scrapeTabsList(urls);
       if (response.success) {
-        result = response.data;
-        this.scrappedDataArray.set(result);
-
-        if (this.scrappedDataArray().length > 0) {
-          this.scrappedDataArrayString.set(
-            JSON.stringify(this.scrappedDataArray(), null, 2)
-          );
+        let result: PostData[] = []; // default
+        if (Array.isArray(response.data) && response.data.length > 0) {
+          result = response.data as PostData[];
         }
+        this.scrappedDataArray.set(result);
+        // this.scrappedDataArray.set(result as PostData[]);
+        this.scrappedDataArrayString.set(JSON.stringify(result, null, 2));
       } else {
         error = response.error;
       }
@@ -412,9 +404,10 @@ export class Bookmarks {
   async runSaveScappedData() {
     try {
       if (this.scrappedDataArray().length > 0) {
+        console.log('>===>> Saving scrapped data to DB...', JSON.stringify(this.scrappedDataArray()));
         const result = await window.electronAPI.invoke(
           'save-scrapped-data',
-          this.scrappedDataArrayString(),
+          this.scrappedDataArray(),
           this.bookmarkFolder + ' - ' + this.selectedFolderName
         );
       }
@@ -424,26 +417,46 @@ export class Bookmarks {
   }
 
   onDBInsert() {
-    if (this.urlsArray().length > 0) {
-      this.runInsertUrlsToDB();
+    if (this.scrappedDataArray().length > 0) {
+      this.runInsertScrapedArrayToDB(this.scrappedDataArray());
     }
   }
 
-  async runInsertUrlsToDB() {
+  async runInsertScrapedArrayToDB(dataArray: PostData[]) {
     try {
-      if (this.urlsArray().length > 0) {
-        const result = await window.electronAPI.invoke(
-          'sqlite:insert-urls-to-db',
-          this.urlsArray()
-        );
-        console.log('>===>> Inserted URLs to DB:', result);
+      if (dataArray.length > 0) {
+        const result = (await window.electronAPI.invoke(
+          'sqlite:insert-articles-from-json-array',
+          dataArray
+        )) as number;
+
+        if (result > 0) {
+          this.dlgService
+            .popup({
+              token: 'succ',
+              header: 'URLs Inserted!',
+              content: result + ' URLs were inserted to the main DB.',
+              posAnsMsg: 'OK',
+              negAnsMsg: '',
+            })
+            .subscribe((res) => console.log('Dialog closed with:', res));
+        } else {
+          console.error('Unexpected result from DB insert:', result);
+          this.dlgService
+            .popup({
+              token: 'error',
+              header: 'Error',
+              content: 'Failed to insert URLs to the main DB.',
+              posAnsMsg: 'OK',
+              negAnsMsg: '',
+            })
+            .subscribe((res) => console.log('Dialog closed with:', res));
+        }
+
+        console.log('>===>> Inserted URLs to main DB:', result);
       }
     } catch (error) {
-      console.error('Error inserting URLs to DB:', error);
+      console.error('Error inserting URLs to main DB:', error);
     }
   }
-
-
-
-
 }

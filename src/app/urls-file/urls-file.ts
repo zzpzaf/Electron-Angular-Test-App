@@ -61,7 +61,7 @@ export class UrlsFile {
     try {
       const response = await this.scrapper.scrapeTabsList(urls);
       if (response.success) {
-        result = response.data;
+        result = response.data as PostData[]; // default
         this.scrappedDataArray.set(result);
 
         if (this.scrappedDataArray().length > 0) {

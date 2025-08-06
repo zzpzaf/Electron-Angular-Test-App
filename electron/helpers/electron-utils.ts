@@ -34,7 +34,7 @@ export function ensureFolderExists(folderPath: string): void {
 
 // -----------------------------------------------------------------------
 export function formatDate(input: string): string {
-  console.log(`formatDate(${input})`);
+  // console.log(`formatDate(${input})`);
 
   const now = new Date();
   const months: Record<string, number> = {

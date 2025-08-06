@@ -16,11 +16,12 @@ export interface PostData extends listURLData{
   date: string;
   likes: number;
   comments: number;
+  content?: string;
 }
 
-export interface MarkedPostData extends PostData {
-  content: string;
-}
+// export interface MarkedPostData extends PostData {
+//   content: string;
+// }
 
 
 

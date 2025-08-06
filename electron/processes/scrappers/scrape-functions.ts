@@ -12,22 +12,24 @@ import { extractFirstPathPart } from '../../../shared/utils/shared-utils';
 import { BrowserWindow } from 'electron';
 
 import pLimit from 'p-limit';
-import { BROWSER_URLPORT, MAX_ARTICLES_NUMBER, SCROLL_DELAY } from '../../../shared/constants';
+import {
+  BROWSER_URLPORT,
+  MAX_ARTICLES_NUMBER,
+  SCROLL_DELAY,
+} from '../../../shared/constants';
 
 // Apply stealth plugin
 puppeteer.use(StealthPlugin());
 
-
 // ========================================================================================================
 // ========================================================================================================
 // Wrapper function to to scrape the basic (meta-) data of a single Article, from an Article's page
-// It calls the scrapeMediumArticle() function 
+// It calls the scrapeMediumArticle() function
 // It also uses the outer helper functions: extractFirstPathPart and formatDate
 // ========================================================================================================
 // ========================================================================================================
 
 export async function scrapeArticleBasic(url: string): Promise<PostData> {
- 
   // Connect to an already running Chrome instance with remote debugging enabled
   const browser = await puppeteer.connect({
     browserURL: BROWSER_URLPORT,
@@ -64,7 +66,7 @@ export async function scrapeArticleBasic(url: string): Promise<PostData> {
 // ========================================================================================================
 // Wrapper function to to scrape the basic (meta-) Article data
 // of all pages passed in using an array of urls
-// It uses the key function: scrapeMediumArticle() 
+// It uses the key function: scrapeMediumArticle()
 //
 // - Receives an array of URLs (string[])
 // - Opens them as parallel tabs (Page instances)
@@ -141,15 +143,24 @@ export async function collectPostsFromUrlTabs(
     results = results.filter((r): r is PostData => r !== null);
 
     let retPosts = results as PostData[];
-    console.log('>===> Total Number of tried Posts: ', retPosts.length )
+    console.log('>===> Total Number of tried Posts: ', retPosts.length);
     let i = 0;
     for (const post of retPosts) {
       if (post) {
         i = i + 1;
         post.counter = i;
+        // 250806 Update
+        // console.log(
+        //   '>===>> collectPostsFromUrlTabs -> scrapeMediumArticle -> rawDate:',
+        //   post.date
+        // );
+        if (post.date && post.date.length) {
+          post.date = formatDate(post.date);
+        }  
+
       }
     }
-    console.log('>===> Total Number of fetched Posts: ', i )
+    console.log('>===> Total Number of fetched Posts: ', i);
 
     return retPosts; // results.filter((r): r is PostData => r !== null);
   } finally {
@@ -173,7 +184,8 @@ async function scrapeMediumArticle(page: Puppeteer.Page): Promise<PostData> {
     const pubEl = document.querySelector('h2 > div');
     const pubname = pubEl && pubEl.textContent ? pubEl.textContent.trim() : '';
     const titleEl = document.querySelector('h1[data-testid="storyTitle"]');
-    let title = titleEl && titleEl.textContent ? titleEl.textContent.trim() : '';
+    let title =
+      titleEl && titleEl.textContent ? titleEl.textContent.trim() : '';
     // If empty, fallback to the page <title> tag
     if (!title) {
       title = document.title ? document.title.trim() : '';
@@ -185,6 +197,24 @@ async function scrapeMediumArticle(page: Puppeteer.Page): Promise<PostData> {
       authorEl && authorEl.textContent ? authorEl.textContent.trim() : '';
 
     let rawDate = '';
+    // const outerContainer = document.querySelector('div.speechify-ignore.bh.m');
+    // if (outerContainer) {
+    //   const dateContainer = outerContainer.querySelector('div.ac.af');
+    //   if (dateContainer) {
+    //     const childNodes = Array.from(dateContainer.childNodes);
+    //     for (let i = childNodes.length - 1; i >= 0; i--) {
+    //       const node = childNodes[i];
+    //       if (node.nodeType === Node.TEXT_NODE) {
+    //         const text = node.textContent ? node.textContent.trim() : '';
+    //         if (text && text !== '·') {
+    //           rawDate = text;
+    //           break;
+    //         }
+    //       }
+    //     }
+    //   }
+    // }
+    //250806 Update
     const outerContainer = document.querySelector('div.speechify-ignore.bh.m');
     if (outerContainer) {
       const dateContainer = outerContainer.querySelector('div.ac.af');
@@ -192,8 +222,19 @@ async function scrapeMediumArticle(page: Puppeteer.Page): Promise<PostData> {
         const childNodes = Array.from(dateContainer.childNodes);
         for (let i = childNodes.length - 1; i >= 0; i--) {
           const node = childNodes[i];
+
+          // If it's an element, try to get its text
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            const text = node.textContent?.trim() || '';
+            if (text && text !== '·' && !/min read/i.test(text)) {
+              rawDate = text;
+              break;
+            }
+          }
+
+          // If it's a text node, read it directly
           if (node.nodeType === Node.TEXT_NODE) {
-            const text = node.textContent ? node.textContent.trim() : '';
+            const text = node.textContent?.trim() || '';
             if (text && text !== '·') {
               rawDate = text;
               break;
@@ -202,6 +243,8 @@ async function scrapeMediumArticle(page: Puppeteer.Page): Promise<PostData> {
         }
       }
     }
+
+    // console.log('>===>> Extracted date:', rawDate); // console.log does not work here due to the Puppeteer context
 
     const likesBtn = document.querySelector('.pw-multi-vote-count button');
     let likes = 0;
@@ -245,14 +288,10 @@ async function scrapeMediumArticle(page: Puppeteer.Page): Promise<PostData> {
   return postData;
 }
 
-
-
-
-
 // ==========================================================================================
 // ==========================================================================================
 // Wrapper function: scrapeList to to scrape a Medium List
-// It calls the key function: scrapeMediumList 
+// It calls the key function: scrapeMediumList
 // It uses the inner helper function: autoScrollToEnd
 // It also uses the outer helper functions: extractFirstPathPart and formatDate
 // ==========================================================================================
@@ -269,7 +308,6 @@ export async function scrapeList(url: string): Promise<PostData[]> {
     browserURL: BROWSER_URLPORT,
     defaultViewport: null,
   });
-  
 
   if (browser)
     console.log(
@@ -458,9 +496,6 @@ async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-
-
-
 /**
  * 250731
  * Automatically scrolls the page to the bottom to trigger lazy-loading
@@ -468,7 +503,11 @@ async function sleep(ms: number): Promise<void> {
  * @param distance Pixels to scroll each step
  * @param delay Delay (ms) between each scroll step
  */
-export async function autoScrollArticlePage(page: import('puppeteer').Page, distance = 200, delay = 100): Promise<void> {
+export async function autoScrollArticlePage(
+  page: import('puppeteer').Page,
+  distance = 200,
+  delay = 100
+): Promise<void> {
   await page.evaluate(
     async (scrollDistance: number, stepDelay: number) => {
       await new Promise<void>((resolve) => {
@@ -489,8 +528,6 @@ export async function autoScrollArticlePage(page: import('puppeteer').Page, dist
     delay
   );
 }
-
-
 
 // -----------------------------------------------------------------------------------------
 // Helper Function to wait for user input
