@@ -41,6 +41,9 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 })
 export class HtmlMarkdown {
   private fb = inject(NonNullableFormBuilder);
+  private scrapper = inject(Articlebasicscraper);
+  public scrappedDataArray = signal<PostData[]>([]);
+
   public linkScrapeForm!: FormGroup;
 
   // public scrappedData = "";
@@ -73,7 +76,7 @@ export class HtmlMarkdown {
     this.linkScrapeForm.get('url')?.valueChanges.subscribe((urlValue) => {
       this.linkURL.set(urlValue);
       this.listurldata = { listname: '', pubauthorslug: '' };
-      
+
       if (urlValue.trim().length > 0 && isValidUrl(urlValue.trim())) {
         console.log('URL changed to:', this.linkURL());
         this.markdownString.set(''); // Clear the string representation of the array
@@ -136,6 +139,11 @@ export class HtmlMarkdown {
   }
 
   async convert(url: string) {
+    if (this.linkScrapeForm.value.add === true) {
+      // If the "Add" checkbox is checked, scrape basic data
+      await this.srapeBasicData();
+    }
+
     const result = (await window.electronAPI.invoke(
       'convert-html-to-markdown',
       {
@@ -144,8 +152,12 @@ export class HtmlMarkdown {
       }
     )) as { success: boolean; markdown?: string; error?: string };
     if (result.success) {
-      console.log('✅ Markdown:', result.markdown);
+      console.log('>===>> ✅ Markdown:', result.markdown);
       this.markdownString.set(result.markdown!);
+      if (this.scrappedDataArray().length === 1) {
+        console.log('>===>> Article Basic Data: ', JSON.stringify(this.scrappedDataArray()[0]));
+        this.scrappedDataArray()[0].content = result.markdown!; // Set the content of the first item
+      }
     } else {
       console.error('❌ Conversion failed:', result.error);
     }
@@ -224,9 +236,8 @@ export class HtmlMarkdown {
 
   async markdownPreview(markdata: string) {
     let rawHtml = await marked.parse(markdata);
-    if (rawHtml.trim().length === 0) rawHtml = "# No Markdown!"; 
+    if (rawHtml.trim().length === 0) rawHtml = '# No Markdown!';
     const safeHtml = this.sanitizer.bypassSecurityTrustHtml(rawHtml);
-    
 
     this.safeHtmlContent.set(safeHtml);
   }
@@ -239,6 +250,82 @@ export class HtmlMarkdown {
     } else {
       console.log('No heading Title found');
       return '';
+    }
+  }
+
+  async srapeBasicData() {
+    let loading = true;
+    let result = null;
+    let error = null;
+    const urlValue = this.linkScrapeForm.value.url;
+
+    let urlsArray: string[] = [];
+    if (urlValue && urlValue.trim().length > 0) urlsArray.push(urlValue.trim());
+    try {
+      const response = await this.scrapper.scrapeTabsList(urlsArray);
+      if (response.success) {
+        let result: PostData[] = []; // default
+        if (Array.isArray(response.data) && response.data.length > 0) {
+          result = response.data as PostData[];
+        }
+        this.scrappedDataArray.set(result);
+        // this.scrappedDataArray.set(result as PostData[]);
+        //this.scrappedDataArrayString.set(JSON.stringify(result, null, 2));
+      } else {
+        error = response.error;
+      }
+    } catch (err) {
+      error = err;
+    } finally {
+      loading = false;
+    }
+  }
+
+
+  onDBInsert() {
+
+    if (this.markdownString().length > 0) {
+      this.runInsertScrapedArrayToDB(this.scrappedDataArray());
+    }
+  }
+
+  async runInsertScrapedArrayToDB(dataArray: PostData[]) {
+    if (dataArray.length === 0) return;
+
+    try {
+      if (dataArray.length > 0) {
+        const result = (await window.electronAPI.invoke(
+          'sqlite:insert-articles-from-json-array',
+          dataArray
+        )) as number;
+
+        if (result > 0) {
+          this.dlgService
+            .popup({
+              token: 'succ',
+              header: 'URLs Inserted!',
+              content: result + ' URLs were inserted to the main DB.',
+              posAnsMsg: 'OK',
+              negAnsMsg: '',
+            })
+            .subscribe((res) => console.log('Dialog closed with:', res));
+        } else {
+          console.error('Unexpected result from DB insert:', result);
+          this.dlgService
+            .popup({
+              token: 'error',
+              header: 'Error',
+              content: 'Failed to insert URLs to the main DB.',
+              posAnsMsg: 'OK',
+              negAnsMsg: '',
+            })
+            .subscribe((res) => console.log('Dialog closed with:', res));
+        }
+
+        console.log('>===>> Inserted URLs to main DB:', result);
+      }
+    } catch (error) {
+      console.error('Error inserting URLs to main DB:', error);
     }
   }
 }
