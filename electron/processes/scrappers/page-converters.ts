@@ -14,8 +14,22 @@ import { JSDOM } from 'jsdom';
 
 import { autoScrollArticlePage } from '../scrappers/scrape-functions';
 import { fencedCodeBlockRule, inlineCodeRule, mediumFriendlyCodeBlockRule } from '../../helpers/turndown-rules';
+import { GIST_IFRAME_SELECTOR_DELAY, GIST_PAGE_LOADING_DELAY, INITIAL_PAGE_LOADING_DELAY, SLEEP_DELAY_FOR_LATE_JS_RENDERING } from './time-constants';
 
 puppeteer.use(StealthPlugin());
+
+
+
+// ========================================================================================================
+// Timer Constants
+// ========================================================================================================
+// const INITIAL_PAGE_LOADING_DELAY = 15000;         // 15 (20) seconds for page load  (htmlToMarkdown)
+// const SLEEP_DELAY_FOR_LATE_JS_RENDERING = 1000;   // 1 second for late JS rendering  (htmlToMarkdown)
+// const GIST_IFRAME_SELECTOR_DELAY = 5000;          // 5 seconds to wait for gist iframes to appear  (getCleanedPageContent)
+// const GIST_PAGE_LOADING_DELAY = 15000;            // 15 (20) seconds for gist page load  (extractCodeFromIframe)
+
+
+
 
 
 
@@ -60,11 +74,20 @@ export async function htmlToMarkdown(
         { waitUntil: 'networkidle0' }
       );
     } else {
-      await page.goto(input, { waitUntil: 'networkidle0', timeout: 20000 });
+      // await page.goto(input, { waitUntil: 'networkidle0', timeout: 20000 });
+      await page.goto(input, {
+        waitUntil: 'networkidle0',
+        timeout: INITIAL_PAGE_LOADING_DELAY,
+      });
     }
 
+
+
     // Small delay for late JS rendering
-    await new Promise((res) => setTimeout(res, 1000));
+    // await new Promise((res) => setTimeout(res, 1000));
+    await new Promise((res) =>
+      setTimeout(res, SLEEP_DELAY_FOR_LATE_JS_RENDERING)
+    );
 
     // Cloudflare challenge detection
     const challenge = await page.evaluate(() =>
@@ -73,6 +96,8 @@ export async function htmlToMarkdown(
     if (challenge) {
       throw new Error('Blocked by bot protection (Cloudflare challenge)');
     }
+
+
 
     // 1️⃣ Get cleaned HTML + captured gist iframe sources
     const { html: cleanedHtml, iframeSrcs } = await getCleanedPageContent(page);
@@ -128,7 +153,10 @@ export async function getCleanedPageContent(
   await autoScrollArticlePage(page);
 
   try {
-    await page.waitForSelector("figure iframe", { timeout: 5000 });
+    // await page.waitForSelector("figure iframe", { timeout: 5000 });
+    await page.waitForSelector("figure iframe", {
+      timeout: GIST_IFRAME_SELECTOR_DELAY,
+    });
   } catch {
     console.warn("⚠️ No gist iframes found within timeout");
   }
@@ -355,7 +383,11 @@ export async function extractCodeFromIframe(
   const page = await browser.newPage();
 
   try {
-    await page.goto(iframeUrl, { waitUntil: "networkidle0", timeout: 20000 });
+    // await page.goto(iframeUrl, { waitUntil: "networkidle0", timeout: 20000 });
+    await page.goto(iframeUrl, {
+      waitUntil: 'networkidle0',
+      timeout: GIST_PAGE_LOADING_DELAY,
+    });
 
     // Find the raw code link
     const { rawCodeUrl, gistPermalink } = await page.evaluate(() => {

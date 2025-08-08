@@ -1,6 +1,6 @@
 // scrape-functions.ts
 // This file is part of an Electron application that scrapes basic article data from a given URL.
-// 250715-23
+// 250715-08xx
 
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
@@ -11,12 +11,33 @@ import { extractFirstPathPart } from '../../../shared/utils/shared-utils';
 
 import { BrowserWindow } from 'electron';
 
+import TurndownService from 'turndown';
+
 import pLimit from 'p-limit';
 import {
   BROWSER_URLPORT,
   MAX_ARTICLES_NUMBER,
   SCROLL_DELAY,
 } from '../../../shared/constants';
+import { getCleanedPageContent, processGists } from './page-converters';
+import { fencedCodeBlockRule, inlineCodeRule, mediumFriendlyCodeBlockRule } from '../../helpers/turndown-rules';
+import { ADDITIONAL_PAGE_DELAY, DEFAULT_AUTOSCROLL_DELAY, OPEN_NEW_TAB_DELAY, TAB_INITIAL_PAGE_LOADING_DELAY } from './time-constants';
+
+
+// ========================================================================================================
+// Timer Constants
+// ========================================================================================================
+// const OPEN_NEW_TAB_DELAY = 500;                 // Delay to open a new tab - avoiding rapid tab creation (collectPostsFromUrlTabs)
+// const TAB_INITIAL_PAGE_LOADING_DELAY = 15000;   // 15 seconds for initial page load (collectPostsFromUrlTabs)
+// const ADDITIONAL_PAGE_DELAY = 1000;             // 1 second for additional page delay for complete page loading (scrapeMediumArticle)
+// const DEFAULT_AUTOSCROLL_DELAY = 100;           // (autoScrollArticlePage)
+
+
+
+
+
+
+
 
 // Apply stealth plugin
 puppeteer.use(StealthPlugin());
@@ -93,19 +114,28 @@ export async function collectPostsFromUrlTabs(
 
         try {
           // Optional delay to avoid rapid tab creation
-          await new Promise((res) => setTimeout(res, 500));
+          // await new Promise((res) => setTimeout(res, 500));
+          await new Promise((res) => setTimeout(res, OPEN_NEW_TAB_DELAY));
 
           page = await browser.newPage();
           console.log(`Opening: ${url}`);
           await page.goto(url, {
             waitUntil: 'domcontentloaded',
-            timeout: 15000,
+            timeout: TAB_INITIAL_PAGE_LOADING_DELAY   //15000,
           });
 
+
+
+          // Scrape the article data by calling the scrapeMediumArticle() key-function
           const data = await scrapeMediumArticle(page);
+
+          const content = await scrapeMediumMarkdownContent(page);
+          data.content = content;
+
           data.counter = p;
           console.log(` Post: ${p} ${JSON.stringify(data)} `);
           return data;
+
         } catch (err) {
           // console.error(`Failed to scrape ${url}:`, err.message || err);
           if (err instanceof Error) {
@@ -149,11 +179,6 @@ export async function collectPostsFromUrlTabs(
       if (post) {
         i = i + 1;
         post.counter = i;
-        // 250806 Update
-        // console.log(
-        //   '>===>> collectPostsFromUrlTabs -> scrapeMediumArticle -> rawDate:',
-        //   post.date
-        // );
         if (post.date && post.date.length) {
           post.date = formatDate(post.date);
         }  
@@ -168,15 +193,29 @@ export async function collectPostsFromUrlTabs(
   }
 }
 
+
+
+
 // ==========================================================================================
 // Key Function to scrape the basic (meta-) data of an Article, from an Article's page
 // ==========================================================================================
 async function scrapeMediumArticle(page: Puppeteer.Page): Promise<PostData> {
-  await new Promise((resolve) => setTimeout(resolve, 1000));
+  // await new Promise((resolve) => setTimeout(resolve, 1000));
+  await new Promise((resolve) => setTimeout(resolve, ADDITIONAL_PAGE_DELAY)); // 1000 ms delay for additional page loading  
 
-  // Wait until the last DOM element (commentsEl)
-  // await page.waitForSelector('button[aria-label="responses"] .pw-responses-count', { timeout: 35000 });
 
+
+  // Cloudflare challenge detection
+  const challenge = await page.evaluate(() =>
+    document.body.innerText.includes('Verify you are human')
+  );
+  if (challenge) {
+    throw new Error('Blocked by bot protection (Cloudflare challenge)');
+  }
+
+  // Scraping Basic Article Data
+  // We use the page.evaluate() function to run the code in the browser context
+  // This allows us to access the DOM and extract the required data
   const postData = await page.evaluate(() => {
     const link = window.location.href;
     const hostname = new URL(link).hostname;
@@ -197,23 +236,7 @@ async function scrapeMediumArticle(page: Puppeteer.Page): Promise<PostData> {
       authorEl && authorEl.textContent ? authorEl.textContent.trim() : '';
 
     let rawDate = '';
-    // const outerContainer = document.querySelector('div.speechify-ignore.bh.m');
-    // if (outerContainer) {
-    //   const dateContainer = outerContainer.querySelector('div.ac.af');
-    //   if (dateContainer) {
-    //     const childNodes = Array.from(dateContainer.childNodes);
-    //     for (let i = childNodes.length - 1; i >= 0; i--) {
-    //       const node = childNodes[i];
-    //       if (node.nodeType === Node.TEXT_NODE) {
-    //         const text = node.textContent ? node.textContent.trim() : '';
-    //         if (text && text !== '·') {
-    //           rawDate = text;
-    //           break;
-    //         }
-    //       }
-    //     }
-    //   }
-    // }
+
     //250806 Update
     const outerContainer = document.querySelector('div.speechify-ignore.bh.m');
     if (outerContainer) {
@@ -244,6 +267,7 @@ async function scrapeMediumArticle(page: Puppeteer.Page): Promise<PostData> {
       }
     }
 
+
     // console.log('>===>> Extracted date:', rawDate); // console.log does not work here due to the Puppeteer context
 
     const likesBtn = document.querySelector('.pw-multi-vote-count button');
@@ -267,6 +291,7 @@ async function scrapeMediumArticle(page: Puppeteer.Page): Promise<PostData> {
     const timestamp = new Date().toISOString();
     const counter = 0;
     const listname = '';
+    const content = ''; // Placeholder for content, markdown obtained later
 
     return {
       counter,
@@ -282,11 +307,67 @@ async function scrapeMediumArticle(page: Puppeteer.Page): Promise<PostData> {
       date: rawDate,
       likes,
       comments,
+      content,
     };
+
   });
 
   return postData;
 }
+
+
+// ==========================================================================================
+// 250808
+// Function to scrape the Markdown content of a Medium article
+// It uses the getCleanedPageContent() and processGists() functions
+// It returns the Markdown content as a string
+// ==========================================================================================
+async function scrapeMediumMarkdownContent(page: Puppeteer.Page): Promise<string>{
+
+  // Not recommended: relies on internal structure
+  // This is not officially supported and may break with future Puppeteer versions
+  const browser = page.browserContext().browser();
+  
+  try {         
+    // 1️⃣ Get cleaned HTML + captured gist iframe sources
+    const { html: cleanedHtml, iframeSrcs } = await getCleanedPageContent(page);
+
+    // 2️⃣ Process gists using existing browser connection
+    const htmlWithGists = await processGists(browser, cleanedHtml, iframeSrcs);
+
+    // 3️⃣ Convert processed HTML to Markdown
+    const turndownService = new TurndownService({
+      codeBlockStyle: 'fenced',
+      headingStyle: 'atx',
+    });
+
+    // Add your custom rules
+    turndownService.addRule('fencedCodeBlocks', fencedCodeBlockRule());
+    turndownService.addRule('inlineCode', inlineCodeRule());
+    turndownService.addRule(
+      'mediumFriendlyCodeBlocks',
+      mediumFriendlyCodeBlockRule()
+    );
+
+    return turndownService.turndown(htmlWithGists);
+  } finally {
+    // if (page) {
+    //   await page.close();
+    // }
+    // Don't close browser, since you're attaching to a running instance
+  }
+
+}
+
+
+
+
+
+
+
+
+
+
 
 // ==========================================================================================
 // ==========================================================================================
@@ -496,6 +577,7 @@ async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// -----------------------------------------------------------------------------------------
 /**
  * 250731
  * Automatically scrolls the page to the bottom to trigger lazy-loading
@@ -506,7 +588,7 @@ async function sleep(ms: number): Promise<void> {
 export async function autoScrollArticlePage(
   page: import('puppeteer').Page,
   distance = 200,
-  delay = 100
+  delay = DEFAULT_AUTOSCROLL_DELAY   //100
 ): Promise<void> {
   await page.evaluate(
     async (scrollDistance: number, stepDelay: number) => {
@@ -568,3 +650,5 @@ async function clickWithRetry(
   }
   return false;
 }
+
+

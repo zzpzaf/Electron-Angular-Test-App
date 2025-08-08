@@ -139,28 +139,16 @@ export class HtmlMarkdown {
   }
 
   async convert(url: string) {
-    if (this.linkScrapeForm.value.add === true) {
-      // If the "Add" checkbox is checked, scrape basic data
-      await this.srapeBasicData();
-    }
-
-    const result = (await window.electronAPI.invoke(
-      'convert-html-to-markdown',
-      {
-        input: url, // URL or raw HTML string
-        isRawHtml: false, // set to true if passing raw HTML
-      }
-    )) as { success: boolean; markdown?: string; error?: string };
-    if (result.success) {
-      console.log('>===>> ✅ Markdown:', result.markdown);
-      this.markdownString.set(result.markdown!);
-      if (this.scrappedDataArray().length === 1) {
-        console.log('>===>> Article Basic Data: ', JSON.stringify(this.scrappedDataArray()[0]));
-        this.scrappedDataArray()[0].content = result.markdown!; // Set the content of the first item
-      }
+    
+    // const scrapedPostData = await this.srapeBasicData();
+    await this.srapeArticleData(); // Adds/Sets the scraped data to the scrappedDataArray
+    if (this.scrappedDataArray().length === 1) {
+      this.markdownString.set(this.scrappedDataArray()[0].content!); // Set the content of the first item
+      console.log('>===>> Article Scraped Data: ', JSON.stringify(this.scrappedDataArray()[0]));
     } else {
-      console.error('❌ Conversion failed:', result.error);
+      console.error('❌ Scraped failed!');
     }
+    
   }
 
   onDragOver(event: DragEvent): void {
@@ -253,7 +241,7 @@ export class HtmlMarkdown {
     }
   }
 
-  async srapeBasicData() {
+  async srapeArticleData() {
     let loading = true;
     let result = null;
     let error = null;
