@@ -329,13 +329,12 @@ async function scrapeMediumMarkdownContent(page: Puppeteer.Page): Promise<string
   const browser = page.browserContext().browser();
   
   try {         
-    // 1️⃣ Get cleaned HTML + captured gist iframe sources
+    // Get cleaned HTML + captured gist iframe sources
     const { html: cleanedHtml, iframeSrcs } = await getCleanedPageContent(page);
 
-    // 2️⃣ Process gists using existing browser connection
+    // Process gists using existing browser connection
     const htmlWithGists = await processGists(browser, cleanedHtml, iframeSrcs);
 
-    // 3️⃣ Convert processed HTML to Markdown
     const turndownService = new TurndownService({
       codeBlockStyle: 'fenced',
       headingStyle: 'atx',
@@ -349,7 +348,12 @@ async function scrapeMediumMarkdownContent(page: Puppeteer.Page): Promise<string
       mediumFriendlyCodeBlockRule()
     );
 
+    // Real convertion from HTML to Markdown
     return turndownService.turndown(htmlWithGists);
+  } catch (error) {
+    
+    console.error('Error scraping Markdown content:', error);
+    throw error;
   } finally {
     // if (page) {
     //   await page.close();
