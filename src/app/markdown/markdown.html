@@ -1,16 +1,22 @@
-<form
+<!-- <form
   nz-form
   nzLayout="inline"
   [formGroup]="linkScrapeForm"
   class="login-form"
   (ngSubmit)="submitForm()"
+> -->
+<form
+  nz-form
+  nzLayout="inline"
+  [formGroup]="linkScrapeForm"
+  class="login-form"
 >
   <nz-form-item class="login-form-spacer"></nz-form-item>
 
   <nz-form-item class="login-form-input">
     <nz-form-control
       nzErrorTip="Please input the URL"
-      nzExtra="Enter/type, paste or drop an Article or List URL here"
+      nzExtra="Enter/type, paste or drag'n'drop an Article URL here"
     >
       <nz-input-group>
         <input
@@ -27,27 +33,32 @@
 
   <nz-form-item>
     <label nz-checkbox formControlName="add">
-      <span>Scrape Basic Data</span>
+      <span>Auto DB Insertion</span>
     </label>
   </nz-form-item>
 
-  <nz-form-item>
+  <!-- <nz-form-item>
     <button nz-button [nzType]="'primary'">Convert</button>
-  </nz-form-item>
+  </nz-form-item> -->
 </form>
 
 <!-- Separator -->
 <div class="login-form-separator"></div>
 
-<!-- Textarea / Preview container -->
+<!-- Markdown Textarea / Preview container -->
 <div class="text-area-container">
+  <textarea nz-input [(ngModel)]="postMetaDataString" class="ta ta--top">
+  </textarea>
   @if (preview) {
-  <div class="markdown-container" [innerHTML]="safeHtmlContent()"></div>
+  <div
+    class="ta ta--bottom markdown-container"
+    [innerHTML]="safeHtmlContent()"
+  ></div>
   } @else {
   <textarea
     nz-input
     [(ngModel)]="markdownString"
-    class="stretch-textarea"
+    class="ta ta--bottom"
   ></textarea>
   }
 
@@ -88,6 +99,7 @@
       Save
     </button>
 
+    @if (!linkScrapeForm.get('add')?.value) {
     <button
       nz-button
       nzType="primary"
@@ -96,5 +108,6 @@
     >
       DB Insert
     </button>
+    }
   </div>
 </div>

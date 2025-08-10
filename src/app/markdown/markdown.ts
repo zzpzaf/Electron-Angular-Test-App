@@ -36,14 +36,14 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
     NzCheckboxModule,
     NzButtonModule,
   ],
-  templateUrl: './html-markdown.html',
-  styleUrl: './html-markdown.scss',
+  templateUrl: './markdown.html',
+  styleUrl: './markdown.scss',
 })
-export class HtmlMarkdown {
+export class Markdown {
   private fb = inject(NonNullableFormBuilder);
   private scrapper = inject(Articlebasicscraper);
   public scrappedDataArray = signal<PostData[]>([]);
-
+  public postMetaDataString = signal<string>('');
   public linkScrapeForm!: FormGroup;
 
   // public scrappedData = "";
@@ -65,6 +65,7 @@ export class HtmlMarkdown {
   public safeHtmlContent = signal<SafeHtml | null>(null);
   private sanitizer = inject(DomSanitizer);
 
+
   constructor() {}
 
   ngOnInit(): void {
@@ -74,22 +75,23 @@ export class HtmlMarkdown {
       this.isAddedChecked.set(value); // Update the signal when checkbox changes
     });
     this.linkScrapeForm.get('url')?.valueChanges.subscribe((urlValue) => {
+      if (urlValue.trim().length === 0 || !isValidUrl(urlValue.trim())) return;
       this.linkURL.set(urlValue);
-      this.listurldata = { listname: '', pubauthorslug: '' };
 
-      if (urlValue.trim().length > 0 && isValidUrl(urlValue.trim())) {
-        console.log('URL changed to:', this.linkURL());
-        this.markdownString.set(''); // Clear the string representation of the array
-        this.safeHtmlContent.set(''); // Clear the markdown string
-        this.preview = false;
-        this.listurldata = analyzeListedLink(urlValue);
-        // console.log('List Name (if):', this.listurldata.listname.trim());
-      }
-      if (this.listurldata.listname.trim().length > 0) {
-        this.linkScrapeForm.get('add')?.setValue(false);
-      } else if (this.listurldata.listname.trim().length === 0) {
-        this.linkScrapeForm.get('add')?.setValue(true);
-      }
+      this.listurldata = { listname: '', pubauthorslug: '' };
+      this.listurldata = analyzeListedLink(urlValue);
+
+      // console.log('URL changed to:', this.linkURL());
+      this.markdownString.set(''); // Clear the string representation of the array
+      this.postMetaDataString.set(''); // Clear the post metadata string
+      this.safeHtmlContent.set(''); // Clear the markdown string
+      this.preview = false;
+
+      // this.convert(this.linkURL());
+      // Call the scraping function with the updated URL
+      // Adds/Sets the scraped data to the scrappedDataArray 
+      this.srapeArticleData(this.linkURL()); 
+      
     });
 
     // It captures directly any Electron message sent and passed via the "message-channel"
@@ -120,36 +122,25 @@ export class HtmlMarkdown {
     });
   }
 
-  submitForm(): void {
-    if (this.linkScrapeForm.valid) {
-      // console.log('submit', this.validateForm.value);
-      const urlValue = this.linkScrapeForm.value.url;
-      const rememberValue = this.linkScrapeForm.value.remember;
-      console.log('Submitted URL: ', urlValue);
-      this.convert(urlValue);
-      // this.isSaveButtonEnabled.set(false);
-    } else {
-      Object.values(this.linkScrapeForm.controls).forEach((control) => {
-        if (control.invalid) {
-          control.markAsDirty();
-          control.updateValueAndValidity({ onlySelf: true });
-        }
-      });
-    }
-  }
+  // submitForm(): void {
+  //   if (this.linkScrapeForm.valid) {
+  //     // console.log('submit', this.validateForm.value);
+  //     const urlValue = this.linkScrapeForm.value.url;
+  //     const rememberValue = this.linkScrapeForm.value.remember;
+  //     console.log('Submitted URL: ', urlValue);
+  //     this.convert(urlValue);
+  //     // this.isSaveButtonEnabled.set(false);
+  //   } else {
+  //     Object.values(this.linkScrapeForm.controls).forEach((control) => {
+  //       if (control.invalid) {
+  //         control.markAsDirty();
+  //         control.updateValueAndValidity({ onlySelf: true });
+  //       }
+  //     });
+  //   }
+  // }
 
-  async convert(url: string) {
-    
-    // const scrapedPostData = await this.srapeBasicData();
-    await this.srapeArticleData(); // Adds/Sets the scraped data to the scrappedDataArray
-    if (this.scrappedDataArray().length === 1) {
-      this.markdownString.set(this.scrappedDataArray()[0].content!); // Set the content of the first item
-      console.log('>===>> Article Scraped Data: ', JSON.stringify(this.scrappedDataArray()[0]));
-    } else {
-      console.error('❌ Scraped failed!');
-    }
-    
-  }
+
 
   onDragOver(event: DragEvent): void {
     event.preventDefault(); // Allow drop
@@ -182,6 +173,7 @@ export class HtmlMarkdown {
 
   onClear() {
     this.markdownString.set(''); // Clear the string representation of the array
+    this.postMetaDataString.set(''); // Clear the post metadata string
     this.safeHtmlContent.set(''); // Clear the markdown string
     this.preview = false;
     this.linkScrapeForm.reset(); // Reset the form
@@ -241,11 +233,24 @@ export class HtmlMarkdown {
     }
   }
 
-  async srapeArticleData() {
+  // async convert(url: string) {
+  //   console.log('>===>> URL changed to:', this.linkURL());
+  //   console.log('>===>> URL:', url);
+
+  //   if (!isValidUrl(url)) {
+  //     this.scrappedError.set('Invalid URL provided.');
+  //     console.error('❌ Invalid URL:', url);
+  //     return;
+  //   }
+  //   // const scrapedPostData = await this.srapeBasicData();
+  //   await this.srapeArticleData(url); // Adds/Sets the scraped data to the scrappedDataArray
+  // }
+
+  async srapeArticleData(urlValue: string) {
     let loading = true;
     let result = null;
     let error = null;
-    const urlValue = this.linkScrapeForm.value.url;
+    // const urlValue = this.linkScrapeForm.value.url;
 
     let urlsArray: string[] = [];
     if (urlValue && urlValue.trim().length > 0) urlsArray.push(urlValue.trim());
@@ -259,6 +264,44 @@ export class HtmlMarkdown {
         this.scrappedDataArray.set(result);
         // this.scrappedDataArray.set(result as PostData[]);
         //this.scrappedDataArrayString.set(JSON.stringify(result, null, 2));
+
+        if (this.scrappedDataArray().length < 1) return;
+
+        const postData: PostData = this.scrappedDataArray()[0];
+        // Set the post metadata
+        const postMetaData: PostData = {
+          listname: this.listurldata.listname,
+          pubauthorslug: this.listurldata.pubauthorslug,
+          hostname: postData.hostname,
+          timestamp: postData.timestamp,
+          pubname: postData.pubname,
+          authorname: postData.authorname,
+          title: postData.title,
+          link: postData.link,
+          image: postData.image,
+          date: postData.date,
+          likes: postData.likes,
+          comments: postData.comments,
+        }
+        this.postMetaDataString.set(JSON.stringify(postMetaData, null, 2));
+
+        // Set the (Markdown) content of the first item
+        this.markdownString.set(postData.content!); 
+
+        // console.log(
+        //   '>===>> Article Scraped Data: ',
+        //   JSON.stringify(this.scrappedDataArray()[0])
+        // );
+
+
+        // console.log(
+        //   '>===>> Add/Insert into DB? ',
+        //   this.linkScrapeForm.get('add')?.value
+        // );
+        if (this.linkScrapeForm.get('add')?.value === true && this.scrappedDataArray().length > 0) {
+          // this.onDBInsert();
+          await this.insertScrapedArrayToDB(this.scrappedDataArray());
+        }
       } else {
         error = response.error;
       }
@@ -269,15 +312,13 @@ export class HtmlMarkdown {
     }
   }
 
-
   onDBInsert() {
-
     if (this.markdownString().length > 0) {
-      this.runInsertScrapedArrayToDB(this.scrappedDataArray());
+      this.insertScrapedArrayToDB(this.scrappedDataArray());
     }
   }
 
-  async runInsertScrapedArrayToDB(dataArray: PostData[]) {
+  async insertScrapedArrayToDB(dataArray: PostData[]) {
     if (dataArray.length === 0) return;
 
     try {

@@ -1,4 +1,4 @@
-# The HtmlMarkdown Component
+# The Markdown Component
 
 ## **Component Overview**
 

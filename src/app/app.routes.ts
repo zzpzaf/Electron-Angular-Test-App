@@ -7,7 +7,7 @@ import { Home } from './home/home';
 import { Links } from './links/links';
 import { UrlsFile } from './urls-file/urls-file';
 import { Bookmarks } from './bookmarks/bookmarks';
-import { HtmlMarkdown } from './html-markdown/html-markdown';
+import { Markdown } from './markdown/markdown';
 
 
 export const appRoutes: Routes = [
@@ -16,7 +16,7 @@ export const appRoutes: Routes = [
   { path: 'links', component: Links },
   { path: 'urlsfile', component: UrlsFile },
   { path: 'bookmarks', component: Bookmarks },
-  { path: 'markdown', component: HtmlMarkdown },
+  { path: 'markdown', component: Markdown },
   { path: '', redirectTo: '/home', pathMatch: 'full' },
 
 ];

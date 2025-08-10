@@ -66,21 +66,43 @@
   width: 100%;
   color: #011e39;
   font-size: smaller;
+  gap: 12px; /* space between areas */
 
-  /* Textarea styling */
-  .stretch-textarea {
-    flex: 1; /* Take all available height in container */
-    font-size: smaller;
-    background-color: rgb(243, 238, 219);
-    resize: none;
+  // /* Textarea styling */
+  // .stretch-textarea {
+  //   flex: 1; /* Take all available height in container */
+  //   font-size: smaller;
+  //   background-color: rgb(243, 238, 219);
+  //   resize: none;
+  //   width: 100%;
+  //   margin-bottom: 16px;
+  // }
+
+  .ta {
+    /* let each textarea be a flex item that can grow/shrink */
+    min-height: 0; /* critical for flex children that scroll */
     width: 100%;
-    margin-bottom: 16px;
+    resize: none;
+    background: rgb(227, 217, 178);
+    font-size: smaller;
+    overflow: auto; /* enable internal scrolling when needed */
+    border: 1px solid #d6d6d6;
+    border-radius: 5px;
+    padding: 8px 10px;
+  }
+
+  .ta--top {
+    flex: 1 1 0%;
+    background: #e9f0e1;
+  }
+  .ta--bottom {
+    flex: 3 3 0%;
   }
 
   /* Markdown preview styling */
   .markdown-container {
-    height: 100%;       /* Match textarea height exactly */
-    min-height: 0;      /* Allow shrinking inside flexbox */
+    height: 100%; /* Match textarea height exactly */
+    min-height: 0; /* Allow shrinking inside flexbox */
     width: 100%;
     margin-bottom: 16px;
 
@@ -90,7 +112,7 @@
     background-color: #fff;
     box-sizing: border-box;
 
-    overflow-y: auto;   /* Scroll long markdown instead of expanding page */
+    overflow-y: auto; /* Scroll long markdown instead of expanding page */
     word-wrap: break-word;
 
     /* Typography */
@@ -99,30 +121,62 @@
     line-height: 1.5;
 
     /* Markdown-specific styles */
-    h1, h2, h3, h4, h5, h6 {
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
       margin: 0.5em 0 0.3em;
       font-weight: 600;
     }
     p {
       margin: 0.5em 0;
     }
-    code {
-      background-color: #f5f5f5;
+
+    /* Inline code only (NOT inside a <pre>) */
+    ::ng-deep :not(pre) > code {
+      // background-color: #e9f0e1 !important;
       padding: 0.2em 0.4em;
       border-radius: 4px;
+      // font-size: 0.9em;
+      font-family: monospace;
+      white-space: break-spaces; /* nicer wrapping inline */
+    }
+
+    /* Fenced code blocks */
+    ::ng-deep pre {
+      background-color: #e9f0e1 !important;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-family: 'Courier New', Courier ; //monospace;
+      font-size: smaller;  // 0.9em;
+      line-height: 1.5;
+      overflow: auto; /* scroll horizontally if needed */
+      margin: 0.5em 0;
+    }
+
+    /* The <code> inside <pre> — reset bg so we don't double-tint */
+    ::ng-deep pre > code {
+      background: transparent !important;
+      display: block;
+      white-space: pre; /* or `pre-wrap` if you want soft-wrapping */
+    }
+
+    ::ng-deep code {
+      // background-color: #e9f0e1 !important;
+      padding: 0.2em 0.4em;
+      border-radius: 4px;
+      font-size: 0.9em;
       font-family: monospace;
     }
-    pre {
-      background-color: #f5f5f5;
-      padding: 8px;
-      border-radius: 4px;
-      overflow-x: auto;
-    }
+
     a {
       color: #1677ff;
       text-decoration: underline;
     }
-    ul, ol {
+    ul,
+    ol {
       padding-left: 20px;
       margin: 0.5em 0;
     }

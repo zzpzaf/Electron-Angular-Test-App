@@ -5,7 +5,7 @@ export interface listURLData {
 
 
 export interface PostData extends listURLData{
-  counter: number;
+  counter?: number;
   hostname: string;
   timestamp: string;
   pubname: string;
