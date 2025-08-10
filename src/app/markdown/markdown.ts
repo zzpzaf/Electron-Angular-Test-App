@@ -25,6 +25,8 @@ import { DlgService } from '../shared/services/dlg-service';
 
 import { marked } from 'marked';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { BackEnd } from '../shared/services/back-end';
+import { from } from 'rxjs';
 
 @Component({
   selector: 'sel-html-markdown',
@@ -65,6 +67,7 @@ export class Markdown {
   public safeHtmlContent = signal<SafeHtml | null>(null);
   private sanitizer = inject(DomSanitizer);
 
+  private backendService = inject(BackEnd);
 
   constructor() {}
 
@@ -76,10 +79,15 @@ export class Markdown {
     });
     this.linkScrapeForm.get('url')?.valueChanges.subscribe((urlValue) => {
       if (urlValue.trim().length === 0 || !isValidUrl(urlValue.trim())) return;
-      this.linkURL.set(urlValue);
 
       this.listurldata = { listname: '', pubauthorslug: '' };
       this.listurldata = analyzeListedLink(urlValue);
+
+      // Get the clean URL without the query parameters part
+      const fullUrl = new URL(urlValue.trim());
+      const clearUrl = fullUrl.origin + fullUrl.pathname;
+      this.linkURL.set(clearUrl);
+
 
       // console.log('URL changed to:', this.linkURL());
       this.markdownString.set(''); // Clear the string representation of the array
@@ -89,10 +97,35 @@ export class Markdown {
 
       // this.convert(this.linkURL());
       // Call the scraping function with the updated URL
-      // Adds/Sets the scraped data to the scrappedDataArray 
-      this.srapeArticleData(this.linkURL()); 
-      
+      // Adds/Sets the scraped data to the scrappedDataArray
+
+      from(this.isUrlExisting(this.linkURL())).subscribe({
+        next: (isExisting) => {
+          console.log('>===>> URL exists:', isExisting);
+          if (isExisting) {
+            console.warn('URL already exists in the database:', this.linkURL());
+            this.dlgService
+              .popup({
+                token: 'warn',
+                header: 'URL Exists',
+                content: 'This URL already exists in the database.',
+                posAnsMsg: 'OK',
+                negAnsMsg: '',
+                delay: 500,
+              })
+              .subscribe((result) => {
+                console.log('Dialog closed with:', result);
+              });
+
+          } else {
+            this.srapeArticleData(this.linkURL());
+          }
+        },
+        error: (err) => console.error('URL check failed:', err),
+      });
     });
+
+
 
     // It captures directly any Electron message sent and passed via the "message-channel"
     window.electronAPI.on('message-channel', (message: string) => {
@@ -139,8 +172,6 @@ export class Markdown {
   //     });
   //   }
   // }
-
-
 
   onDragOver(event: DragEvent): void {
     event.preventDefault(); // Allow drop
@@ -282,23 +313,25 @@ export class Markdown {
           date: postData.date,
           likes: postData.likes,
           comments: postData.comments,
-        }
+        };
         this.postMetaDataString.set(JSON.stringify(postMetaData, null, 2));
 
         // Set the (Markdown) content of the first item
-        this.markdownString.set(postData.content!); 
+        this.markdownString.set(postData.content!);
 
         // console.log(
         //   '>===>> Article Scraped Data: ',
         //   JSON.stringify(this.scrappedDataArray()[0])
         // );
 
-
         // console.log(
         //   '>===>> Add/Insert into DB? ',
         //   this.linkScrapeForm.get('add')?.value
         // );
-        if (this.linkScrapeForm.get('add')?.value === true && this.scrappedDataArray().length > 0) {
+        if (
+          this.linkScrapeForm.get('add')?.value === true &&
+          this.scrappedDataArray().length > 0
+        ) {
           // this.onDBInsert();
           await this.insertScrapedArrayToDB(this.scrappedDataArray());
         }
@@ -318,43 +351,61 @@ export class Markdown {
     }
   }
 
+  /**
+   * Inserts the scraped data array into the main database.
+   * Displays a dialog with the result of the insertion.
+   * @param dataArray - The array of PostData to insert.
+   */
   async insertScrapedArrayToDB(dataArray: PostData[]) {
     if (dataArray.length === 0) return;
+    try {
+      const insertedCount = await this.backendService.insertArticles(dataArray);
+      if (insertedCount > 0) {
+        this.dlgService
+          .popup({
+            token: 'succ',
+            header: 'Articles Inserted!',
+            content: insertedCount + ' articles were inserted to the main DB.',
+            posAnsMsg: 'OK',
+            negAnsMsg: '',
+          })
+          .subscribe((res) => console.log('Dialog closed with:', res));
+      } else {
+        console.error('Unexpected result from DB insert:', insertedCount);
+        this.dlgService
+          .popup({
+            token: 'error',
+            header: 'Error',
+            content: 'Failed to insert articles to the main DB.',
+            posAnsMsg: 'OK',
+            negAnsMsg: '',
+          })
+          .subscribe((res) => console.log('Dialog closed with:', res));
+      }
+    } catch (err) {
+      console.error('Error inserting URLs to main DB:', err);
+    }
+  }
+
+  /*
+   * Checks if a URL already exists in the 'articles' table.
+   * @param {string} urlString - The URL to check for existence.
+   * @returns {boolean} - Returns true
+   * if the URL exists, false otherwise.
+   */
+  async isUrlExisting(urlString: string): Promise<boolean> {
+    if (!window.electronAPI) {
+      console.error('>===>> No Main DB connection.');
+      return false;
+    }
 
     try {
-      if (dataArray.length > 0) {
-        const result = (await window.electronAPI.invoke(
-          'sqlite:insert-articles-from-json-array',
-          dataArray
-        )) as number;
-
-        if (result > 0) {
-          this.dlgService
-            .popup({
-              token: 'succ',
-              header: 'URLs Inserted!',
-              content: result + ' URLs were inserted to the main DB.',
-              posAnsMsg: 'OK',
-              negAnsMsg: '',
-            })
-            .subscribe((res) => console.log('Dialog closed with:', res));
-        } else {
-          console.error('Unexpected result from DB insert:', result);
-          this.dlgService
-            .popup({
-              token: 'error',
-              header: 'Error',
-              content: 'Failed to insert URLs to the main DB.',
-              posAnsMsg: 'OK',
-              negAnsMsg: '',
-            })
-            .subscribe((res) => console.log('Dialog closed with:', res));
-        }
-
-        console.log('>===>> Inserted URLs to main DB:', result);
-      }
+      const exists = await this.backendService.checkUrlExists(urlString);
+      console.log('>===>> URL exists:', exists);
+      return exists; // true or false
     } catch (error) {
-      console.error('Error inserting URLs to main DB:', error);
+      console.error('Error checking if URL exists:', error);
+      return false; // default fallback
     }
   }
 }

@@ -27,20 +27,49 @@ const mainDb = getMainConnection();
 // }
 
 
-/* --------------------------------------------------------------------------------------------------
+/** --------------------------------------------------------------------------------------------------
  * Queries for Main Application SQLite DB dealing with articles, categories, and other data
  * --------------------------------------------------------------------------------------------------
-* - insertArticlesFromJson: Inserts an array of articles into the 'articles' table
-* 
+ * - insertArticlesFromJson: Inserts an array of articles into the 'articles' table
+ * - isUrlExisting: Checks if a URL already exists in the 'articles' table (250810)
+ * 
  * - safeValue: Helper function to safely handle different data types (Iis not used yet)
  * - safeStr: Helper function to ensure string values are safe (Iis not used yet)
- * - safeNum: Helper function to ensure number values are safe (Iis not used yet)
-/*
+ * - safeNum: Helper function to ensure number values are safe (Iis not used yet) 
+ **/
+
+
+/* 250810
+ * Checks if a URL already exists in the 'articles' table.
+ * @param {string} urlString - The URL to check for existence.
+ * @returns {boolean} - Returns true if the URL exists, false otherwise.
+ */
+export function isUrlExisting(urlString: string): boolean {
+  if (!mainDb) {
+    console.error('>===>> No Main DB connection.');
+    return false;
+  }
+
+  try {
+    const checkStmt = mainDb.prepare(`
+      SELECT 1 
+      FROM articles 
+      WHERE linkurl = ? 
+      LIMIT 1
+    `);
+
+    const row = checkStmt.get(urlString);
+    return row !== undefined; // true if found, false otherwise
+  } catch (err) {
+    console.error('Error checking URL existence:', err);
+    return false;
+  }
+}
 
 
 
 
-
+ /*
  * Inserts an array of articles into the 'articles' table.
  * @param {PostData[]} posts - Array of articles to insert.
  * @returns {number} - The number of successfully inserted articles.

@@ -66,8 +66,11 @@ export class Dialog implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     const d = this.dlgData;
+
+    console.log('>===>> Dialog data:', JSON.stringify(d));
+
     if (!d.delay) d.delay = 5000;
-    if (d.token === 'info' || d.token === 'succ') {
+    if (d.token === 'info' || d.token === 'succ' || d.token === 'warn') {
       this.autoCloseTimer = setTimeout(() => {
         this.modalRef.destroy();
       }, d.delay);

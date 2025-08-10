@@ -32,7 +32,7 @@ import { htmlToMarkdown } from './processes/scrappers/page-converters';
 // import { handleOpenFile, handleDroppedFile } from './helpers/electron-utils';
 import { shell } from 'electron';
 import { closeDBConnections } from './dbs/sqlite/connections';
-import { insertArticlesFromJson } from './dbs/sqlite/mandb_queries';
+import { insertArticlesFromJson, isUrlExisting } from './dbs/sqlite/mandb_queries';
 
 const isDev = require('electron-is-dev');
 
@@ -345,6 +345,20 @@ ipcMain.handle(
     }
   }
 );
+
+ipcMain.handle('sqlite:check-if-url-existing', 
+  (event: any, link: string) => {
+  try {
+    const sanitized = (link ?? '').trim();
+    if (!sanitized) return false; // empty/invalid input → treat as not found
+    const isExisting = isUrlExisting(sanitized);
+    return isExisting; // boolean
+  } catch (err) {
+    console.error('Error checking linkurl existence:', link, err);
+    return false; // always return boolean
+  }
+});
+
 
 ipcMain.handle(
   'sqlite:get-subfolders-tree',
