@@ -24,10 +24,11 @@ import {
 
 import { DlgService } from '../shared/services/dlg-service';
 
-import { marked } from 'marked';
-import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+// import { marked } from 'marked';
+import { SafeHtml } from '@angular/platform-browser';
 import { BackEnd } from '../shared/services/back-end';
 import { from } from 'rxjs';
+import { Markshow } from '../shared/services/markshow';
 
 @Component({
   selector: 'sel-html-markdown',
@@ -66,7 +67,10 @@ export class Markdown {
 
   public preview: boolean = false;
   public safeHtmlContent = signal<SafeHtml | null>(null);
-  private sanitizer = inject(DomSanitizer);
+  // private sanitizer = inject(DomSanitizer);
+
+  private markedService = inject(Markshow);
+
 
   private backendService = inject(BackEnd);
 
@@ -251,9 +255,9 @@ export class Markdown {
   }
 
   async markdownPreview(markdata: string) {
-    let rawHtml = await marked.parse(markdata);
-    if (rawHtml.trim().length === 0) rawHtml = '# No Markdown!';
-    const safeHtml = this.sanitizer.bypassSecurityTrustHtml(rawHtml);
+    // let rawHtml = await marked.parse(markdata);
+    // if (rawHtml.trim().length === 0) rawHtml = '# No Markdown!';
+    const safeHtml = this.markedService.render(markdata);
 
     this.safeHtmlContent.set(safeHtml);
   }
