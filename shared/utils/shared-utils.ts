@@ -41,7 +41,7 @@ export function analyzeListedLink(url: string): listURLData {
   const pathname = urlObj.pathname;
   console.log('Link Pathname: ', pathname);
   const parts = getPathNameParts(pathname);
-  console.log('Path Name has: ', parts.length, 'parts: ', parts);
+  console.log('>===>> URL Path Name has: ', parts.length, ' - parts: ', parts);
   const i = parts.indexOf(listLiteral);
   if ( parts.length < 2 || parts.length > 3 || i < 0) return emptyObj;
 
@@ -56,7 +56,17 @@ export function analyzeListedLink(url: string): listURLData {
   return {listname: v_listname, pubauthorslug: v_pubauthorslug};
 }
 
-
+export function getMediumSlugFromUrl(url: string): string {
+  console.log('Link to be analyzed for slug: ', url);
+  if (url.trim().length === 0) return '';
+  const urlObj = new URL(url);
+  const pathname = urlObj.pathname;
+  console.log('Link Pathname: ', pathname);
+  const parts = getPathNameParts(pathname);
+  console.log('>===>> URL Path Name has: ', parts.length, ' - parts: ', parts);
+  if (parts.length === 0) return '';
+  return parts[parts.length-1];
+}
 
 
 export function getPathNameParts(pathName: string): string[] {

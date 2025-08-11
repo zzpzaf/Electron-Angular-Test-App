@@ -80,9 +80,12 @@ export class BackEnd {
   }
 
   checkUrlExists(link: string): Promise<boolean> {
-    return this.ipcInvoke<boolean>('sqlite:check-if-url-existing', link);
+    return this.ipcInvoke<boolean>('sqlite:check-if-url-exists', link);
   }
 
+  checkSlugExists(slug: string): Promise<boolean> {
+    return this.ipcInvoke<boolean>('sqlite:check-if-slug-exists', slug);
+  }
 
 
 

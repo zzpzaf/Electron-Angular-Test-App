@@ -59,9 +59,50 @@ export function isUrlExisting(urlString: string): boolean {
     `);
 
     const row = checkStmt.get(urlString);
+
+    console.log('>===>> Checking URL existence:', urlString, ' - Found:', row );
+
     return row !== undefined; // true if found, false otherwise
   } catch (err) {
     console.error('Error checking URL existence:', err);
+    return false;
+  }
+}
+
+/* 250811
+ * Checks if a URL slug already exists in the 'articles' table.
+ * @param {string} urlSlug - The URL slug to check for existence.
+ * @returns {boolean} - Returns true if the URL slug exists, false otherwise.
+ */
+export function isSlugExisting(urlSlug: string): boolean {
+  if (!mainDb) {
+    console.error('>===>> No Main DB connection.');
+    return false;
+  }
+
+  try {
+    const checkStmt = mainDb.prepare(`
+      SELECT 1 
+      FROM articles 
+      WHERE linkurl LIKE ? 
+      LIMIT 1
+    `);
+
+    // Add wildcards to search for the substring anywhere in linkurl
+    const searchPattern = `%${urlSlug}%`;
+
+    const row = checkStmt.get(searchPattern);
+
+    console.log(
+      '>===>> Checking partial URL slug existence:',
+      urlSlug,
+      ' - Found:',
+      row
+    );
+
+    return row !== undefined; // true if found, false otherwise
+  } catch (err) {
+    console.error('Error checking URL slug existence:', err);
     return false;
   }
 }

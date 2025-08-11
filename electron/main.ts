@@ -32,7 +32,7 @@ import { htmlToMarkdown } from './processes/scrappers/page-converters';
 // import { handleOpenFile, handleDroppedFile } from './helpers/electron-utils';
 import { shell } from 'electron';
 import { closeDBConnections } from './dbs/sqlite/connections';
-import { insertArticlesFromJson, isUrlExisting } from './dbs/sqlite/mandb_queries';
+import { insertArticlesFromJson, isSlugExisting, isUrlExisting } from './dbs/sqlite/mandb_queries';
 
 const isDev = require('electron-is-dev');
 
@@ -346,7 +346,7 @@ ipcMain.handle(
   }
 );
 
-ipcMain.handle('sqlite:check-if-url-existing', 
+ipcMain.handle('sqlite:check-if-url-exists', 
   (event: any, link: string) => {
   try {
     const sanitized = (link ?? '').trim();
@@ -358,6 +358,21 @@ ipcMain.handle('sqlite:check-if-url-existing',
     return false; // always return boolean
   }
 });
+
+
+ipcMain.handle('sqlite:check-if-slug-exists', 
+  (event: any, slug: string) => {
+  try {
+    const sanitized = (slug ?? '').trim();
+    if (!sanitized) return false; // empty/invalid input → treat as not found
+    const isExisting = isSlugExisting(sanitized);
+    return isExisting; // boolean
+  } catch (err) {
+    console.error('Error checking Slug existence:', slug, err);
+    return false; // always return boolean
+  }
+});
+
 
 
 ipcMain.handle(
@@ -403,6 +418,7 @@ ipcMain.handle(
     return qryResult;
   }
 );
+
 
 // Not-used so far ....
 ipcMain.handle('open-component-window', (event: any, data: any) => {

@@ -18,6 +18,7 @@ import {
 } from '../../../shared/projectObjects/varObjects'; // Import the PostData interface
 import {
   analyzeListedLink,
+  getMediumSlugFromUrl,
   isValidUrl,
 } from '../../../shared/utils/shared-utils';
 
@@ -80,6 +81,9 @@ export class Markdown {
     this.linkScrapeForm.get('url')?.valueChanges.subscribe((urlValue) => {
       if (urlValue.trim().length === 0 || !isValidUrl(urlValue.trim())) return;
 
+      console.log('>===>> URL changed to:', urlValue);
+
+
       this.listurldata = { listname: '', pubauthorslug: '' };
       this.listurldata = analyzeListedLink(urlValue);
 
@@ -88,6 +92,7 @@ export class Markdown {
       const clearUrl = fullUrl.origin + fullUrl.pathname;
       this.linkURL.set(clearUrl);
 
+      console.log('>===>> Cleaned URL:', this.linkURL());
 
       // console.log('URL changed to:', this.linkURL());
       this.markdownString.set(''); // Clear the string representation of the array
@@ -99,16 +104,16 @@ export class Markdown {
       // Call the scraping function with the updated URL
       // Adds/Sets the scraped data to the scrappedDataArray
 
-      from(this.isUrlExisting(this.linkURL())).subscribe({
+      from(this.isSlugExisting(this.linkURL())).subscribe({
         next: (isExisting) => {
-          console.log('>===>> URL exists:', isExisting);
+          console.log('>===>> URL Slug exists?', isExisting);
           if (isExisting) {
-            console.warn('URL already exists in the database:', this.linkURL());
+            console.warn('>===>> URL slug already exists in the database:', this.linkURL());
             this.dlgService
               .popup({
                 token: 'warn',
-                header: 'URL Exists',
-                content: 'This URL already exists in the database.',
+                header: 'Slug Exists',
+                content: 'The URL Slug already exists in the database.',
                 posAnsMsg: 'OK',
                 negAnsMsg: '',
                 delay: 500,
@@ -388,19 +393,19 @@ export class Markdown {
   }
 
   /*
-   * Checks if a URL already exists in the 'articles' table.
-   * @param {string} urlString - The URL to check for existence.
-   * @returns {boolean} - Returns true
-   * if the URL exists, false otherwise.
+   * Checks if a URL slug already exists in the 'articles' table.
+   * @param {string} urlString - The URL to check for slug existence.
+   * @returns {boolean} - Returns true if the URL slug exists, false otherwise.
    */
-  async isUrlExisting(urlString: string): Promise<boolean> {
+  async isSlugExisting(urlString: string): Promise<boolean> {
     if (!window.electronAPI) {
       console.error('>===>> No Main DB connection.');
       return false;
     }
+    const urlSlug = getMediumSlugFromUrl(urlString);
 
     try {
-      const exists = await this.backendService.checkUrlExists(urlString);
+      const exists = await this.backendService.checkSlugExists(urlSlug);
       console.log('>===>> URL exists:', exists);
       return exists; // true or false
     } catch (error) {
