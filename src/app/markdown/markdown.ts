@@ -65,7 +65,7 @@ export class Markdown {
 
   // private modalRef = inject(NzModalRef);
 
-  public preview: boolean = false;
+  public preview: boolean = true;
   public safeHtmlContent = signal<SafeHtml | null>(null);
   // private sanitizer = inject(DomSanitizer);
 
@@ -102,7 +102,7 @@ export class Markdown {
       this.markdownString.set(''); // Clear the string representation of the array
       this.postMetaDataString.set(''); // Clear the post metadata string
       this.safeHtmlContent.set(''); // Clear the markdown string
-      this.preview = false;
+      // this.preview = false;
 
       // this.convert(this.linkURL());
       // Call the scraping function with the updated URL
@@ -204,18 +204,22 @@ export class Markdown {
     }
   }
 
-  onPreview() {
+  onContentView() {
     // Toggle preview mode
     this.preview = !this.preview;
     if (this.markdownString().length === 0) return;
-    this.markdownPreview(this.markdownString());
+    if (this.preview){
+      this.markdownPreview(this.markdownString());
+    } else {
+      this.safeHtmlContent.set(""); // Clear the preview content
+    }
   }
 
   onClear() {
     this.markdownString.set(''); // Clear the string representation of the array
     this.postMetaDataString.set(''); // Clear the post metadata string
     this.safeHtmlContent.set(''); // Clear the markdown string
-    this.preview = false;
+    // this.preview = false;
     this.linkScrapeForm.reset(); // Reset the form
   }
 
@@ -258,7 +262,6 @@ export class Markdown {
     // let rawHtml = await marked.parse(markdata);
     // if (rawHtml.trim().length === 0) rawHtml = '# No Markdown!';
     const safeHtml = this.markedService.render(markdata);
-
     this.safeHtmlContent.set(safeHtml);
   }
 
@@ -327,6 +330,7 @@ export class Markdown {
 
         // Set the (Markdown) content of the first item
         this.markdownString.set(postData.content!);
+        this.markdownPreview(this.markdownString());
 
         // console.log(
         //   '>===>> Article Scraped Data: ',

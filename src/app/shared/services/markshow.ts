@@ -1,3 +1,12 @@
+// Markshow Service - markshow.ts
+// src/app/shared/services/markshow.ts
+// ===========================================================================================================
+// This service processes Markdown content, sanitizes it, and converts inline HTML tags to code spans
+// to ensure they render correctly in the application. It uses the `marked` library for Markdown parsing
+// and `DOMPurify` for sanitization.
+// It also provides a method to render the Markdown content as safe HTML.
+
+
 import { inject, Injectable } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { marked } from 'marked';
@@ -31,11 +40,14 @@ function backtickInlineAngles(src: string, strict = true): string {
   const out: string[] = [];
   let para: string[] = [];
 
-  const flush = () => {
+  const flushParagraph = () => {
     if (!para.length) return;
     let text = para.join('\n');
 
-    // mask inline code spans: `code`, ``code``
+    // 250812 Treat \`<...>\` as a real code span: \` ... \` -> ` ... `
+    text = unescapeBackslashedBackticksAroundAngles(text);
+
+    // Mask existing inline code spans so we don't touch them like: `code`, ``code``
     const masks: string[] = [];
     text = text.replace(/(`+)([\s\S]*?)\1/g, m => {
       const t = `\uE000C${masks.length}\uE001`;
@@ -83,13 +95,28 @@ function backtickInlineAngles(src: string, strict = true): string {
   };
 
   for (const line of lines) {
-    if (/^\s*(```|~~~)/.test(line)) { flush(); inFence = !inFence; out.push(line); continue; }
+    if (/^\s*(```|~~~)/.test(line)) { flushParagraph(); inFence = !inFence; out.push(line); continue; }
     if (inFence) { out.push(line); continue; }
-    if (line.trim() === '') { flush(); out.push(line); } else { para.push(line); }
+    if (line.trim() === '') { flushParagraph(); out.push(line); } else { para.push(line); }
   }
-  flush();
+  flushParagraph();
   return out.join('\n');
 }
+
+
+// 250812
+// It normalizes the cases where a piece of angle-brackets text, surrounded by escaped (with backslashes), 
+// single backticks, is found in a Markdown text paragraph/prose. It actually, removes the backslashes:
+//   \`<...>\` -> `<...>` 
+// It shoul do this BEFORE masking code spans.
+function unescapeBackslashedBackticksAroundAngles(text: string): string {
+  // Matches a backslash-escaped single backtick, then a single-line <...>, then a backslash-escaped single backtick.
+  // Examples matched: \`<title>\`, \`<script type="application/ld+json">\`
+  // Allows optional surrounding spaces inside the backticks.
+  return text.replace(/\\`(\s*<[^>\n]+>\s*)\\`/g, (_m, inner) => '`' + inner + '`');
+}
+
+
 
 
 

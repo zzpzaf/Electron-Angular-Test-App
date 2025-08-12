@@ -28,8 +28,7 @@ import {
   countUniqueLinksByFolderId,
 } from './dbs/sqlite/fdb_queries';
 import { backupOrgPlacesSQLite } from './dbs/sqlite/sqlite3-utils';
-import { htmlToMarkdown } from './processes/scrappers/page-converters';
-// import { handleOpenFile, handleDroppedFile } from './helpers/electron-utils';
+// import { htmlToMarkdown } from './processes/scrappers/page-converters';
 import { shell } from 'electron';
 import { closeDBConnections } from './dbs/sqlite/connections';
 import { insertArticlesFromJson, isSlugExisting, isUrlExisting } from './dbs/sqlite/mandb_queries';
@@ -166,19 +165,19 @@ ipcMain.handle(
   }
 );
 
-ipcMain.handle(
-  'convert-html-to-markdown',
-  async (event: any, args: { input: string; isRawHtml: boolean }) => {
-    const { input, isRawHtml } = args;
+// ipcMain.handle(
+//   'convert-html-to-markdown',
+//   async (event: any, args: { input: string; isRawHtml: boolean }) => {
+//     const { input, isRawHtml } = args;
 
-    try {
-      const markdown = await htmlToMarkdown(input, isRawHtml);
-      return { success: true, markdown };
-    } catch (error: any) {
-      return { success: false, error: error.message || 'Unknown error' };
-    }
-  }
-);
+//     try {
+//       const markdown = await htmlToMarkdown(input, isRawHtml);
+//       return { success: true, markdown };
+//     } catch (error: any) {
+//       return { success: false, error: error.message || 'Unknown error' };
+//     }
+//   }
+// );
 
 ipcMain.handle(
   'save-scrapped-data',

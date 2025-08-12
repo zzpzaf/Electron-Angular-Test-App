@@ -67,7 +67,7 @@
       nz-button
       nzType="primary"
       [disabled]="markdownString.length === 0 && linkURL().length === 0"
-      (click)="onPreview()"
+      (click)="onContentView()"
     >
       {{ preview ? "Markdown" : "Preview" }}
     </button>

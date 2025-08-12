@@ -5,42 +5,42 @@
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import type * as Puppeteer from 'puppeteer';
+import { BrowserWindow } from 'electron';
+import pLimit from 'p-limit';
+import { JSDOM } from 'jsdom';
+
+import TurndownService from 'turndown';
+import {
+  fencedCodeBlockRule,
+  inlineCodeRule,
+  mediumFriendlyCodeBlockRule,
+} from '../../helpers/turndown-rules';
+
 import { PostData } from '../../../shared/projectObjects/varObjects';
 import { formatDate } from '../../helpers/electron-utils';
 import { extractFirstPathPart } from '../../../shared/utils/shared-utils';
 
-import { BrowserWindow } from 'electron';
-
-import TurndownService from 'turndown';
-
-import pLimit from 'p-limit';
 import {
   BROWSER_URLPORT,
   MAX_ARTICLES_NUMBER,
   SCROLL_DELAY,
-} from '../../../shared/constants';
-import { getCleanedPageContent, processGists } from './page-converters';
-import { fencedCodeBlockRule, inlineCodeRule, mediumFriendlyCodeBlockRule } from '../../helpers/turndown-rules';
-import { ADDITIONAL_PAGE_DELAY, DEFAULT_AUTOSCROLL_DELAY, OPEN_NEW_TAB_DELAY, TAB_INITIAL_PAGE_LOADING_DELAY } from './time-constants';
-
+  DEFAULT_AUTOSCROLL_DELAY,
+  ADDITIONAL_PAGE_DELAY,
+  GIST_IFRAME_SELECTOR_DELAY,
+  GIST_PAGE_LOADING_DELAY,
+  OPEN_NEW_TAB_DELAY,
+  TAB_INITIAL_PAGE_LOADING_DELAY,
+  AFTER_AUTOSCROLL_GIST_IFRAME_SELECTOR_DELAY,
+} from './scrape-constants';
 
 // ========================================================================================================
-// Timer Constants
-// ========================================================================================================
-// const OPEN_NEW_TAB_DELAY = 500;                 // Delay to open a new tab - avoiding rapid tab creation (collectPostsFromUrlTabs)
-// const TAB_INITIAL_PAGE_LOADING_DELAY = 15000;   // 15 seconds for initial page load (collectPostsFromUrlTabs)
-// const ADDITIONAL_PAGE_DELAY = 1000;             // 1 second for additional page delay for complete page loading (scrapeMediumArticle)
-// const DEFAULT_AUTOSCROLL_DELAY = 100;           // (autoScrollArticlePage)
-
-
-
-
-
-
-
 
 // Apply stealth plugin
 puppeteer.use(StealthPlugin());
+
+
+
+
 
 // ========================================================================================================
 // ========================================================================================================
@@ -85,9 +85,9 @@ export async function scrapeArticleBasic(url: string): Promise<PostData> {
 
 // ========================================================================================================
 // ========================================================================================================
-// Wrapper function to to scrape the basic (meta-) Article data
+// Wrapper function to to scrape the Article data
 // of all pages passed in using an array of urls
-// It uses the key function: scrapeMediumArticle()
+// It uses the key functions: 1. scrapeMediumArticle(), 2.scrapeMediumMarkdownContent()
 //
 // - Receives an array of URLs (string[])
 // - Opens them as parallel tabs (Page instances)
@@ -103,6 +103,7 @@ export async function collectPostsFromUrlTabs(
     browserURL: BROWSER_URLPORT,
     defaultViewport: null,
   });
+
 
   const limit = pLimit(5); // lower concurrency due to shared profile
 
@@ -121,10 +122,8 @@ export async function collectPostsFromUrlTabs(
           console.log(`Opening: ${url}`);
           await page.goto(url, {
             waitUntil: 'domcontentloaded',
-            timeout: TAB_INITIAL_PAGE_LOADING_DELAY   //15000,
+            timeout: TAB_INITIAL_PAGE_LOADING_DELAY, //15000,   /****** */
           });
-
-
 
           // Scrape the article data by calling the scrapeMediumArticle() key-function
           const data = await scrapeMediumArticle(page);
@@ -135,7 +134,6 @@ export async function collectPostsFromUrlTabs(
           data.counter = p;
           console.log(` Post: ${p} ${JSON.stringify(data)} `);
           return data;
-
         } catch (err) {
           // console.error(`Failed to scrape ${url}:`, err.message || err);
           if (err instanceof Error) {
@@ -181,8 +179,7 @@ export async function collectPostsFromUrlTabs(
         post.counter = i;
         if (post.date && post.date.length) {
           post.date = formatDate(post.date);
-        }  
-
+        }
       }
     }
     console.log('>===> Total Number of fetched Posts: ', i);
@@ -193,17 +190,18 @@ export async function collectPostsFromUrlTabs(
   }
 }
 
-
-
-
 // ==========================================================================================
 // Key Function to scrape the basic (meta-) data of an Article, from an Article's page
 // ==========================================================================================
 async function scrapeMediumArticle(page: Puppeteer.Page): Promise<PostData> {
+  
+  
+  await page.setUserAgent(
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
+  );
+  
   // await new Promise((resolve) => setTimeout(resolve, 1000));
-  await new Promise((resolve) => setTimeout(resolve, ADDITIONAL_PAGE_DELAY)); // 1000 ms delay for additional page loading  
-
-
+  await new Promise((resolve) => setTimeout(resolve, ADDITIONAL_PAGE_DELAY)); // 1000 ms delay for additional page loading
 
   // Cloudflare challenge detection
   const challenge = await page.evaluate(() =>
@@ -267,7 +265,6 @@ async function scrapeMediumArticle(page: Puppeteer.Page): Promise<PostData> {
       }
     }
 
-
     // console.log('>===>> Extracted date:', rawDate); // console.log does not work here due to the Puppeteer context
 
     const likesBtn = document.querySelector('.pw-multi-vote-count button');
@@ -309,26 +306,25 @@ async function scrapeMediumArticle(page: Puppeteer.Page): Promise<PostData> {
       comments,
       content,
     };
-
   });
 
   return postData;
 }
 
-
 // ==========================================================================================
 // 250808
 // Function to scrape the Markdown content of a Medium article
-// It uses the getCleanedPageContent() and processGists() functions
+// It calls the helper functons: 1.getCleanedPageContent() 2.processGists()
 // It returns the Markdown content as a string
 // ==========================================================================================
-async function scrapeMediumMarkdownContent(page: Puppeteer.Page): Promise<string>{
-
+async function scrapeMediumMarkdownContent(
+  page: Puppeteer.Page
+): Promise<string> {
   // Not recommended: relies on internal structure
   // This is not officially supported and may break with future Puppeteer versions
   const browser = page.browserContext().browser();
-  
-  try {         
+
+  try {
     // Get cleaned HTML + captured gist iframe sources
     const { html: cleanedHtml, iframeSrcs } = await getCleanedPageContent(page);
 
@@ -351,7 +347,6 @@ async function scrapeMediumMarkdownContent(page: Puppeteer.Page): Promise<string
     // Real convertion from HTML to Markdown
     return turndownService.turndown(htmlWithGists);
   } catch (error) {
-    
     console.error('Error scraping Markdown content:', error);
     throw error;
   } finally {
@@ -360,18 +355,287 @@ async function scrapeMediumMarkdownContent(page: Puppeteer.Page): Promise<string
     // }
     // Don't close browser, since you're attaching to a running instance
   }
-
 }
 
+// ------------------------------------------------------------------------------------------------------------------------------------------------------------
+// getCleanedPageContent() - Helper function that cleans unnecessary content
+// ------------------------------------------------------------------------------------------------------------------------------------------------------------
+// Returns the page content:
+// Starts from the main <h1> with data-testid="storyTitle" instead of the entire <body>.
+// Still removes scripts, styles, noscript, iframe tags for safety.
+// Has a fallback if the storyTitle isn’t found (will just behave like your original code).
+// Removes any elements containing the text "Zoom image will be displayed" before returning the cleaned HTML.
+// Keeps the first <h1> as is (the main title) and converts all other <h1> elements into <h2> so they appear as proper subheadings in the Markdown output.
+// Removes the div element, with an attributethat starts with "speechify-ignore", and is placed after the h1 Article Title
+// Extracts separately iframe src URLs for Gists
+// Returns both the cleaned HTML and the list of iframe sources
+// ------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+export async function getCleanedPageContent(
+  page: import('puppeteer').Page
+): Promise<{ html: string; iframeSrcs: string[] }> {
+  await autoScrollArticlePage(page);
 
+  try {
+    // await page.waitForSelector("figure iframe", { timeout: 5000 });
+    await page.waitForSelector('figure iframe', {
+      timeout: AFTER_AUTOSCROLL_GIST_IFRAME_SELECTOR_DELAY,  // 1000 ms
+    });
+  } catch {
+    console.warn('⚠️ No gist iframes found within timeout');
+  }
 
+  const iframeSources: string[] = await page.evaluate(() => {
+    return Array.from(document.querySelectorAll('figure iframe'))
+      .map((iframe) => iframe.getAttribute('src') || '')
+      .filter(Boolean);
+  });
 
+  console.log('📌 Found gist iframe src:', iframeSources);
 
+  const rawHTML = await page.evaluate(() => {
+    const removeSpecificText = (root: HTMLElement, textToRemove: string) => {
+      root.querySelectorAll('*').forEach((el) => {
+        el.childNodes.forEach((node) => {
+          if (
+            node.nodeType === Node.TEXT_NODE &&
+            node.textContent?.trim() === textToRemove
+          ) {
+            node.textContent = '';
+          }
+        });
+      });
+    };
 
+    const removeSpeechifyIgnoreDivs = (root: HTMLElement) => {
+      root
+        .querySelectorAll('div[class^="speechify-ignore"]')
+        .forEach((el) => el.remove());
+    };
 
+    const fixHeadings = (root: HTMLElement) => {
+      const h1s = root.querySelectorAll('h1');
+      let firstFound = false;
+      h1s.forEach((h1) => {
+        if (!firstFound) {
+          firstFound = true;
+        } else {
+          const h2 = document.createElement('h2');
+          h2.innerHTML = h1.innerHTML;
+          h1.replaceWith(h2);
+        }
+      });
+    };
 
+    const removeContentBeforeFirstHeading = (root: HTMLElement) => {
+      const firstHeading = root.querySelector('h1');
+      if (firstHeading) {
+        let prev = firstHeading.previousSibling;
+        while (prev) {
+          const toRemove = prev;
+          prev = prev.previousSibling;
+          toRemove?.parentNode?.removeChild(toRemove);
+        }
+      }
+    };
 
+    const titleEl = document.querySelector('h1[data-testid="storyTitle"]');
+    let container: HTMLElement;
+
+    if (!titleEl) {
+      container = document.body.cloneNode(true) as HTMLElement;
+    } else {
+      let articleContainer: HTMLElement | null =
+        titleEl.closest('article') ||
+        titleEl.closest('section') ||
+        titleEl.closest('main') ||
+        document.body;
+      container = articleContainer.cloneNode(true) as HTMLElement;
+    }
+
+    container
+      .querySelectorAll('script, style, noscript')
+      .forEach((el) => el.remove());
+
+    removeSpecificText(container, 'Zoom image will be displayed');
+    removeContentBeforeFirstHeading(container);
+    removeSpeechifyIgnoreDivs(container);
+    fixHeadings(container);
+
+    return container.innerHTML;
+  });
+
+  return { html: rawHTML, iframeSrcs: iframeSources };
+}
+
+// ------------------------------------------------------------------------------------------------------------------------------------------------------------
+// processGists() - Helper function that finds the gist-met
+// ------------------------------------------------------------------------------------------------------------------------------------------------------------
+// Returns the page content:
+// Finds all .gist-meta divs.
+// For each one:
+//     Extracts the raw code URL (first <a> tag’s href).
+//     Extracts the Gist permalink (second <a> tag’s href).
+//     Fetches the raw code directly from GitHub (inside Puppeteer via fetch()).
+//     Creates a clean <pre><code> block with the fetched code.
+//     Appends a small <p> after it with the permalink.
+// Replaces the original table + .gist-meta with our cleaned <pre><code> + link.
+// ------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+export async function processGists(
+  browser: Puppeteer.Browser,
+  html: string,
+  iframeSrcs: string[]
+): Promise<string> {
+  console.log('🔍 Processing gists...');
+  console.log('📌 Captured iframe sources:', iframeSrcs);
+
+  const dom = new JSDOM(html);
+  const document = dom.window.document;
+
+  // --- 1️⃣ Process .gist-meta blocks ---
+  const gistBlocks = document.querySelectorAll('.gist-meta');
+  if (gistBlocks.length > 0) {
+    console.log(`📌 Found ${gistBlocks.length} gist-meta blocks`);
+    for (const gistMeta of gistBlocks) {
+      const links = gistMeta.querySelectorAll('a');
+      if (links.length >= 2) {
+        const rawCodeUrl = links[0].getAttribute('href') || '';
+        const gistPermalink = links[1].getAttribute('href') || '';
+
+        if (rawCodeUrl) {
+          try {
+            const response = await fetch(rawCodeUrl);
+            const codeText = await response.text();
+
+            // Create code block
+            const pre = document.createElement('pre');
+            const code = document.createElement('code');
+            code.textContent = codeText;
+            pre.appendChild(code);
+
+            // Create gist link
+            const linkPara = document.createElement('p');
+            linkPara.textContent = `Gist Link: ${gistPermalink}`;
+
+            // Replace gist-meta with code + link
+            gistMeta.previousElementSibling?.remove();
+            gistMeta.replaceWith(pre, linkPara);
+          } catch (err) {
+            console.warn('⚠️ Failed to fetch gist code:', rawCodeUrl, err);
+          }
+        }
+      }
+    }
+  }
+
+  // --- 2️⃣ Process iframe-based gists ---
+  if (iframeSrcs.length > 0) {
+    console.log(
+      `📌 Processing ${iframeSrcs.length} iframe-based gist embeds...`
+    );
+
+    const figures = Array.from(document.querySelectorAll('figure iframe')).map(
+      (iframe) => iframe.closest('figure')
+    );
+
+    for (let i = 0; i < iframeSrcs.length; i++) {
+      const iframeUrl = iframeSrcs[i];
+      if (!iframeUrl) continue;
+
+      try {
+        const gistData = await extractCodeFromIframe(browser, iframeUrl);
+        if (!gistData?.code) {
+          console.warn(`⚠️ Could not extract code from ${iframeUrl}`);
+          continue;
+        }
+
+        // Create code block
+        const pre = document.createElement('pre');
+        const code = document.createElement('code');
+        code.textContent = gistData.code;
+        pre.appendChild(code);
+
+        // Create gist link (only if available)
+        let linkPara: HTMLParagraphElement | null = null;
+        if (gistData.gistPermalink) {
+          const i = gistData.gistPermalink.lastIndexOf('/raw');
+          const gistLink =
+            i > 0 ? gistData.gistPermalink.slice(0, i) : gistData.gistPermalink;
+          linkPara = document.createElement('p');
+          // linkPara.textContent = `Gist Link: ${gistData.gistPermalink}`;
+          linkPara.textContent = `[ Gist Link: ${gistLink} ]`;
+        }
+
+        // Replace figure with both elements
+        if (figures[i]) {
+          if (linkPara) {
+            figures[i]?.replaceWith(pre, linkPara);
+          } else {
+            figures[i]?.replaceWith(pre);
+          }
+        }
+      } catch (err) {
+        console.warn(`⚠️ Failed to process iframe gist: ${iframeUrl}`, err);
+      }
+    }
+  }
+
+  return document.body.innerHTML;
+}
+
+// ------------------------------------------------------------------------------------------------------------------------------------------------------------
+// extractCodeFromIframe() - Helper function that opens and obtains Gist code blocks
+// ------------------------------------------------------------------------------------------------------------------------------------------------------------
+// Extracts raw code from a Gist iframe using an existing Puppeteer browser instance.
+//
+//
+// ------------------------------------------------------------------------------------------------------------------------------------------------------------
+export async function extractCodeFromIframe(
+  browser: Puppeteer.Browser,
+  iframeUrl: string
+): Promise<{ code: string; gistPermalink?: string } | null> {
+  const page = await browser.newPage();
+
+  try {
+    // await page.goto(iframeUrl, { waitUntil: "networkidle0", timeout: 20000 });
+    await page.goto(iframeUrl, {
+      waitUntil: 'networkidle0',
+      timeout: GIST_PAGE_LOADING_DELAY,  //******/
+    });
+
+    // Find the raw code link
+    const { rawCodeUrl, gistPermalink } = await page.evaluate(() => {
+      const rawLink = document.querySelector<HTMLAnchorElement>(
+        '.gist-meta a[href*="/raw"]'
+      );
+      const permalinkLink = document.querySelector<HTMLAnchorElement>(
+        '.gist-meta a[href^="https://gist.github.com"]'
+      );
+
+      return {
+        rawCodeUrl: rawLink?.href || null,
+        gistPermalink: permalinkLink?.href || null,
+      };
+    });
+
+    if (!rawCodeUrl) {
+      console.warn(`⚠️ No raw code link found inside iframe: ${iframeUrl}`);
+      return null;
+    }
+
+    // Fetch the raw code directly (no HTML parsing!)
+    const res = await fetch(rawCodeUrl);
+    const codeText = await res.text();
+
+    return { code: codeText, gistPermalink: gistPermalink ?? undefined };
+  } catch (err) {
+    console.error(`❌ Failed to extract gist from iframe: ${iframeUrl}`, err);
+    return null;
+  } finally {
+    await page.close();
+  }
+}
 
 // ==========================================================================================
 // ==========================================================================================
@@ -532,8 +796,51 @@ async function scrapeMediumList(page: Puppeteer.Page): Promise<PostData[]> {
   });
 }
 
+
+
 // -----------------------------------------------------------------------------------------
-// Helper function to automatically scroll to the end of the page
+/*
+ * 250731 
+ * Helper function to automatically scroll a Medium article page
+ * to the bottom to trigger lazy-loading of content.
+ * It automatically scrolls the page to the bottom to trigger lazy-loading
+ * It uses the Puppeteer Page instance to scroll down by a specified distance
+ * at regular intervals until the end of the page is reached.
+ * It can be used to ensure all content is loaded before scraping.
+ * Parameters:
+ * @param page Puppeteer Page instance
+ * @param distance Pixels to scroll each step
+ * @param delay Delay (ms) between each scroll step
+ */
+export async function autoScrollArticlePage(
+  page: import('puppeteer').Page,
+  distance = 200,
+  delay = DEFAULT_AUTOSCROLL_DELAY //100
+): Promise<void> {
+  await page.evaluate(
+    async (scrollDistance: number, stepDelay: number) => {
+      await new Promise<void>((resolve) => {
+        let totalHeight = 0;
+        const timer = setInterval(() => {
+          const { scrollHeight } = document.body;
+          window.scrollBy(0, scrollDistance);
+          totalHeight += scrollDistance;
+
+          if (totalHeight >= scrollHeight) {
+            clearInterval(timer);
+            resolve();
+          }
+        }, stepDelay);
+      });
+    },
+    distance,
+    delay
+  );
+}
+
+
+// -----------------------------------------------------------------------------------------
+// Helper function to automatically scroll to the end of the Medium List page
 // until a specified number of articles is reached or no new articles are loaded
 // Returns the total number of articles found
 // -----------------------------------------------------------------------------------------
@@ -581,39 +888,14 @@ async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// -----------------------------------------------------------------------------------------
-/**
- * 250731
- * Automatically scrolls the page to the bottom to trigger lazy-loading
- * @param page Puppeteer Page instance
- * @param distance Pixels to scroll each step
- * @param delay Delay (ms) between each scroll step
- */
-export async function autoScrollArticlePage(
-  page: import('puppeteer').Page,
-  distance = 200,
-  delay = DEFAULT_AUTOSCROLL_DELAY   //100
-): Promise<void> {
-  await page.evaluate(
-    async (scrollDistance: number, stepDelay: number) => {
-      await new Promise<void>((resolve) => {
-        let totalHeight = 0;
-        const timer = setInterval(() => {
-          const { scrollHeight } = document.body;
-          window.scrollBy(0, scrollDistance);
-          totalHeight += scrollDistance;
 
-          if (totalHeight >= scrollHeight) {
-            clearInterval(timer);
-            resolve();
-          }
-        }, stepDelay);
-      });
-    },
-    distance,
-    delay
-  );
-}
+
+
+
+
+
+
+
 
 // -----------------------------------------------------------------------------------------
 // Helper Function to wait for user input
@@ -654,5 +936,3 @@ async function clickWithRetry(
   }
   return false;
 }
-
-
