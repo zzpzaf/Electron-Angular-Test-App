@@ -394,14 +394,24 @@ export async function getCleanedPageContent(
   console.log('📌 Found gist iframe src:', iframeSources);
 
   const rawHTML = await page.evaluate(() => {
-    const removeSpecificText = (root: HTMLElement, textToRemove: string) => {
+    // const removeSpecificText = (root: HTMLElement, textToRemove: string) => {
+    // Instead of removing just a single text, we can remove multiple texts in an array
+    const removeSpecificText = (root: HTMLElement, textsToRemove: string[]) => {
       root.querySelectorAll('*').forEach((el) => {
         el.childNodes.forEach((node) => {
-          if (
-            node.nodeType === Node.TEXT_NODE &&
-            node.textContent?.trim() === textToRemove
-          ) {
-            node.textContent = '';
+          if (node.nodeType === Node.TEXT_NODE) {
+            const text = node.textContent?.trim() || '';
+            if (textsToRemove.includes(text)) {
+              node.textContent = '';
+            }
+          }
+        });
+      });
+      // Also remove elements that contain only any text specified in textsToRemove array
+      textsToRemove.forEach((t) => {
+        root.querySelectorAll('*').forEach((el) => {
+          if (el.textContent?.trim() === t) {
+            el.remove();
           }
         });
       });
@@ -457,7 +467,13 @@ export async function getCleanedPageContent(
       .querySelectorAll('script, style, noscript')
       .forEach((el) => el.remove());
 
-    removeSpecificText(container, 'Zoom image will be displayed');
+    // removeSpecificText(container, 'Zoom image will be displayed');
+    // Specify the array of multiple texts to remove
+    removeSpecificText(container, [
+      'Zoom image will be displayed',
+      'Press enter or click to view image in full size'
+    ]);
+
     removeContentBeforeFirstHeading(container);
     removeSpeechifyIgnoreDivs(container);
     fixHeadings(container);
