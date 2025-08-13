@@ -45,6 +45,15 @@
 <!-- Separator -->
 <div class="login-form-separator"></div>
 
+<span class="article-status"> 
+  @if (isNewArticle && postMetaDataString().length > 0) {
+    New Article Scraped !
+  } @else if (postMetaDataString().length > 0) {
+    *** Existing Article ***
+  }
+</span>
+
+
 <!-- Markdown Textarea / Preview container -->
 <div class="text-area-container">
   <textarea nz-input [(ngModel)]="postMetaDataString" class="ta ta--top">

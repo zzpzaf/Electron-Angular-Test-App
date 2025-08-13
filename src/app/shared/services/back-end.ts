@@ -87,7 +87,9 @@ export class BackEnd {
     return this.ipcInvoke<boolean>('sqlite:check-if-slug-exists', slug);
   }
 
-
+  getPostDatabySlug(slug: string): Promise<PostData | null> {
+    return this.ipcInvoke<PostData | null>('sqlite:get-post-data-by-slug', slug);
+  }
 
 
 

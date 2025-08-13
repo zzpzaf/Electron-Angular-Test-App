@@ -74,6 +74,8 @@ export class Markdown {
   private backendService = inject(BackEnd);
   private loader = inject(LoaderService);
 
+  public isNewArticle: boolean = false; // Flag to indicate if it's a new article
+
   constructor() {}
 
   ngOnInit(): void {
@@ -110,10 +112,11 @@ export class Markdown {
       // Call the scraping function with the updated URL
       // Adds/Sets the scraped data to the scrappedDataArray
 
-      from(this.isSlugExisting(this.linkURL())).subscribe({
-        next: (isExisting) => {
-          console.log('>===>> URL Slug exists?', isExisting);
-          if (isExisting) {
+      console.log('>===>> Calling the function "getArticleDataBySlug" with: ', this.linkURL());
+      from(this.getArticleDataBySlug(this.linkURL())).subscribe({
+        next: (articleData) => {
+          console.log('>===>> URL Slug exists?', articleData?.title);
+          if (articleData) {
             // this.loader.hide(); // Hide the loader if slug exists
             console.warn('>===>> URL slug already exists in the database:', this.linkURL());
             this.dlgService
@@ -128,6 +131,8 @@ export class Markdown {
               .subscribe((result) => {
                 console.log('Dialog closed with:', result);
               });
+            this.isNewArticle = false; // Set the flag to false for existing article
+            this.showArticleData(articleData); // Show the article data in the UI  
 
           } else {
             // this.srapeArticleData(this.linkURL());
@@ -314,46 +319,14 @@ export class Markdown {
           result = response.data as PostData[];
         }
         this.scrappedDataArray.set(result);
-        // this.scrappedDataArray.set(result as PostData[]);
-        // this.scrappedDataArrayString.set(JSON.stringify(result, null, 2));
-
-
-        // this.loader.hide(); // Hide the loader after scraping
-
 
         if (this.scrappedDataArray().length < 1) return;
-
         const postData: PostData = this.scrappedDataArray()[0];
-        // Set the post metadata
-        const postMetaData: PostData = {
-          listname: this.listurldata.listname,
-          pubauthorslug: this.listurldata.pubauthorslug,
-          hostname: postData.hostname,
-          timestamp: postData.timestamp,
-          pubname: postData.pubname,
-          authorname: postData.authorname,
-          title: postData.title,
-          link: postData.link,
-          image: postData.image,
-          date: postData.date,
-          likes: postData.likes,
-          comments: postData.comments,
-        };
-        this.postMetaDataString.set(JSON.stringify(postMetaData, null, 2));
 
-        // Set the (Markdown) content of the first item
-        this.markdownString.set(postData.content!);
-        this.markdownPreview(this.markdownString());
+        this.isNewArticle = true; // Set the flag to true for new article
 
-        // console.log(
-        //   '>===>> Article Scraped Data: ',
-        //   JSON.stringify(this.scrappedDataArray()[0])
-        // );
+        this.showArticleData(postData); // Show the article data in the UI
 
-        // console.log(
-        //   '>===>> Add/Insert into DB? ',
-        //   this.linkScrapeForm.get('add')?.value
-        // );
         if (
           this.linkScrapeForm.get('add')?.value === true &&
           this.scrappedDataArray().length > 0
@@ -370,6 +343,41 @@ export class Markdown {
       loading = false;
     }
   }
+
+  showArticleData( postData: PostData) {
+
+    const postMetaData: PostData = {
+      listname: this.listurldata.listname,
+      pubauthorslug: this.listurldata.pubauthorslug,
+      hostname: postData.hostname,
+      timestamp: postData.timestamp,
+      pubname: postData.pubname,
+      authorname: postData.authorname,
+      title: postData.title,
+      link: postData.link,
+      image: postData.image,
+      date: postData.date,
+      likes: postData.likes,
+      comments: postData.comments,
+    };
+    this.postMetaDataString.set(JSON.stringify(postMetaData, null, 2));
+    // Set the (Markdown) content of the first item
+    this.markdownString.set(postData.content!);
+    this.markdownPreview(this.markdownString());
+
+  // console.log(
+  //   '>===>> Article Scraped Data: ',
+  //   JSON.stringify(this.scrappedDataArray()[0])
+  // );
+
+  // console.log(
+  //   '>===>> Add/Insert into DB? ',
+  //   this.linkScrapeForm.get('add')?.value
+  // );
+
+}
+
+
 
   onDBInsert() {
     if (this.markdownString().length > 0) {
@@ -413,7 +421,7 @@ export class Markdown {
     }
   }
 
-  /*
+  /**
    * Checks if a URL slug already exists in the 'articles' table.
    * @param {string} urlString - The URL to check for slug existence.
    * @returns {boolean} - Returns true if the URL slug exists, false otherwise.
@@ -434,4 +442,29 @@ export class Markdown {
       return false; // default fallback
     }
   }
+
+  /**
+   * Returns article data (PostData) by its URL slug, or null if not found. 
+   * @param {string} urlString - The URL to check for existence.
+   * @returns {PostData | null} - Returns the article data if found, or null if not found. 
+   */
+  async getArticleDataBySlug(urlString: string): Promise<PostData | null> {
+    if (!window.electronAPI) {
+      console.error('>===>> No Main DB connection.');
+      return null;
+    }
+
+    const urlSlug = getMediumSlugFromUrl(urlString);
+
+    try {
+      const articleData = await this.backendService.getPostDatabySlug(urlSlug);
+      console.log('>===>> Article data fetched by slug:', articleData?.title);
+      return articleData; // Returns PostData or null if not found
+    } catch (error) {
+      console.error('Error fetching article data by slug:', error);
+      return null; // default fallback
+    }
+  }
+
+
 }

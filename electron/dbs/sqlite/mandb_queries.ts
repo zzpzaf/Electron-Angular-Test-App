@@ -107,6 +107,58 @@ export function isSlugExisting(urlSlug: string): boolean {
   }
 }
 
+// 250813
+/**
+ * Retrieves a post by its URL slug from the 'articles' table.
+ * @param {string} urlSlug - The URL slug to search for.
+ * @returns {PostData | null} - Returns the post data if found, or null if not found.
+ */
+export function getPostBySlug(urlSlug: string): PostData | null {
+  if (!mainDb) {
+    console.error('>===>> No Main DB connection.');
+    return null;
+  }
+
+  console.log('>===>> "getPostBySlug" -> Fetching post by slug:', urlSlug);
+  try {
+    const stmt = mainDb.prepare(`
+      SELECT
+        listname,
+        pubauthorslug,
+        0 AS counter,          -- placeholder, not stored in DB
+        hostname,
+        timestamp,
+        pubname,
+        authorname,
+        title,
+        linkurl AS link,
+        imageurl AS image,
+        date,
+        likes,
+        comments,
+        content
+      FROM articles
+      WHERE linkurl LIKE ?
+      LIMIT 1
+    `);
+
+    const searchPattern = `%${urlSlug}%`;
+    const row = stmt.get(searchPattern);
+    console.log('>===>> "getPostBySlug" -> Post Fetched by slug:', JSON.stringify(row, null, 2 ));
+    if (!row) {
+      return null;
+    }
+
+    // Ensure it matches PostData type
+    return row as PostData;
+  } catch (err) {
+    console.error('Error fetching post by slug:', err);
+    return null;
+  }
+}
+
+
+
 
 
 

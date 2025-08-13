@@ -31,7 +31,7 @@ import { backupOrgPlacesSQLite } from './dbs/sqlite/sqlite3-utils';
 // import { htmlToMarkdown } from './processes/scrappers/page-converters';
 import { shell } from 'electron';
 import { closeDBConnections } from './dbs/sqlite/connections';
-import { insertArticlesFromJson, isSlugExisting, isUrlExisting } from './dbs/sqlite/mandb_queries';
+import { getPostBySlug, insertArticlesFromJson, isSlugExisting, isUrlExisting } from './dbs/sqlite/mandb_queries';
 
 const isDev = require('electron-is-dev');
 
@@ -372,6 +372,19 @@ ipcMain.handle('sqlite:check-if-slug-exists',
   }
 });
 
+
+ipcMain.handle('sqlite:get-post-data-by-slug', 
+  (event: any, slug: string) => {
+  try {
+    const sanitized = (slug ?? '').trim();
+    if (!sanitized) return false; // empty/invalid input → treat as not found
+    const postData: PostData | null = getPostBySlug(sanitized);
+    return postData; // PostData or null
+  } catch (err) {
+    console.error('Error getting Post data by Slug:', slug, err);
+    return false; // always return boolean
+  }
+});
 
 
 ipcMain.handle(
