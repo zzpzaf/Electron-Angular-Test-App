@@ -1,0 +1,5 @@
+    @if (loader.isLoading()) {
+      <div class="loader-backdrop" aria-live="polite" aria-busy="true">
+        <nz-spin [nzSize]="'large'" [nzTip]="loader.tip() ?? 'Loading…'"></nz-spin>
+      </div>
+    }

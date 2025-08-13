@@ -29,6 +29,7 @@ import { SafeHtml } from '@angular/platform-browser';
 import { BackEnd } from '../shared/services/back-end';
 import { from } from 'rxjs';
 import { Markshow } from '../shared/services/markshow';
+import { LoaderService } from '../shared/services/loader-service';
 
 @Component({
   selector: 'sel-html-markdown',
@@ -70,9 +71,8 @@ export class Markdown {
   // private sanitizer = inject(DomSanitizer);
 
   private markedService = inject(Markshow);
-
-
   private backendService = inject(BackEnd);
+  private loader = inject(LoaderService);
 
   constructor() {}
 
@@ -84,6 +84,8 @@ export class Markdown {
     });
     this.linkScrapeForm.get('url')?.valueChanges.subscribe((urlValue) => {
       if (urlValue.trim().length === 0 || !isValidUrl(urlValue.trim())) return;
+
+      // this.loader.show(); // Show the loader when URL changes
 
       console.log('>===>> URL changed to:', urlValue);
 
@@ -112,6 +114,7 @@ export class Markdown {
         next: (isExisting) => {
           console.log('>===>> URL Slug exists?', isExisting);
           if (isExisting) {
+            // this.loader.hide(); // Hide the loader if slug exists
             console.warn('>===>> URL slug already exists in the database:', this.linkURL());
             this.dlgService
               .popup({
@@ -127,7 +130,13 @@ export class Markdown {
               });
 
           } else {
-            this.srapeArticleData(this.linkURL());
+            // this.srapeArticleData(this.linkURL());
+            // ** Use the Loader ***
+            // fire-and-forget (subscribe ignores returned Promise)
+            void this.loader.withLoader(
+              () => this.srapeArticleData(this.linkURL()),
+              'Scraping article data ...'
+            );
           }
         },
         error: (err) => console.error('URL check failed:', err),
@@ -137,24 +146,24 @@ export class Markdown {
 
 
     // It captures directly any Electron message sent and passed via the "message-channel"
-    window.electronAPI.on('message-channel', (message: string) => {
-      const msg: string = 'ELECTRON --> : ' + message;
-      // It calls the dlgService to pop-up an error message:
-      // this.testError(msg);
-      this.dlgService
-        .popup({
-          token: 'error',
-          header: 'Error!',
-          content: msg,
-          posAnsMsg: 'OK',
-          negAnsMsg: '',
-        })
-        .subscribe((result) => {
-          console.log('Dialog closed with:', result);
-        });
+    // window.electronAPI.on('message-channel', (message: string) => {
+    //   const msg: string = 'ELECTRON --> : ' + message;
+    //   // It calls the dlgService to pop-up an error message:
+    //   // this.testError(msg);
+    //   this.dlgService
+    //     .popup({
+    //       token: 'error',
+    //       header: 'Error!',
+    //       content: msg,
+    //       posAnsMsg: 'OK',
+    //       negAnsMsg: '',
+    //     })
+    //     .subscribe((result) => {
+    //       console.log('Dialog closed with:', result);
+    //     });
 
-      console.log('>===>>>', msg);
-    });
+    //   console.log('>===>>>', msg);
+    // });
   }
 
   setupForm() {
@@ -306,7 +315,11 @@ export class Markdown {
         }
         this.scrappedDataArray.set(result);
         // this.scrappedDataArray.set(result as PostData[]);
-        //this.scrappedDataArrayString.set(JSON.stringify(result, null, 2));
+        // this.scrappedDataArrayString.set(JSON.stringify(result, null, 2));
+
+
+        // this.loader.hide(); // Hide the loader after scraping
+
 
         if (this.scrappedDataArray().length < 1) return;
 

@@ -1,0 +1,19 @@
+.loader-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 1100;
+  pointer-events: all;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+:host ::ng-deep .ant-spin-dot {
+  font-size: 64px; /* bigger than the 'large' which is ~32px */
+}
+:host ::ng-deep .ant-spin-dot i {
+  width: 14px;
+  height: 14px;
+}
