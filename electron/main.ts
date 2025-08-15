@@ -32,16 +32,26 @@ import { backupOrgPlacesSQLite } from './dbs/sqlite/sqlite3-utils';
 import { shell } from 'electron';
 import { closeDBConnections } from './dbs/sqlite/connections';
 import { getPostBySlug, insertArticlesFromJson, isSlugExisting, isUrlExisting } from './dbs/sqlite/mandb_queries';
+import { attachContextMenu } from './context-menu';
 
 const isDev = require('electron-is-dev');
 
-const { app, BrowserWindow, ipcMain } = require('electron');
+// const { app, BrowserWindow, ipcMain, Menu } = require('electron');
+import { app, BrowserWindow, ipcMain } from 'electron';
 
 let mainAppWin: any;
 
+
+
+// ======================================================================================================
+// The Main Function to create the main Electron application window
+// ======================================================================================================
 function createWindow() {
   console.log('>====>> App ready, creating window');
 
+  // ====================================================================
+  // Create the main Electron application window
+  // ====================================================================
   mainAppWin = new BrowserWindow({
     width: 1000,
     height: 800,
@@ -53,12 +63,15 @@ function createWindow() {
       contextIsolation: true,
       // nodeIntegration: false,  // Recommended
       // enableRemoteModule: false,
-      // sandbox: false,          // Must be false to expose `file.path`
+      sandbox: false,  // Must be false to allow the preload.ts to import other scripts like the ./context-select-all-support
     },
   });
+  // ====================================================================
 
+  // ===========================================================================
   // Intercept an external link (https://...) and open it, in user’s default browser instead
-  mainAppWin.webContents.setWindowOpenHandler((details: HandlerDetails) => {
+  // ===========================================================================
+    mainAppWin.webContents.setWindowOpenHandler((details: HandlerDetails) => {
     const { url } = details;
     // Open all non-local URLs in the default browser
     if (!url.startsWith('file://') && !url.startsWith('http://localhost')) {
@@ -73,7 +86,15 @@ function createWindow() {
       shell.openExternal(url);
     }
   });
+  // ===========================================================================
 
+
+
+
+  // ==========================================================================
+  // Load the Angular app from the dist folder
+  // ==========================================================================
+  // Use path.join to ensure correct path resolution across platforms
   const angularDistPath = path.join(
     process.cwd(),
     'dist/electronang1/browser/index.html'
@@ -83,6 +104,11 @@ function createWindow() {
   console.log('__dirname:', __dirname);
   console.log('Loading Angular app from:', angularDistPath);
 
+  // Load the Angular app
+  // mainAppWin.loadURL(`file://${angularDistPath}`);
+  // or, if you prefer to use loadFile:
+  // mainAppWin.loadFile(angularDistPath);
+  // Note: loadFile is preferred for local files, but loadURL works too.
   mainAppWin
     .loadFile(angularDistPath)
     .then(() => {
@@ -96,21 +122,60 @@ function createWindow() {
   if (isDev) {
     mainAppWin.webContents.openDevTools();
   }
+  // ==========================================================================
 
+
+
+  
+  // ==========================================================================
+  // Attach a custom context menu
+  // This will allow right-click context menu support in the Electron app
+  // ==========================================================================
+  // let disposeContextMenu = attachContextMenu(mainAppWin);
+  // A minimal entry to attach context menu
+  // let disposeContextMenu: (() => void) | null = attachContextMenu(mainAppWin);
+  // Or, use ReturnType so it always matches whatever attachContextMenu returns:
+  let disposeContextMenu: ReturnType<typeof attachContextMenu> | null = attachContextMenu(mainAppWin);
+  // ==========================================================================
+
+
+
+  // ==========================================================================
+  // Show the main window when it's ready
+  // ==========================================================================
   mainAppWin.once('ready-to-show', () => {
     console.log('Main window ready to show');
     mainAppWin.show();
   });
+  // ==========================================================================
 
+
+
+
+  // ==========================================================================
+  // Handle window close event
+  // ==========================================================================
   mainAppWin.on('closed', () => {
+    disposeContextMenu?.();
+    disposeContextMenu = null;
     console.log('Main window closed');
   });
+  // ==========================================================================
+
 }
 
+
+
+
+// ======================================================================================================
+// Electron app initialization
+// ======================================================================================================
 app.whenReady().then(() => {
   console.log('Electron app is ready');
   createWindow();
 
+  // Activate the main window when the app is activated (e.g., from the dock on macOS)
+  // This is useful for macOS where the app can be activated without any windows open
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       console.log('Re-activating app, creating window');
@@ -118,16 +183,38 @@ app.whenReady().then(() => {
     }
   });
 });
+// ======================================================================================================
 
+
+
+
+
+// ======================================================================================================
+// Handle app quitting
+// ======================================================================================================
+// Quit the app when all windows are closed (except on macOS)
+// On macOS, it's common to keep the app running even if no windows are open
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     console.log('All windows closed, quitting app');
     app.quit();
   }
 });
+// ======================================================================================================
 
+
+
+
+
+
+
+
+
+
+
+// ****************************************************************************************************** 
 // Custom IPC handlers
-// -----------------------------------------------------------------
+// ****************************************************************************************************** 
 
 ipcMain.handle('app:quit', (event: any) => {
   // Close all windows first (usually app.quit() will do it anyway)

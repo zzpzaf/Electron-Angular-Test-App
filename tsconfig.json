@@ -1,3 +1,6 @@
+// tsconfig.json
+// This file is used to configure TypeScript compiler options for an Angular project.
+
 /* To learn more about Typescript configuration file: https://www.typescriptlang.org/docs/handbook/tsconfig-json.html. */
 /* To learn more about Angular compiler options: https://angular.dev/reference/configs/angular-compiler-options. */
 
@@ -15,7 +18,8 @@
     "experimentalDecorators": true,
     "importHelpers": true,
     "target": "ES2022",
-    "module": "preserve"
+    "module": "preserve",
+    // "moduleResolution": "node"               // 👈 add this for consistency
   },
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,
@@ -26,8 +30,7 @@
   },
   "files": [],
   "references": [
-    {
-      "path": "./tsconfig.app.json"
-    }
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.main.json" }       // 👈 add this so a single build covers Electron 
   ]
 }
