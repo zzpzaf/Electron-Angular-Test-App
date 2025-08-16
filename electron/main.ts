@@ -38,6 +38,7 @@ const isDev = require('electron-is-dev');
 
 // const { app, BrowserWindow, ipcMain, Menu } = require('electron');
 import { app, BrowserWindow, ipcMain } from 'electron';
+import { attachCopiedImages } from './context-copy-selected-images';
 
 let mainAppWin: any;
 
@@ -136,6 +137,7 @@ function createWindow() {
   // let disposeContextMenu: (() => void) | null = attachContextMenu(mainAppWin);
   // Or, use ReturnType so it always matches whatever attachContextMenu returns:
   let disposeContextMenu: ReturnType<typeof attachContextMenu> | null = attachContextMenu(mainAppWin);
+  let disposeCopiedImages: ReturnType<typeof attachCopiedImages> | null = attachCopiedImages();
   // ==========================================================================
 
 
@@ -158,6 +160,9 @@ function createWindow() {
   mainAppWin.on('closed', () => {
     disposeContextMenu?.();
     disposeContextMenu = null;
+    disposeCopiedImages?.();
+    disposeCopiedImages = null;
+    mainAppWin = null; // Clear the reference to the main window
     console.log('Main window closed');
   });
   // ==========================================================================
