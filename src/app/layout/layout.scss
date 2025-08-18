@@ -1,9 +1,50 @@
-.logo {
-  height: 32px;
-  margin: 16px;
-  color:aquamarine
+.logo-icon-btn {
+  height: 100px;
+  width: 80px;
+  margin-left: 12px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  display: inline-flex;
+  align-items: center  ;
+  justify-content: center;
+  line-height: 1;
+  // font-size: 64px;   /* icon size */
+  // color: #7fffd4;    /* icon color */
 }
-nz-header {
+
+::ng-deep button.logo-icon-btn.ant-btn .anticon {
+    font-size: 36px !important; /* icon size */
+    color: #7fffd4 !important; /* icon color */
+}
+
+.icon-btn {
+  padding: 0;
+  border: none;
+  color: rgb(167, 199, 188);
+  // font-size: 16px;
+  background: transparent;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.icon-btn:hover {
+  color: #ffffff; /* highlight on hover */
+}
+
+::ng-deep
+  button.ant-btn.icon-btn.ant-btn-link.ant-btn-circle.ant-btn-icon-only {
+  font-size: 12px !important; /* icon size */
+  color: #7fffd4 !important;    /* icon color */
+}
+
+
+.sider-menu-items {
+  // margin-top: 20px;
+  padding-top: 12px;
+}
+
+.log nz-header {
   height: 40px !important;
   display: flex;
   align-items: center;
@@ -18,49 +59,115 @@ nz-header {
   color: aquamarine;
 }
 
-/* Second header (nzh2) */
+// /* Second header (nzh2) */
+// #nzh2 {
+//   display: flex;
+//   justify-content: space-between; /* left text & right icons */
+//   align-items: center;
+//   padding: 0 24px;
+//   font-size: 14px;
+//   color: rgb(167, 199, 188);
+// }
+
+// #nzh2 .header-left {
+//   font-size: 12px;
+//   color: rgb(167, 199, 188);
+// }
+
+// #nzh2 .header-right {
+//   display: flex;
+//   align-items: center;
+//   gap: 8px; /* spacing between icons */
+// }
+
+// .icon-btn {
+//   padding: 0;
+//   border: none;
+//   color: rgb(167, 199, 188);
+//   font-size: 16px;
+//   background: transparent;
+//   cursor: pointer;
+//   transition: color 0.2s ease;
+// }
+
+/* Row 2 container */
 #nzh2 {
   display: flex;
-  justify-content: space-between; /* left text & right icons */
   align-items: center;
-  padding: 0 24px;
-  font-size: 14px;
-  color: rgb(167, 199, 188);
+  justify-content: space-between;
+  height: 48px;
+  padding: 0 16px;
 }
 
+/* Let the left side grow so the menu has width */
 #nzh2 .header-left {
-  font-size: 14px;
-  color: rgb(167, 199, 188);
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
+/* === HARD RESET just for the header menu === */
+#nzh2 .main-menu.ant-menu {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  width: auto !important; /* undo any global width from sidebar */
+  // width: 100%;                /* fill the left area */
+}
+
+#nzh2 .main-menu.ant-menu-horizontal {
+  display: flex !important; /* resist global ul/li overrides or ::ng-deep */
+  align-items: center;
+  justify-content: space-between; /* <— requested */
+  flex-wrap: nowrap !important;
+  height: 40px;
+  line-height: 32px;
+  white-space: nowrap;
+  // gap: 14px; /* <-- the visual gap between items */
+  // gap: 0;                      /* no flex gap between items */
+}
+
+/* Clickable area; no extra space on the outer edges */
+#nzh2 .main-menu.ant-menu-horizontal > .ant-menu-item {
+  display: inline-flex !important;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 0 12px; /* item hit area */
+}
+
+/* Ensure each item has clickable padding (in addition to the gap) */
+#nzh2 .main-menu.ant-menu-horizontal > .ant-menu-item,
+#nzh2 .main-menu.ant-menu-horizontal > .ant-menu-submenu {
+  display: inline-flex !important;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 0 10px !important; /* clickable area */
+}
+
+/* Belt-and-suspenders: if some global CSS kills padding, still keep spacing */
+#nzh2 .main-menu.ant-menu-horizontal > li + li {
+  margin-left: 6px !important;
+}
+
+/* Optional: keep underline indicator hidden in the header row */
+#nzh2 .ant-menu-dark.ant-menu-horizontal > .ant-menu-item::after,
+#nzh2 .ant-menu-dark.ant-menu-horizontal > .ant-menu-submenu::after {
+  border-bottom: none;
+}
+
+/* Right icons */
 #nzh2 .header-right {
   display: flex;
   align-items: center;
-  gap: 8px; /* spacing between icons */
+  gap: 8px;
 }
-
-.icon-btn {
-  padding: 0;
-  border: none;
-  color: rgb(167, 199, 188);
-  font-size: 16px;
-  background: transparent;
-  cursor: pointer;
-  transition: color 0.2s ease;
-}
-
-.icon-btn:hover {
-  color: #ffffff; /* highlight on hover */
-}
-
-
-
 
 ::ng-deep .ant-layout-sider-trigger {
   background: #001529;
-  color: aquamarine
+  color: aquamarine;
 }
-
 
 ::ng-deep .ant-layout-sider-children {
   padding: 0 !important;
@@ -87,9 +194,6 @@ nz-header {
   width: 100% !important;
 }
 
-
-
-
 ::ng-deep nz-content {
   // margin: 24px 16px;
   // padding: 24px;
@@ -100,5 +204,5 @@ nz-header {
 nz-footer {
   text-align: center;
   color: aquamarine;
-  background: #001529;  // same as sider/header default dark background
+  background: #001529; // same as sider/header default dark background
 }

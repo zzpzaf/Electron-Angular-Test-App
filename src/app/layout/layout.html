@@ -2,10 +2,29 @@
 
 <nz-layout>
   @if (!showSettings()) {
-    <nz-sider nzCollapsible [nzWidth]="140" [nzCollapsedWidth]="50">
-      <div class="logo">PZ</div>
+  <nz-sider nzCollapsible [nzWidth]="140" [nzCollapsedWidth]="50">
+    <div >
+      <button
+        nz-button
+        nzType="link" 
+        nzShape="circle" 
+        class="logo-icon-btn"
+        nz-tooltip
+        nzTooltipTitle="Home"
+        [routerLink]="'/'"
+      >
+        <span 
+          nz-icon 
+          nzType="home" 
+          nzTheme="outline" 
+        ></span>
+      </button>  
+      <!-- PZ -->
+    </div>
+
+    <div class="sider-menu-items">
       <ul nz-menu nzTheme="dark" nzMode="inline">
-        @for (item of siderMenuItems; track item.label) {
+        @for (item of $siderMenuItems(); track item.label) {
         <li nz-menu-item>
           <a [routerLink]="item.route">
             <span nz-icon [nzType]="item.icon"></span>
@@ -14,16 +33,30 @@
         </li>
         }
       </ul>
-    </nz-sider>
+    </div>
+    
+  </nz-sider>
   }
   <nz-layout>
     <nz-header id="nzh1">
-      <h1>
-        {{ headerTitle }}
-      </h1>
+      <h1>{{ headerTitle }}</h1>
     </nz-header>
+
     <nz-header id="nzh2">
-      <div class="header-left">Test Test Test</div>
+      <div class="header-left">
+        <ul nz-menu nzMode="horizontal" nzTheme="dark" class="main-menu">
+          @for (item of mainMenuItems; track item.id) {
+          <li
+            nz-menu-item
+            [nzSelected]="item.id === selectedMainMenuId"
+            (click)="onMainMenuClick(item)"
+          >
+            {{ item.label }}
+          </li>
+          }
+        </ul>
+      </div>
+
       <div class="header-right">
         <button
           nz-button
@@ -49,6 +82,7 @@
         </button>
       </div>
     </nz-header>
+
     <nz-content>
       <!-- <div>Main Content Goes Here</div> -->
       @if (showSettings()) {

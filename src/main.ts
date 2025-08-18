@@ -7,7 +7,7 @@ import { appRoutes } from './app/app.routes';
 import { NzModalModule } from 'ng-zorro-antd/modal';
 import { importProvidersFrom } from '@angular/core';
 import { provideNzIcons } from 'ng-zorro-antd/icon';
-import { LogoutOutline, SettingOutline } from '@ant-design/icons-angular/icons';
+import { LogoutOutline, SettingOutline, HomeOutline } from '@ant-design/icons-angular/icons';
 
 
 // bootstrapApplication(App, appConfig)
@@ -19,7 +19,7 @@ bootstrapApplication(App, {
     ...(appConfig.providers || []),
     provideRouter(appRoutes, withHashLocation()),
     importProvidersFrom(NzModalModule),
-    provideNzIcons([SettingOutline, LogoutOutline])
+    provideNzIcons([SettingOutline, LogoutOutline, HomeOutline,])
 
   ]
 }).catch((err) => console.error(err));

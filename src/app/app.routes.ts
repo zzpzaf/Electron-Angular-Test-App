@@ -8,6 +8,7 @@ import { Links } from './links/links';
 import { UrlsFile } from './urls-file/urls-file';
 import { Bookmarks } from './bookmarks/bookmarks';
 import { Markdown } from './markdown/markdown';
+import { DbArticles } from './db-articles/db-articles';
 
 
 export const appRoutes: Routes = [
@@ -17,6 +18,7 @@ export const appRoutes: Routes = [
   { path: 'urlsfile', component: UrlsFile },
   { path: 'bookmarks', component: Bookmarks },
   { path: 'markdown', component: Markdown },
+  { path: 'articles', component: DbArticles },
   { path: '', redirectTo: '/home', pathMatch: 'full' },
 
 ];
