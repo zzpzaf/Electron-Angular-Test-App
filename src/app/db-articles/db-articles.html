@@ -1,1 +1,41 @@
-<p>db-articles works!</p>
+
+<nz-layout class="comp-layout">
+  <!-- Sidebar -->
+  <nz-sider nzCollapsible nzWidth="160px" class="comp-sider">
+    <div class="sider-header">
+        Categories
+    </div>
+
+    <div class="sider-menu" role="navigation" aria-label="Sidebar menu scroll area">
+      <ul>
+        @for (item of [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]; track item) {
+          <li>Menu item {{ item }}</li>
+        }
+      </ul>
+    </div>
+
+    <div class="sider-footer">
+        <!-- Sider Footer -->
+        <label nz-checkbox [(ngModel)]="rootOnly" (ngModelChange)="isOnlyRootToggle()">Root Only</label> 
+    </div>
+  </nz-sider>
+
+    <!-- Header -->
+    <!-- <nz-header class="comp-header">
+      <div class="header-content">
+      </div>
+    </nz-header> -->
+
+  <!-- Content -->
+  <nz-content class="comp-content">
+    <div class="inner-content">
+      <!-- Router outlet for Angular pages -->
+      <!-- <router-outlet></router-outlet> -->
+    </div>
+  </nz-content>
+
+  <!-- Footer -->
+  <!-- <nz-footer class="app-footer">
+     
+    </nz-footer> -->
+</nz-layout>

@@ -1,0 +1,135 @@
+/* Ensure the component and its layout can resolve height from the parent */
+:host {
+  display: block;
+  height: 100%;
+  min-height: 0;
+}
+
+.comp-layout {
+  height: 100%;
+  min-height: 0;
+  background: #001529; // main background
+}
+
+.comp-sider {
+  background: #012241; // keep sidebar consistent
+  color: #6ed0c5 !important;
+
+  // - Necessary for removing the bottom gap!
+  // If your theme uses a different trigger height, just change --sider-trigger-h to match.
+  --sider-trigger-h: 48px; 
+}
+
+
+/* NG-Zorro wraps sider content in .ant-layout-sider-children.
+    Make it a flex column so header/menu/footer lay out correctly. 
+    IMPORTANT: don't force height:100% unless ALL parents set height. 
+*/
+// :host ::ng-deep .comp-sider .ant-layout-sider-children {
+// :host ::ng-deep nz-sider.comp-sider > .ant-layout-sider-children {
+:host ::ng-deep nz-sider.comp-sider.ant-layout-sider.ant-layout-sider-dark > .ant-layout-sider-children {
+display: flex;
+flex-direction: column;
+height: 100%;      /* removed: height: 100%; */
+min-height: 0;     /* allows the middle section to shrink/scroll when parent constrains height */
+padding: 0 !important;
+}
+/* If the default NG-Zorro trigger is present, keep space for it. */
+// :host ::ng-deep .comp-sider.ant-layout-sider-has-trigger .ant-layout-sider-children {
+// :host ::ng-deep nz-sider.comp-sider.ant-layout-sider-has-trigger > .ant-layout-sider-children {
+:host ::ng-deep nz-sider.comp-sider.ant-layout-sider.ant-layout-sider-dark.ant-layout-sider-has-trigger > .ant-layout-sider-children {
+  padding-bottom: 0 !important;   // 48px -> default trigger height 
+}
+
+// If some theme CSS re-applies padding later, still force the footer flush 
+// Necessary for removing the bottom gap!
+:host ::ng-deep nz-sider.comp-sider.ant-layout-sider-has-trigger .sider-footer {
+  margin-bottom: calc(var(--sider-trigger-h) * -1) !important; /* pull footer down */
+}
+
+
+/* Header + Footer same height */
+.sider-header,
+.sider-footer {
+  height: 48px; /* pick 48/56/64 per your design */
+  min-height: 48px;
+  display: grid;   // flex;
+  //   align-items: center;
+  //   justify-items: center;
+  place-items: center;
+  padding: 0;
+  font-weight: 300;
+  line-height: 1;
+  user-select: none;
+  text-align: center;
+}
+
+.sider-header {
+  color: aquamarine !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+.sider-footer {
+  // color:aquamarine !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  .ant-checkbox-wrapper {
+    color:aquamarine !important;
+    font-size: 14px;
+    // font-variant: tabular-nums;
+    // line-height: 1.5715;
+    // list-style: none;
+    // font-feature-settings: "tnum";
+    // display: inline-flex;
+    // align-items: baseline;
+    // line-height: unset;
+    cursor: pointer;
+  }
+}
+
+/* Middle section fills available space and scrolls */
+/* Scrollable middle area for future nz-menu */
+.sider-menu {
+  flex: 1 1 auto;
+  min-height: 0; /* critical for scroll when height-constrained by parent */
+  overflow-y: auto;
+  padding: 8px 0;
+  /* Keep a visible gutter for the scrollbar in Chromium/Electron */
+  scrollbar-gutter: stable;
+
+  /* Optional: style the scrollbar so it’s visible even on macOS */
+  &::-webkit-scrollbar { width: 8px; }
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.35);
+    border-radius: 8px;
+  }
+  &::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  li {
+    padding: 6px 12px;
+    color: #6ed0c5; /* ensure visible on dark background */
+    cursor: pointer;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+  }
+}
+
+.comp-content {
+  margin-left: 0.5px;
+  padding: 12px;
+  background: #3b9bc1; // white inner content box
+
+  .inner-content {
+    background: #fff;
+    border-radius: 8px;
+    padding: 16px;
+  }
+}
