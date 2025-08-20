@@ -7,6 +7,7 @@ import {
   collectPostsFromUrlTabs,
 } from './processes/scrappers/scrape-functions';
 import {
+  coerceParameter,
   copyFileAsync,
   copyWildFiles,
   deleteFiles,
@@ -17,7 +18,7 @@ import {
   handleSaveScrappedData,
   selectFolder,
 } from './helpers/electron-utils';
-import { listURLData, PostData } from '../shared/projectObjects/varObjects';
+import { Category, CategoryNode, listURLData, PostData } from '../shared/projectObjects/varObjects';
 import { getFileFullPathName } from './helpers/electron-utils';
 import {
   getSubfoldersByParentFolderName,
@@ -31,7 +32,7 @@ import { backupOrgPlacesSQLite } from './dbs/sqlite/sqlite3-utils';
 // import { htmlToMarkdown } from './processes/scrappers/page-converters';
 import { shell } from 'electron';
 import { closeDBConnections } from './dbs/sqlite/connections';
-import { getPostBySlug, insertArticlesFromJson, isSlugExisting, isUrlExisting } from './dbs/sqlite/mandb_queries';
+import { getCategoriesByParentId, getPostBySlug, getSubcategoryForest, insertArticlesFromJson, isSlugExisting, isUrlExisting } from './dbs/sqlite/mandb_queries';
 import { attachContextMenu } from './context-menu';
 
 const isDev = require('electron-is-dev');
@@ -477,6 +478,47 @@ ipcMain.handle('sqlite:get-post-data-by-slug',
     return false; // always return boolean
   }
 });
+
+ipcMain.handle('sqlite:get-categories-by-parent-id', 
+  (event: any, parent_id?: unknown) => {
+  // Parameter parent_id can be: number, nul, or not provided at all 
+  try {
+    const coerced = coerceParameter(parent_id);
+    const categories: Category[] = getCategoriesByParentId(coerced);
+    return categories; 
+  } catch (err) {
+    console.error('Error getting Categories by parent_id: "', parent_id, '" ', err);
+    return false; // always return boolean
+  }
+});
+
+
+ipcMain.handle('sqlite:get-sub-category-forest-by-parent-id', 
+  (event: any, parent_id: unknown) => {
+  // Parameter parent_id can be: number, '', or not provided at all 
+  try {
+    const coerced = coerceParameter(parent_id);
+    const effective = coerced === undefined ? null : coerced;
+    const categoryForest: CategoryNode[] = getSubcategoryForest(effective as number | null);
+    return categoryForest; 
+  } catch (err) {
+    console.error('Error getting Category Forest by parent_id: "', parent_id, '" ', err);
+    return [];  
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 ipcMain.handle(

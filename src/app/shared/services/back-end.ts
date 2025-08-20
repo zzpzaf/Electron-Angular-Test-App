@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { PostData } from '../../../../shared/projectObjects/varObjects';
+import { Category, CategoryNode, PostData } from '../../../../shared/projectObjects/varObjects';
 
 interface DeleteFilesResult {
   deleted: string[];
@@ -87,12 +87,18 @@ export class BackEnd {
     return this.ipcInvoke<boolean>('sqlite:check-if-slug-exists', slug);
   }
 
-  getPostDatabySlug(slug: string): Promise<PostData | null> {
+  getPostDataBySlug(slug: string): Promise<PostData | null> {
     return this.ipcInvoke<PostData | null>('sqlite:get-post-data-by-slug', slug);
   }
 
+  getCategoriesByParentId(parent_id? : null | number): Promise<Category[]> {
+     return this.ipcInvoke<Category[]>('sqlite:get-categories-by-parent-id', parent_id);
+  }
 
 
+  getCategoryForestByParentId(parent_id? : null | number): Promise<CategoryNode[]> {
+     return this.ipcInvoke<CategoryNode[]>('sqlite:get-sub-category-forest-by-parent-id', parent_id);
+  }
 
   /*
   * Application wide functions

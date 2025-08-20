@@ -457,7 +457,7 @@ export class Markdown {
     const urlSlug = getMediumSlugFromUrl(urlString);
 
     try {
-      const articleData = await this.backendService.getPostDatabySlug(urlSlug);
+      const articleData = await this.backendService.getPostDataBySlug(urlSlug);
       console.log('>===>> Article data fetched by slug:', articleData?.title);
       return articleData; // Returns PostData or null if not found
     } catch (error) {

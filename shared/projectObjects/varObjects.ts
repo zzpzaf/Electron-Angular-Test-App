@@ -19,17 +19,29 @@ export interface PostData extends listURLData{
   content?: string;
 }
 
-// export interface MarkedPostData extends PostData {
-//   content: string;
-// }
+
+export interface Category {
+  id: number;
+  name: string;
+  description: string;
+  parent_id: number
+}
+
+export type CategoryRow = {
+  id: number;
+  name: string;
+  description: string | null;
+  parent_id: number | null;
+};
 
 
-
-// export type SubfolderRow = {
-//   folder_id: number;
-//   folder_name: string | null;
-//   parent_id: number | null;
-// };
+export interface CategoryNode {
+  id: number;
+  name: string;
+  description: string; 
+  parent_id: number | null;
+  subCategoryNode: CategoryNode[];
+}
 
 
 export type SubfolderRow = {
@@ -49,13 +61,6 @@ export type FolderMatch = {
   id: number;
   parent_id: number | null;
 };
-
-// interface FolderNode_old1 {
-//   folder_id: number;
-//   folder_name: string;
-//   parent_id: number | null;
-//   children?: FolderNode_old1[];
-// }
 
 
 export interface FolderNode {

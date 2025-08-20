@@ -542,3 +542,28 @@ export function getPropertyValueBySubstring(
   if (typeof value === 'string' && value.includes(substring)) retValue = value;
   return retValue;
 }
+
+
+
+// --------------------------------------------------------------------------
+export function coerceParameter(input: unknown): number | null | undefined {
+  // undefined → no filter (return all)
+  if (input === undefined) return undefined;
+
+  // null (real null) or the string "null" → top-level
+  if (input === null) return null;
+  if (typeof input === 'string' && input.trim().toLowerCase() === 'null') return null;
+
+  // empty string → treat like undefined (return all)
+  if (typeof input === 'string' && input.trim() === '') return undefined;
+
+  // numbers pass-through
+  if (typeof input === 'number' && Number.isInteger(input)) return input;
+
+  // numeric strings → parse
+  if (typeof input === 'string') {
+    const n = Number(input.trim());
+    if (Number.isInteger(n)) return n;
+  }
+  
+}
