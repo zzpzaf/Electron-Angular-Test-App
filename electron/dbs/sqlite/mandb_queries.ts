@@ -36,6 +36,8 @@ const mainDb = getMainConnection();
  * - safeValue: Helper function to safely handle different data types (Iis not used yet)
  * - safeStr: Helper function to ensure string values are safe (Iis not used yet)
  * - safeNum: Helper function to ensure number values are safe (Iis not used yet) 
+ * 
+ *  + + + + + 
  **/
 
 
@@ -121,11 +123,12 @@ export function getPostBySlug(urlSlug: string): PostData | null {
 
   console.log('>===>> "getPostBySlug" -> Fetching post by slug:', urlSlug);
   try {
+    // field 'ranking' added on 250820
     const stmt = mainDb.prepare(`
       SELECT
+        id,
         listname,
         pubauthorslug,
-        0 AS counter,          -- placeholder, not stored in DB
         hostname,
         timestamp,
         pubname,
@@ -136,7 +139,8 @@ export function getPostBySlug(urlSlug: string): PostData | null {
         date,
         likes,
         comments,
-        content
+        content, 
+        ranking
       FROM articles
       WHERE linkurl LIKE ?
       LIMIT 1
@@ -257,6 +261,109 @@ export function insertArticlesFromJson(posts: PostData[]): number {
     return 0;
   }
 }
+
+
+
+
+/**
+ * 250821
+ * Returns an array that contains either just 1 article with the specific id or all articles
+ * If no id parameter is provided, it returns all articles (all rows)
+ * 
+ */
+export function getArticleById(id?: number): PostData[] {
+  if (!mainDb) {
+    console.error('>===>> No Main DB connection.');
+    return [];
+  }
+
+  try {
+    let rows: PostData[] = [];
+        if (id === undefined) {
+      // No id param → return ALL Articles
+      const stmt = mainDb.prepare<[], PostData>(`
+      SELECT
+        id,
+        listname,
+        pubauthorslug,         
+        hostname,
+        timestamp,
+        pubname,
+        authorname,
+        title,
+        linkurl AS link,
+        imageurl AS image,
+        date,
+        likes,
+        comments,
+        content, 
+        ranking
+      FROM articles
+      ORDER BY title
+      `);
+      rows = stmt.all();
+     
+    } else {
+      // id is a number → fetch just an article with this id
+      const stmt = mainDb.prepare<{ id: number }, PostData>(`
+      SELECT
+        id,
+        listname,
+        pubauthorslug,         
+        hostname,
+        timestamp,
+        pubname,
+        authorname,
+        title,
+        linkurl AS link,
+        imageurl AS image,
+        date,
+        likes,
+        comments,
+        content, 
+        ranking
+      FROM articles
+      WHERE id = @id
+      ORDER BY title
+      `);
+      rows = stmt.all({ id });
+    }
+    return rows;
+  } catch (err) {
+    console.error('Error fetching categories:', err);
+    return [];
+  }
+}
+
+/**
+ * 250821
+ * Returns an array of all articles that have NO category assigned (no entry in the article-categories join table).
+ * 
+ */
+export function getUncategorizedArticles(): PostData[] {
+  if (!mainDb) {
+    console.error('>===>> No Main DB connection.');
+    return [];
+  }
+
+  try {
+    let rows: PostData[] = [];
+    const stmt = mainDb.prepare(`
+      SELECT a.*
+      FROM articles a
+      LEFT JOIN "article_categories" ac 
+        ON a.id = ac.article_id
+      WHERE ac.article_id IS NULL
+    `);
+    rows = stmt.all() as PostData[];
+    return rows;
+  } catch (err) {
+    console.error('Error fetching uncategorized Articles:', err);
+    return [];
+  }
+}
+
+
 
 
 
@@ -396,7 +503,7 @@ export function getSubcategoryTree(rootId: number): CategoryNode | null {
 
 /**
  * 250819
- * Builds a forest (array of root CategoryNode) for all categories whose parent_id equals `parentId`.
+ * Builds a *** forest *** (array of root CategoryNode) for all categories whose parent_id equals `parentId`.
  * - parentId === null  -> roots are top-level categories (parent_id IS NULL)
  * - parentId is number -> roots are the direct children of that parent
  */

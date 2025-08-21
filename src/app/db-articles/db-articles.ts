@@ -59,8 +59,8 @@ export class DbArticles {
   public $articles = signal<PostData[]>([]);
   private backendService = inject(BackEnd);
 
-  public unassignedOnly: boolean = true;    // All Unassigned Articles
-  public  treeDisabled: boolean  = true;   // when true: the whole tree is disabled
+  public unassignedOnly: boolean = true; // All Unassigned Articles
+  public treeDisabled: boolean = true; // when true: the whole tree is disabled
 
   expandedKeys: string[] = [];
   selectedKeys: string[] = [];
@@ -71,6 +71,8 @@ export class DbArticles {
 
   ngOnInit() {
     this.getCategoryForestByParentId(null);
+    // this.getArticlesById();
+    this.getUnassignedArticles();
   }
 
   public isOnlyUnassignedToggle() {
@@ -91,16 +93,15 @@ export class DbArticles {
   private clearSelection() {
     this.selectedKeys = [];
     if (this.nztree) {
-      this.nztree.getSelectedNodeList().forEach(n => (n.isSelected = false));
+      this.nztree.getSelectedNodeList().forEach((n) => (n.isSelected = false));
     }
   }
-
 
   onTreeNodeClick(event: NzFormatEmitEvent) {
     const node = event.node;
     if (!node) return;
 
-    console.log('>===>> Node clicked: ', node.key, ' - ', node.title) ;
+    console.log('>===>> Node clicked: ', node.key, ' - ', node.title);
 
     // select the clicked node
     this.selectedKeys = [node.key!];
@@ -116,8 +117,13 @@ export class DbArticles {
   onCheckBoxChanged(event: NzFormatEmitEvent) {
     const node = event.node;
     if (!node) return;
-    console.log('>===>> Node Checked change: ', node.key, ' - ', node.title, node) ;
-
+    console.log(
+      '>===>> Node Checked change: ',
+      node.key,
+      ' - ',
+      node.title,
+      node
+    );
   }
 
   onTreeNodeExpandChange(event: NzFormatEmitEvent) {
@@ -168,6 +174,76 @@ export class DbArticles {
         error
       );
     }
+  }
+
+  async getUnassignedArticles() {
+    let articles: PostData[] = [];
+    try {
+      articles = await this.backendService.getUncategorizedArticles();
+      if (articles.length > 0) {
+        this.showArticlesMetaDataArray(articles);
+        // To-Do
+        // fill the table with articles meta data array
+      }
+    } catch (error) {
+      console.log('>===>> Error fetching Un-Assigned / Un-Categorized Articles from BackEnd: ', error);
+    }
+  }
+
+
+
+  async getArticlesById(id?: number) {
+    let articles: PostData[] = [];
+    try {
+      articles = await this.backendService.getArticlesById(id);
+      if (articles.length > 0) {
+        this.showArticlesMetaDataArray(articles);
+        // To-Do
+        // fill the table with articles meta data array
+      }
+    } catch (error) {
+      console.log('>===>> Error fetching Article(s) from BackEnd: ', error);
+    }
+  }
+
+  showArticlesMetaDataArray(articles: PostData[]) {
+    const articleMetaDataArray: PostData[] =
+      this.getArticlesMetaDataArray(articles);
+    console.log(
+      '>===>> ',
+      articles.length,
+      ' Articles Fetched: ',
+      JSON.stringify(articleMetaDataArray)
+    );
+  }
+
+  getArticlesMetaDataArray(articles: PostData[]): PostData[] {
+    let articlesMetaDataArray: PostData[] = [];
+    for (let postData of articles) {
+      articlesMetaDataArray.push(this.getArticleMetaData(postData));
+    }
+    return articlesMetaDataArray;
+  }
+
+  getArticleMetaData(postData: PostData): PostData {
+    const postMetaData: PostData = {
+      id: postData.id, // added on 250821
+      listname: postData.listname,
+      pubauthorslug: postData.pubauthorslug,
+      hostname: postData.hostname,
+      timestamp: postData.timestamp,
+      pubname: postData.pubname,
+      authorname: postData.authorname,
+      title: postData.title,
+      link: postData.link,
+      image: postData.image,
+      date: postData.date,
+      likes: postData.likes,
+      comments: postData.comments,
+      ranking: postData.ranking, // added on 250820
+    };
+    return postMetaData;
+    //this.postMetaDataString.set(JSON.stringify(postMetaData, null, 2));
   }
 
   // If we want to expand all nodes that have children:

@@ -5,6 +5,7 @@ export interface listURLData {
 
 
 export interface PostData extends listURLData{
+  id?: number;
   counter?: number;
   hostname: string;
   timestamp: string;
@@ -17,6 +18,7 @@ export interface PostData extends listURLData{
   likes: number;
   comments: number;
   content?: string;
+  ranking?: number;     // added on 250820
 }
 
 

@@ -18,7 +18,12 @@ import {
   handleSaveScrappedData,
   selectFolder,
 } from './helpers/electron-utils';
-import { Category, CategoryNode, listURLData, PostData } from '../shared/projectObjects/varObjects';
+import {
+  Category,
+  CategoryNode,
+  listURLData,
+  PostData,
+} from '../shared/projectObjects/varObjects';
 import { getFileFullPathName } from './helpers/electron-utils';
 import {
   getSubfoldersByParentFolderName,
@@ -32,7 +37,16 @@ import { backupOrgPlacesSQLite } from './dbs/sqlite/sqlite3-utils';
 // import { htmlToMarkdown } from './processes/scrappers/page-converters';
 import { shell } from 'electron';
 import { closeDBConnections } from './dbs/sqlite/connections';
-import { getCategoriesByParentId, getPostBySlug, getSubcategoryForest, insertArticlesFromJson, isSlugExisting, isUrlExisting } from './dbs/sqlite/mandb_queries';
+import {
+  getArticleById,
+  getCategoriesByParentId,
+  getPostBySlug,
+  getSubcategoryForest,
+  getUncategorizedArticles,
+  insertArticlesFromJson,
+  isSlugExisting,
+  isUrlExisting,
+} from './dbs/sqlite/mandb_queries';
 import { attachContextMenu } from './context-menu';
 
 const isDev = require('electron-is-dev');
@@ -42,8 +56,6 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import { attachCopiedImages } from './context-copy-selected-images';
 
 let mainAppWin: any;
-
-
 
 // ======================================================================================================
 // The Main Function to create the main Electron application window
@@ -65,7 +77,7 @@ function createWindow() {
       contextIsolation: true,
       // nodeIntegration: false,  // Recommended
       // enableRemoteModule: false,
-      sandbox: false,  // Must be false to allow the preload.ts to import other scripts like the ./context-select-all-support
+      sandbox: false, // Must be false to allow the preload.ts to import other scripts like the ./context-select-all-support
     },
   });
   // ====================================================================
@@ -73,7 +85,7 @@ function createWindow() {
   // ===========================================================================
   // Intercept an external link (https://...) and open it, in user’s default browser instead
   // ===========================================================================
-    mainAppWin.webContents.setWindowOpenHandler((details: HandlerDetails) => {
+  mainAppWin.webContents.setWindowOpenHandler((details: HandlerDetails) => {
     const { url } = details;
     // Open all non-local URLs in the default browser
     if (!url.startsWith('file://') && !url.startsWith('http://localhost')) {
@@ -89,9 +101,6 @@ function createWindow() {
     }
   });
   // ===========================================================================
-
-
-
 
   // ==========================================================================
   // Load the Angular app from the dist folder
@@ -126,9 +135,6 @@ function createWindow() {
   }
   // ==========================================================================
 
-
-
-  
   // ==========================================================================
   // Attach a custom context menu
   // This will allow right-click context menu support in the Electron app
@@ -137,11 +143,11 @@ function createWindow() {
   // A minimal entry to attach context menu
   // let disposeContextMenu: (() => void) | null = attachContextMenu(mainAppWin);
   // Or, use ReturnType so it always matches whatever attachContextMenu returns:
-  let disposeContextMenu: ReturnType<typeof attachContextMenu> | null = attachContextMenu(mainAppWin);
-  let disposeCopiedImages: ReturnType<typeof attachCopiedImages> | null = attachCopiedImages();
+  let disposeContextMenu: ReturnType<typeof attachContextMenu> | null =
+    attachContextMenu(mainAppWin);
+  let disposeCopiedImages: ReturnType<typeof attachCopiedImages> | null =
+    attachCopiedImages();
   // ==========================================================================
-
-
 
   // ==========================================================================
   // Show the main window when it's ready
@@ -151,9 +157,6 @@ function createWindow() {
     mainAppWin.show();
   });
   // ==========================================================================
-
-
-
 
   // ==========================================================================
   // Handle window close event
@@ -167,11 +170,7 @@ function createWindow() {
     console.log('Main window closed');
   });
   // ==========================================================================
-
 }
-
-
-
 
 // ======================================================================================================
 // Electron app initialization
@@ -191,10 +190,6 @@ app.whenReady().then(() => {
 });
 // ======================================================================================================
 
-
-
-
-
 // ======================================================================================================
 // Handle app quitting
 // ======================================================================================================
@@ -208,19 +203,9 @@ app.on('window-all-closed', () => {
 });
 // ======================================================================================================
 
-
-
-
-
-
-
-
-
-
-
-// ****************************************************************************************************** 
+// ******************************************************************************************************
 // Custom IPC handlers
-// ****************************************************************************************************** 
+// ******************************************************************************************************
 
 ipcMain.handle('app:quit', (event: any) => {
   // Close all windows first (usually app.quit() will do it anyway)
@@ -438,8 +423,7 @@ ipcMain.handle(
   }
 );
 
-ipcMain.handle('sqlite:check-if-url-exists', 
-  (event: any, link: string) => {
+ipcMain.handle('sqlite:check-if-url-exists', (event: any, link: string) => {
   try {
     const sanitized = (link ?? '').trim();
     if (!sanitized) return false; // empty/invalid input → treat as not found
@@ -451,9 +435,7 @@ ipcMain.handle('sqlite:check-if-url-exists',
   }
 });
 
-
-ipcMain.handle('sqlite:check-if-slug-exists', 
-  (event: any, slug: string) => {
+ipcMain.handle('sqlite:check-if-slug-exists', (event: any, slug: string) => {
   try {
     const sanitized = (slug ?? '').trim();
     if (!sanitized) return false; // empty/invalid input → treat as not found
@@ -465,9 +447,7 @@ ipcMain.handle('sqlite:check-if-slug-exists',
   }
 });
 
-
-ipcMain.handle('sqlite:get-post-data-by-slug', 
-  (event: any, slug: string) => {
+ipcMain.handle('sqlite:get-post-data-by-slug', (event: any, slug: string) => {
   try {
     const sanitized = (slug ?? '').trim();
     if (!sanitized) return false; // empty/invalid input → treat as not found
@@ -479,47 +459,77 @@ ipcMain.handle('sqlite:get-post-data-by-slug',
   }
 });
 
-ipcMain.handle('sqlite:get-categories-by-parent-id', 
+
+ipcMain.handle('sqlite:get-articles-by-id', (event: any, id?: number) => {
+  // Parameter id can be: a number > 0, or not provided at all
+  let articles: PostData[] = [];
+  try {
+    if (!id) {
+      articles = getArticleById();
+    } else if (id > 0) {
+      articles = getArticleById(id);
+    }
+    return articles;
+  } catch (err) {
+    console.error('Error getting Articles by id: "', id, '" ', err);
+    return articles;
+  }
+});
+
+ipcMain.handle('sqlite:get-uncategorized-articles', (event: any) => {
+  let articles: PostData[] = [];
+  try {
+    articles = getUncategorizedArticles();
+    return articles;
+  } catch (err) {
+    console.error('Error getting Uncategorized Articles: ', err);
+    return articles;
+  }
+});
+
+
+ipcMain.handle(
+  'sqlite:get-categories-by-parent-id',
   (event: any, parent_id?: unknown) => {
-  // Parameter parent_id can be: number, nul, or not provided at all 
-  try {
-    const coerced = coerceParameter(parent_id);
-    const categories: Category[] = getCategoriesByParentId(coerced);
-    return categories; 
-  } catch (err) {
-    console.error('Error getting Categories by parent_id: "', parent_id, '" ', err);
-    return false; // always return boolean
+    // Parameter parent_id can be: number, nul, or not provided at all
+    try {
+      const coerced = coerceParameter(parent_id);
+      const categories: Category[] = getCategoriesByParentId(coerced);
+      return categories;
+    } catch (err) {
+      console.error(
+        'Error getting Categories by parent_id: "',
+        parent_id,
+        '" ',
+        err
+      );
+      return false; // always return boolean
+    }
   }
-});
+);
 
-
-ipcMain.handle('sqlite:get-sub-category-forest-by-parent-id', 
+ipcMain.handle(
+  'sqlite:get-sub-category-forest-by-parent-id',
   (event: any, parent_id: unknown) => {
-  // Parameter parent_id can be: number, '', or not provided at all 
-  try {
-    const coerced = coerceParameter(parent_id);
-    const effective = coerced === undefined ? null : coerced;
-    const categoryForest: CategoryNode[] = getSubcategoryForest(effective as number | null);
-    return categoryForest; 
-  } catch (err) {
-    console.error('Error getting Category Forest by parent_id: "', parent_id, '" ', err);
-    return [];  
+    // Parameter parent_id can be: number, '', or not provided at all
+    try {
+      const coerced = coerceParameter(parent_id);
+      const effective = coerced === undefined ? null : coerced;
+      const categoryForest: CategoryNode[] = getSubcategoryForest(
+        effective as number | null
+      );
+      return categoryForest;
+    } catch (err) {
+      console.error(
+        'Error getting Category Forest by parent_id: "',
+        parent_id,
+        '" ',
+        err
+      );
+      return [];
+    }
   }
-});
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+);
 
 ipcMain.handle(
   'sqlite:get-subfolders-tree',
@@ -565,7 +575,6 @@ ipcMain.handle(
   }
 );
 
-
 // Not-used so far ....
 ipcMain.handle('open-component-window', (event: any, data: any) => {
   const newWin = new BrowserWindow({
@@ -586,3 +595,4 @@ ipcMain.handle('open-component-window', (event: any, data: any) => {
     newWin.webContents.send('mark-data', data);
   });
 });
+

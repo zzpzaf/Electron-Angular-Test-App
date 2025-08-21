@@ -347,6 +347,7 @@ export class Markdown {
   showArticleData( postData: PostData) {
 
     const postMetaData: PostData = {
+      id: postData.id,                // added on 250821
       listname: this.listurldata.listname,
       pubauthorslug: this.listurldata.pubauthorslug,
       hostname: postData.hostname,
@@ -359,6 +360,7 @@ export class Markdown {
       date: postData.date,
       likes: postData.likes,
       comments: postData.comments,
+      ranking: postData.ranking         // added on 250820
     };
     this.postMetaDataString.set(JSON.stringify(postMetaData, null, 2));
     // Set the (Markdown) content of the first item

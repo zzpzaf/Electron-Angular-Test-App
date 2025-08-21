@@ -91,10 +91,18 @@ export class BackEnd {
     return this.ipcInvoke<PostData | null>('sqlite:get-post-data-by-slug', slug);
   }
 
+  getArticlesById(id? : number): Promise<PostData[]> {
+     return this.ipcInvoke<PostData[]>('sqlite:get-articles-by-id', id);
+  }
+
+  getUncategorizedArticles(): Promise<PostData[]> {
+     return this.ipcInvoke<PostData[]>('sqlite:get-uncategorized-articles');
+  }
+
+
   getCategoriesByParentId(parent_id? : null | number): Promise<Category[]> {
      return this.ipcInvoke<Category[]>('sqlite:get-categories-by-parent-id', parent_id);
   }
-
 
   getCategoryForestByParentId(parent_id? : null | number): Promise<CategoryNode[]> {
      return this.ipcInvoke<CategoryNode[]>('sqlite:get-sub-category-forest-by-parent-id', parent_id);
