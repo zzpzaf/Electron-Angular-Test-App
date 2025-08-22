@@ -349,7 +349,22 @@ export function getUncategorizedArticles(): PostData[] {
   try {
     let rows: PostData[] = [];
     const stmt = mainDb.prepare(`
-      SELECT a.*
+      SELECT 
+        a.id,
+        a.listname,
+        a.pubauthorslug,         
+        a.hostname,
+        a.timestamp,
+        a.pubname,
+        a.authorname,
+        a.title,
+        a.linkurl AS link,
+        a.imageurl AS image,
+        a.date,
+        a.likes,
+        a.comments,
+        a.content, 
+        a.ranking
       FROM articles a
       LEFT JOIN "article_categories" ac 
         ON a.id = ac.article_id

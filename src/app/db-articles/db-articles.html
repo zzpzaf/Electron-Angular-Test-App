@@ -5,7 +5,7 @@
 
     <div
       class="sider-menu"
-      [class.tree-disabled]="treeDisabled"  
+      [class.tree-disabled]="treeDisabled"
       role="navigation"
       aria-label="Sidebar menu scroll area"
     >
@@ -15,13 +15,11 @@
         }
       </ul> -->
       <nz-tree
-
         [nzData]="$treeNodes()"
         [nzExpandedKeys]="expandedKeys"
         [nzSelectedKeys]="selectedKeys"
         nzBlockNode
         (nzClick)="onTreeNodeClick($event)"
-
         (nzExpandChange)="onTreeNodeExpandChange($event)"
       >
         <!-- <ng-template #nzTreeTemplate let-node>
@@ -50,8 +48,148 @@
   <!-- Content -->
   <nz-content class="comp-content">
     <div class="inner-content">
-      <!-- Router outlet for Angular pages -->
-      <!-- <router-outlet></router-outlet> -->
+      <nz-table
+        #table
+        [nzData]="$articlesMetaData()"
+        [nzScroll]="{ x: 'max-content' }"
+        [nzPageIndex]="pageIndex"
+        [(nzPageIndex)]="pageIndex"
+        [nzPageSize]="pageSize"
+        [(nzPageSize)]="pageSize"
+        [nzShowPagination]="true"
+      >
+        <!-- ------------------------------------------------------- -->
+
+        <thead>
+          <tr>
+            <!-- 1 -->
+            <th
+              nzColumnKey="id"
+              [nzSortFn]="sortById"
+              [nzSortDirections]="['ascend', 'descend', null]"
+            >
+              Id
+            </th>
+            <!-- 2 -->
+            <th
+              nzColumnKey="title"
+              [nzSortFn]="sortByTitle"
+              [nzSortDirections]="['ascend', 'descend', null]"
+            >
+              Article Title
+            </th>
+            <!-- 3 -->
+            <th nzColumnKey="image">Image</th>
+            <!-- 4 -->
+            <th
+              nzColumnKey="date"
+              [nzSortFn]="sortByDate"
+              [nzSortDirections]="['ascend', 'descend', null]"
+            >
+              Date (YYMMDD)
+            </th>
+            <!-- 5 -->
+            <th
+              nzColumnKey="hostname"
+              [nzSortFn]="sortByHostname"
+              [nzSortDirections]="['ascend', 'descend', null]"
+            >
+              Hostname
+            </th>
+            <!-- 6 -->
+            <th nzColumnKey="pubname">Publication</th>
+            <!-- 7 -->
+            <th nzColumnKey="authorname" [nzShowFilter]="true">Author</th>
+            <!-- 8 -->
+            <th nzColumnKey="pubauthorslug" [nzShowFilter]="true">
+              Author's Slug
+            </th>
+            <!-- 9 -->
+            <th
+              nzColumnKey="listname"
+              [nzSortFn]="sortByListname"
+              [nzSortDirections]="['ascend', 'descend', null]"
+            >
+              Medium List name
+            </th>
+
+            <!-- 10 -->
+            <th
+              nzColumnKey="likes"
+              [nzSortFn]="sortByLikes"
+              [nzSortDirections]="['descend', 'ascend', null]"
+            >
+              Likes
+            </th>
+            <!-- 11 -->
+            <th nzColumnKey="comments">Comments</th>
+            <!-- 12 -->
+            <th nzColumnKey="ranking">Ranking</th>
+            <!-- 13 -->
+            <th nzColumnKey="timestamp">Time Stamp</th>
+          </tr>
+        </thead>
+
+        <!-- ------------------------------------------------------- -->
+
+        <tbody>
+          @for (row of table.data; track row.id ?? row.link) {
+          <tr>
+            <!-- 1 -->
+            <td nzAlign="center">{{ row.id }}</td>
+            <!-- 2 -->
+            <td>
+              <a [href]="row.link" target="_blank" rel="noopener noreferrer">{{
+                row.title
+              }}</a>
+            </td>
+            <!-- 3 -->
+            <td nzAlign="center">
+              <img
+                [src]="row.image"
+                alt=""
+                referrerpolicy="no-referrer"
+                style="height: 20px; width: auto"
+              />
+            </td>
+            <!-- 4 -->
+            <td nzAlign="center">{{ row.date }}</td>
+            <!-- 5 -->
+            <!-- <td>{{ row.hostname }}</td> -->
+            <td>
+              <a
+                [href]="
+                  row.hostname.startsWith('http://') ||
+                  row.hostname.startsWith('https://')
+                    ? row.hostname
+                    : 'http://' + row.hostname
+                "
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {{ row.hostname }}
+              </a>
+            </td>
+            <!-- 6 -->
+            <td>{{ row.pubname }}</td>
+            <!-- 7 -->
+            <td>{{ row.authorname }}</td>
+            <!-- 8 -->
+            <td>{{ row.pubauthorslug }}</td>
+            <!-- 9 -->
+            <td>{{ row.listname }}</td>
+            <!-- 10 -->
+            <td nzAlign="center">{{ row.likes }}</td>
+            <!-- 11 -->
+            <td nzAlign="center">{{ row.comments }}</td>
+            <!-- 12 -->
+            <td nzAlign="center">{{ row.ranking }}</td>
+            <!-- 13  -->
+            <td>{{ row.timestamp }}</td>
+          </tr>
+          }
+        </tbody>
+      </nz-table>
     </div>
   </nz-content>
 

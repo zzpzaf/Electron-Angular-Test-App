@@ -14,6 +14,14 @@ import { NzCheckboxModule } from 'ng-zorro-antd/checkbox';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 
 import {
+  NzTableModule,
+  NzTableSortFn,
+  NzTableFilterList,
+  NzTableFilterFn,
+  NzTableQueryParams,
+} from 'ng-zorro-antd/table';
+
+import {
   NzTreeModule,
   NzFormatEmitEvent,
   NzTreeComponent,
@@ -47,6 +55,7 @@ function mapCategoryNodesToTree(nodes: CategoryNode[]): NzTreeNodeOptions[] {
     NzButtonModule,
     NzTreeModule,
     NzTreeSelectModule,
+    NzTableModule,
   ],
   templateUrl: './db-articles.html',
   styleUrl: './db-articles.scss',
@@ -57,6 +66,8 @@ export class DbArticles {
   public $treeNodes = signal<NzTreeNodeOptions[]>([]);
 
   public $articles = signal<PostData[]>([]);
+  public $articlesMetaData = signal<PostData[]>([]);
+
   private backendService = inject(BackEnd);
 
   public unassignedOnly: boolean = true; // All Unassigned Articles
@@ -66,6 +77,21 @@ export class DbArticles {
   selectedKeys: string[] = [];
 
   @ViewChild(NzTreeComponent) nztree!: NzTreeComponent;
+
+
+  // 250821 - Added for table support.
+  // Pagination state (two-way bound)
+  pageIndex = 1;
+  pageSize = 10;
+  private str = (v: any) => (v ?? '').toString().toLowerCase();
+
+  sortById: NzTableSortFn<PostData> = (a, b) => this.str(a.id).localeCompare(this.str(b.id));
+  sortByTitle: NzTableSortFn<PostData>    = (a, b) => this.str(a.title).localeCompare(this.str(b.title));
+  sortByLink: NzTableSortFn<PostData>     = (a, b) => this.str(a.link).localeCompare(this.str(b.link));
+  sortByHostname: NzTableSortFn<PostData> = (a, b) => this.str(a.hostname).localeCompare(this.str(b.hostname));
+  sortByListname: NzTableSortFn<PostData> = (a, b) => this.str(a.listname).localeCompare(this.str(b.listname));
+  sortByDate: NzTableSortFn<PostData> = (a, b) => a.date.localeCompare(b.date);
+  sortByLikes: NzTableSortFn<PostData> = (a, b) => a.likes - b.likes;
 
   constructor() {}
 
@@ -181,16 +207,17 @@ export class DbArticles {
     try {
       articles = await this.backendService.getUncategorizedArticles();
       if (articles.length > 0) {
-        this.showArticlesMetaDataArray(articles);
-        // To-Do
-        // fill the table with articles meta data array
+        // this.showArticlesMetaDataArray(articles);
+        this.$articlesMetaData.set(this.getArticlesMetaDataArray(articles));
+        // this.showArticlesMetaDataArray(articles);
       }
     } catch (error) {
-      console.log('>===>> Error fetching Un-Assigned / Un-Categorized Articles from BackEnd: ', error);
+      console.log(
+        '>===>> Error fetching Un-Assigned / Un-Categorized Articles from BackEnd: ',
+        error
+      );
     }
   }
-
-
 
   async getArticlesById(id?: number) {
     let articles: PostData[] = [];
