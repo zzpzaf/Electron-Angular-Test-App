@@ -12,6 +12,7 @@ import { NzLayoutModule } from 'ng-zorro-antd/layout';
 import { NzMenuModule } from 'ng-zorro-antd/menu';
 import { NzCheckboxModule } from 'ng-zorro-antd/checkbox';
 import { NzButtonModule } from 'ng-zorro-antd/button';
+import { NzRateModule } from 'ng-zorro-antd/rate';
 
 import {
   NzTableModule,
@@ -29,6 +30,10 @@ import {
 } from 'ng-zorro-antd/tree';
 import { NzTreeSelectModule } from 'ng-zorro-antd/tree-select';
 
+import { NzIconModule } from 'ng-zorro-antd/icon';
+
+
+
 function mapCategoryNodesToTree(nodes: CategoryNode[]): NzTreeNodeOptions[] {
   return nodes.map((n) => ({
     key: String(n.id),
@@ -45,6 +50,8 @@ function mapCategoryNodesToTree(nodes: CategoryNode[]): NzTreeNodeOptions[] {
   }));
 }
 
+
+
 @Component({
   selector: 'app-db-articles',
   imports: [
@@ -56,6 +63,8 @@ function mapCategoryNodesToTree(nodes: CategoryNode[]): NzTreeNodeOptions[] {
     NzTreeModule,
     NzTreeSelectModule,
     NzTableModule,
+    NzIconModule,
+    NzRateModule,
   ],
   templateUrl: './db-articles.html',
   styleUrl: './db-articles.scss',
@@ -78,20 +87,28 @@ export class DbArticles {
 
   @ViewChild(NzTreeComponent) nztree!: NzTreeComponent;
 
-
   // 250821 - Added for table support.
   // Pagination state (two-way bound)
   pageIndex = 1;
   pageSize = 10;
+  public nzRateToolTips: string[] = ['bad', 'ok', 'good', 'great', 'must'];
   private str = (v: any) => (v ?? '').toString().toLowerCase();
 
-  sortById: NzTableSortFn<PostData> = (a, b) => this.str(a.id).localeCompare(this.str(b.id));
-  sortByTitle: NzTableSortFn<PostData>    = (a, b) => this.str(a.title).localeCompare(this.str(b.title));
-  sortByLink: NzTableSortFn<PostData>     = (a, b) => this.str(a.link).localeCompare(this.str(b.link));
-  sortByHostname: NzTableSortFn<PostData> = (a, b) => this.str(a.hostname).localeCompare(this.str(b.hostname));
-  sortByListname: NzTableSortFn<PostData> = (a, b) => this.str(a.listname).localeCompare(this.str(b.listname));
+  // sortById: NzTableSortFn<PostData> = (a, b) => this.str(a.id).localeCompare(this.str(b.id));
+  sortById: NzTableSortFn<PostData> = (a, b) => a.id! - b.id!;
+  sortByTitle: NzTableSortFn<PostData> = (a, b) =>
+    this.str(a.title).localeCompare(this.str(b.title));
+  sortByLink: NzTableSortFn<PostData> = (a, b) =>
+    this.str(a.link).localeCompare(this.str(b.link));
+  sortByHostname: NzTableSortFn<PostData> = (a, b) =>
+    this.str(a.hostname).localeCompare(this.str(b.hostname));
+  sortByListname: NzTableSortFn<PostData> = (a, b) =>
+    this.str(a.listname).localeCompare(this.str(b.listname));
   sortByDate: NzTableSortFn<PostData> = (a, b) => a.date.localeCompare(b.date);
   sortByLikes: NzTableSortFn<PostData> = (a, b) => a.likes - b.likes;
+  sortByRanking: NzTableSortFn<PostData> = (a, b) =>
+    (a.ranking ?? 0) - (b.ranking ?? 0);
+
 
   constructor() {}
 
@@ -164,6 +181,34 @@ export class DbArticles {
       this.expandedKeys = this.expandedKeys.filter((k) => k !== node.key);
     }
   }
+
+
+  onMarkdown(row: PostData, index: number, e: MouseEvent) {
+    e.stopPropagation();           // avoid triggering row click/expand
+    // do your thing here (open modal, navigate, etc.)
+    console.log('>===>> Markdown click', { row, index });
+  }
+
+  // immutable update when user changes the stars
+  onRankChange(row: PostData, value: number) {
+    // this.posts.update((arr) =>
+    //   arr.map((it) =>
+    //     it.id === row.id || it.link === row.link
+    //       ? { ...it, ranking: value }
+    //       : it
+    //   )
+    // );
+  }
+
+
+
+
+
+
+
+
+
+
 
   async getCategoriesByParentId(parent_Id?: null | number) {
     try {

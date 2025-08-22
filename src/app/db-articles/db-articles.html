@@ -50,6 +50,7 @@
     <div class="inner-content">
       <nz-table
         #table
+        class="col-balanced-gap"
         [nzData]="$articlesMetaData()"
         [nzScroll]="{ x: 'max-content' }"
         [nzPageIndex]="pageIndex"
@@ -71,6 +72,8 @@
               Id
             </th>
             <!-- 2 -->
+            <th nzAlign="center">MD</th>
+            <!-- 3 -->
             <th
               nzColumnKey="title"
               [nzSortFn]="sortByTitle"
@@ -78,9 +81,9 @@
             >
               Article Title
             </th>
-            <!-- 3 -->
-            <th nzColumnKey="image">Image</th>
             <!-- 4 -->
+            <th nzColumnKey="image">Image</th>
+            <!-- 5 -->
             <th
               nzColumnKey="date"
               [nzSortFn]="sortByDate"
@@ -88,7 +91,7 @@
             >
               Date (YYMMDD)
             </th>
-            <!-- 5 -->
+            <!-- 6 -->
             <th
               nzColumnKey="hostname"
               [nzSortFn]="sortByHostname"
@@ -96,15 +99,15 @@
             >
               Hostname
             </th>
-            <!-- 6 -->
-            <th nzColumnKey="pubname">Publication</th>
             <!-- 7 -->
-            <th nzColumnKey="authorname" [nzShowFilter]="true">Author</th>
+            <th nzColumnKey="pubname">Publication</th>
             <!-- 8 -->
+            <th nzColumnKey="authorname" [nzShowFilter]="true">Author</th>
+            <!-- 9 -->
             <th nzColumnKey="pubauthorslug" [nzShowFilter]="true">
               Author's Slug
             </th>
-            <!-- 9 -->
+            <!-- 10 -->
             <th
               nzColumnKey="listname"
               [nzSortFn]="sortByListname"
@@ -113,7 +116,7 @@
               Medium List name
             </th>
 
-            <!-- 10 -->
+            <!-- 11 -->
             <th
               nzColumnKey="likes"
               [nzSortFn]="sortByLikes"
@@ -121,11 +124,19 @@
             >
               Likes
             </th>
-            <!-- 11 -->
-            <th nzColumnKey="comments">Comments</th>
             <!-- 12 -->
-            <th nzColumnKey="ranking">Ranking</th>
+            <th nzColumnKey="comments">Comments</th>
             <!-- 13 -->
+            <!-- <th nzColumnKey="ranking">Ranking</th> -->
+            <th
+              nzColumnKey="ranking"
+              [nzSortFn]="sortByRanking"
+              [nzSortDirections]="['descend', 'ascend', null]"
+              nzAlign="center"
+            >
+              Ranking
+            </th>
+            <!-- 14 -->
             <th nzColumnKey="timestamp">Time Stamp</th>
           </tr>
         </thead>
@@ -133,17 +144,30 @@
         <!-- ------------------------------------------------------- -->
 
         <tbody>
-          @for (row of table.data; track row.id ?? row.link) {
+          @for (row of table.data; track row.id ?? row.link; let i = $index) {
           <tr>
             <!-- 1 -->
             <td nzAlign="center">{{ row.id }}</td>
             <!-- 2 -->
+            <td nzAlign="center">
+              <button
+                nz-button
+                nzType="text"
+                nzShape="circle"
+                nzSize="small"
+                aria-label="Open markdown"
+                (click)="onMarkdown(row, i, $event)"
+              >
+                <span nz-icon nzType="file-markdown" nzTheme="twotone"></span>
+              </button>
+            </td>
+            <!-- 3 -->
             <td>
               <a [href]="row.link" target="_blank" rel="noopener noreferrer">{{
                 row.title
               }}</a>
             </td>
-            <!-- 3 -->
+            <!-- 4 -->
             <td nzAlign="center">
               <img
                 [src]="row.image"
@@ -152,9 +176,9 @@
                 style="height: 20px; width: auto"
               />
             </td>
-            <!-- 4 -->
-            <td nzAlign="center">{{ row.date }}</td>
             <!-- 5 -->
+            <td nzAlign="center">{{ row.date }}</td>
+            <!-- 6 -->
             <!-- <td>{{ row.hostname }}</td> -->
             <td>
               <a
@@ -170,21 +194,33 @@
                 {{ row.hostname }}
               </a>
             </td>
-            <!-- 6 -->
-            <td>{{ row.pubname }}</td>
             <!-- 7 -->
-            <td>{{ row.authorname }}</td>
+            <td>{{ row.pubname }}</td>
             <!-- 8 -->
-            <td>{{ row.pubauthorslug }}</td>
+            <td>{{ row.authorname }}</td>
             <!-- 9 -->
-            <td>{{ row.listname }}</td>
+            <td>{{ row.pubauthorslug }}</td>
             <!-- 10 -->
-            <td nzAlign="center">{{ row.likes }}</td>
+            <td>{{ row.listname }}</td>
             <!-- 11 -->
-            <td nzAlign="center">{{ row.comments }}</td>
+            <td nzAlign="center">{{ row.likes }}</td>
             <!-- 12 -->
-            <td nzAlign="center">{{ row.ranking }}</td>
-            <!-- 13  -->
+            <td nzAlign="center">{{ row.comments }}</td>
+            <!-- 13 -->
+            <!-- <td nzAlign="center">{{ row.ranking }}</td> -->
+            <td nzAlign="center">
+              <nz-rate
+                class="rate-cell"
+                [ngModel]="row.ranking ?? 0"
+                (ngModelChange)="onRankChange(row, $event)"
+                [nzCount]="5"
+                [nzAllowClear]="false"
+                [nzTooltips]="nzRateToolTips"
+              >
+              </nz-rate>
+            </td>
+
+            <!-- 14  -->
             <td>{{ row.timestamp }}</td>
           </tr>
           }
