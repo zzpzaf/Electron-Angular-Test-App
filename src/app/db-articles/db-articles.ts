@@ -32,8 +32,6 @@ import { NzTreeSelectModule } from 'ng-zorro-antd/tree-select';
 
 import { NzIconModule } from 'ng-zorro-antd/icon';
 
-
-
 function mapCategoryNodesToTree(nodes: CategoryNode[]): NzTreeNodeOptions[] {
   return nodes.map((n) => ({
     key: String(n.id),
@@ -49,8 +47,6 @@ function mapCategoryNodesToTree(nodes: CategoryNode[]): NzTreeNodeOptions[] {
     isLeaf: !n.subCategoryNode || n.subCategoryNode.length === 0,
   }));
 }
-
-
 
 @Component({
   selector: 'app-db-articles',
@@ -108,7 +104,6 @@ export class DbArticles {
   sortByLikes: NzTableSortFn<PostData> = (a, b) => a.likes - b.likes;
   sortByRanking: NzTableSortFn<PostData> = (a, b) =>
     (a.ranking ?? 0) - (b.ranking ?? 0);
-
 
   constructor() {}
 
@@ -182,11 +177,17 @@ export class DbArticles {
     }
   }
 
-
   onMarkdown(row: PostData, index: number, e: MouseEvent) {
-    e.stopPropagation();           // avoid triggering row click/expand
-    // do your thing here (open modal, navigate, etc.)
-    console.log('>===>> Markdown click', { row, index });
+
+    e.stopPropagation(); // avoid triggering row click/expand
+
+    // console.log('>===>> Markdown click', { row, index });
+
+    // const data: object = { postDataRow: row, message: 'Hello from DbArticles Window' };
+    const article: PostData = this.$articles().find(a => a.id === row.id)!;
+    if (window.electronAPI.openWindow) {
+      window.electronAPI.openWindow(article);
+    }
   }
 
   // immutable update when user changes the stars
@@ -199,16 +200,6 @@ export class DbArticles {
     //   )
     // );
   }
-
-
-
-
-
-
-
-
-
-
 
   async getCategoriesByParentId(parent_Id?: null | number) {
     try {
@@ -252,6 +243,7 @@ export class DbArticles {
     try {
       articles = await this.backendService.getUncategorizedArticles();
       if (articles.length > 0) {
+        this.$articles.set(articles);
         // this.showArticlesMetaDataArray(articles);
         this.$articlesMetaData.set(this.getArticlesMetaDataArray(articles));
         // this.showArticlesMetaDataArray(articles);

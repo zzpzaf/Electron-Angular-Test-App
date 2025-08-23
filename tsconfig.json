@@ -19,6 +19,7 @@
     "importHelpers": true,
     "target": "ES2022",
     "module": "preserve",
+    // "module": "esnext", // or "es2020", "es2022", "node16", etc.
     // "moduleResolution": "node"               // 👈 add this for consistency
   },
   "angularCompilerOptions": {

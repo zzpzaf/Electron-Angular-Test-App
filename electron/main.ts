@@ -57,18 +57,27 @@ import { attachCopiedImages } from './context-copy-selected-images';
 
 let mainAppWin: any;
 
+  // ==========================================================================
+  // Define the path of ndex.html file of the running Angular app from the dist folder
+  // ==========================================================================
+  // Use path.join to ensure correct path resolution across platforms
+  const angularDistPath = path.join(
+    process.cwd(),
+    'dist/electronang1/browser/index.html'
+  );
+
 // ======================================================================================================
 // The Main Function to create the main Electron application window
 // ======================================================================================================
 function createWindow() {
-  console.log('>====>> App ready, creating window');
+  console.log('>===>> App ready, creating window');
 
   // ====================================================================
   // Create the main Electron application window
   // ====================================================================
   mainAppWin = new BrowserWindow({
-    width: 1000,
-    height: 800,
+    width: 1400,
+    height: 900,
     // icon: path.join(__dirname, 'assets/icon.png'),
     // title: 'MEDIUM Scrapper',
     show: false, // show only when ready
@@ -102,18 +111,18 @@ function createWindow() {
   });
   // ===========================================================================
 
-  // ==========================================================================
-  // Load the Angular app from the dist folder
-  // ==========================================================================
-  // Use path.join to ensure correct path resolution across platforms
-  const angularDistPath = path.join(
-    process.cwd(),
-    'dist/electronang1/browser/index.html'
-  );
+  // // ==========================================================================
+  // // Load the Angular app from the dist folder
+  // // ==========================================================================
+  // // Use path.join to ensure correct path resolution across platforms
+  // const angularDistPath = path.join(
+  //   process.cwd(),
+  //   'dist/electronang1/browser/index.html'
+  // );
 
-  console.log('process.cwd():', process.cwd());
-  console.log('__dirname:', __dirname);
-  console.log('Loading Angular app from:', angularDistPath);
+  console.log('>===>> process.cwd():', process.cwd());
+  console.log('>===>> __dirname:', __dirname);
+  console.log('>===>> Loading Angular app from:', angularDistPath);
 
   // Load the Angular app
   // mainAppWin.loadURL(`file://${angularDistPath}`);
@@ -123,10 +132,10 @@ function createWindow() {
   mainAppWin
     .loadFile(angularDistPath)
     .then(() => {
-      console.log('Angular app loaded successfully');
+      console.log('>===>> Angular app loaded successfully');
     })
     .catch((err: unknown) => {
-      console.error('Failed to load Angular app:', err);
+      console.error('>===>> Failed to load Angular app:', err);
     });
 
   // Open DevTools only if in development mode
@@ -153,7 +162,7 @@ function createWindow() {
   // Show the main window when it's ready
   // ==========================================================================
   mainAppWin.once('ready-to-show', () => {
-    console.log('Main window ready to show');
+    console.log('>===>> Main window ready to show');
     mainAppWin.show();
   });
   // ==========================================================================
@@ -167,23 +176,32 @@ function createWindow() {
     disposeCopiedImages?.();
     disposeCopiedImages = null;
     mainAppWin = null; // Clear the reference to the main window
-    console.log('Main window closed');
+    console.log('>===>> Main window closed');
   });
   // ==========================================================================
 }
+
+
+
+
+
+
+
+
+
 
 // ======================================================================================================
 // Electron app initialization
 // ======================================================================================================
 app.whenReady().then(() => {
-  console.log('Electron app is ready');
+  console.log('>===>> Electron app is ready');
   createWindow();
 
   // Activate the main window when the app is activated (e.g., from the dock on macOS)
   // This is useful for macOS where the app can be activated without any windows open
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      console.log('Re-activating app, creating window');
+      console.log('>===>> Re-activating app, creating window');
       createWindow();
     }
   });
@@ -197,11 +215,102 @@ app.whenReady().then(() => {
 // On macOS, it's common to keep the app running even if no windows are open
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
-    console.log('All windows closed, quitting app');
+    console.log('>===>> All windows closed, quitting app');
     app.quit();
   }
 });
 // ======================================================================================================
+
+
+
+// ======================================================================================================
+// Handle a NEW Electron window openning via a route path (defined in Angular app.route.ts) and pass data
+// ======================================================================================================
+//
+let markViewerWindow: BrowserWindow | null = null;
+ipcMain.handle('open-new-window', async (_event, data) => {
+
+  const routePath: string = '/show-mark';
+
+  console.log('>===>> Opening a New Window (open-new-window)');
+  // console.log('>===>> process.cwd():', process.cwd());
+  // console.log('>===>> __dirname:', __dirname);
+
+  if (markViewerWindow && !markViewerWindow.isDestroyed()) {
+    // Window already open – just focus and send new data
+    markViewerWindow.focus();
+    markViewerWindow.webContents.send('window-data', data);
+    return true;
+  }
+
+  const win = new BrowserWindow({
+    width: 800,
+    height: 1000,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      sandbox: false,
+    },
+  });
+  markViewerWindow = win;
+
+  // Pass the data via query string 
+  // *** Passing data via query parameters is not the best practice for large structured data
+  // const encodedData = encodeURIComponent(JSON.stringify(data));
+  // win.loadURL(`file://${angularDistPath}#/show-mark?data=${encodedData}`);
+  
+  // win.loadURL(`file://${angularDistPath}#/show-mark`);
+  // markViewerWindow.loadURL(`file://${angularDistPath}#/show-mark`);
+  markViewerWindow.loadURL(`file://${angularDistPath}#/${routePath}`);
+
+  markViewerWindow.once('ready-to-show', () => {
+    markViewerWindow?.show();
+  });
+
+  // Send data to window after it's fully loaded
+  // win.webContents.once('did-finish-load', () => {
+  markViewerWindow.webContents.once('did-finish-load', () => {
+    console.log('>===>> ✅ New window finished loading. Sending data...');
+    // console.log('>===>> 📨 Data sent from main process:', JSON.stringify(data));
+    markViewerWindow?.webContents.send('window-data', data);
+    // setTimeout(() => {
+    //   console.log('>===>> ⏱️ Sending delayed data to new window...');
+    //   markViewerWindow.webContents.send('window-data', data);
+    // }, 300); // Try 300–500ms
+  });
+
+
+  // Open DevTools for debugging
+  if (isDev) {
+    win.webContents.openDevTools();
+  }
+
+  // Clean up when closed
+  markViewerWindow.on('closed', () => {
+    markViewerWindow = null;
+  });
+
+  return true;
+});
+// ======================================================================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // ******************************************************************************************************
 // Custom IPC handlers

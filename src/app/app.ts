@@ -1,5 +1,6 @@
 import { Component, signal } from '@angular/core';
-import { Layout } from "./layout/layout";
+import { RouterModule } from '@angular/router';
+// import { Layout } from "./layout/layout";
 import { Loader } from './shared/loader/loader';
 
 
@@ -12,7 +13,8 @@ import { Loader } from './shared/loader/loader';
 @Component({
   selector: 'app-root',
   imports: [
-    Layout,
+    // Layout,
+    RouterModule,
     Loader,
   ],
   templateUrl: './app.html',
