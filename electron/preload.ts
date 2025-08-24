@@ -48,7 +48,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   on: (channel: string, callback: (data: any) => void) =>
     ipcRenderer.on(channel, (_event: IpcRendererEvent, data: any) =>
     {
-      console.log('>===>> [preload] Received data from main process:', JSON.stringify(data));
+      // console.log('>===>> [preload] Received data from main process:', JSON.stringify(data));
       callback(data)
     }     
    ),

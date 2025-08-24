@@ -69,7 +69,7 @@ let mainAppWin: any;
 // ======================================================================================================
 // The Main Function to create the main Electron application window
 // ======================================================================================================
-function createWindow() {
+function createMainAppWindow() {
   console.log('>===>> App ready, creating window');
 
   // ====================================================================
@@ -146,7 +146,7 @@ function createWindow() {
 
   // ==========================================================================
   // Attach a custom context menu
-  // This will allow right-click context menu support in the Electron app
+  // This will allow right-click context menu support in the Electron Main App Window
   // ==========================================================================
   // let disposeContextMenu = attachContextMenu(mainAppWin);
   // A minimal entry to attach context menu
@@ -195,14 +195,14 @@ function createWindow() {
 // ======================================================================================================
 app.whenReady().then(() => {
   console.log('>===>> Electron app is ready');
-  createWindow();
+  createMainAppWindow();
 
   // Activate the main window when the app is activated (e.g., from the dock on macOS)
   // This is useful for macOS where the app can be activated without any windows open
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       console.log('>===>> Re-activating app, creating window');
-      createWindow();
+      createMainAppWindow();
     }
   });
 });
@@ -267,6 +267,19 @@ ipcMain.handle('open-new-window', async (_event, data) => {
     markViewerWindow?.show();
   });
 
+
+
+  // ==========================================================================
+  // Attach the custom context menu
+  // This will allow right-click context menu support in the new Electron Window
+  // ==========================================================================
+  let disposeContextMenu: ReturnType<typeof attachContextMenu> | null =
+    attachContextMenu(markViewerWindow);
+  let disposeCopiedImages: ReturnType<typeof attachCopiedImages> | null =
+    attachCopiedImages();
+  // ==========================================================================
+
+  
   // Send data to window after it's fully loaded
   // win.webContents.once('did-finish-load', () => {
   markViewerWindow.webContents.once('did-finish-load', () => {
@@ -287,6 +300,10 @@ ipcMain.handle('open-new-window', async (_event, data) => {
 
   // Clean up when closed
   markViewerWindow.on('closed', () => {
+    disposeContextMenu?.();
+    disposeContextMenu = null;
+    disposeCopiedImages?.();
+    disposeCopiedImages = null;
     markViewerWindow = null;
   });
 

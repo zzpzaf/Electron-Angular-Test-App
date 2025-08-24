@@ -1,0 +1,157 @@
+/* src/styles/markdown-styles.scss */
+
+$md-max-image-width: 800px; // the default max image width predefined value
+
+.markdown-container {
+
+  --md-max-image-width: #{$md-max-image-width};
+
+  height: 100%; /* Match textarea height exactly */
+  min-height: 0; /* Allow shrinking inside flexbox */
+  width: 100%;
+  margin-bottom: 16px;
+
+  padding: 8px 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  background-color: #fff;
+  box-sizing: border-box;
+
+  overflow-y: auto; /* Scroll long markdown instead of expanding page */
+  word-wrap: break-word;
+
+  /* Typography */
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+
+  /* Markdown-specific styles */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    margin: 0.5em 0 0.3em;
+    font-weight: 600;
+  }
+  p {
+    margin: 0.5em 0;
+  }
+
+  /* Inline code only (NOT inside a <pre>) */
+  // ::ng-deep :not(pre) > code {
+  //   // background-color: #e9f0e1 !important;
+  //   padding: 0.2em 0.4em;
+  //   border-radius: 4px;
+  //   // font-size: 0.9em;
+  //   font-family: monospace;
+  //   white-space: break-spaces; /* nicer wrapping inline */
+  // }
+
+  /* Fenced code blocks */
+  // ::ng-deep pre {
+  //   background-color: #e9f0e1 !important;
+  //   padding: 8px 12px;
+  //   border-radius: 4px;
+  //   font-family: "Courier New", Courier; //monospace;
+  //   font-size: smaller; // 0.9em;
+  //   line-height: 1.5;
+  //   overflow: auto; /* scroll horizontally if needed */
+  //   margin: 0.5em 0;
+  // }
+
+  /* The <code> inside <pre> — reset bg so we don't double-tint */
+  // ::ng-deep pre > code {
+  //   background: transparent !important;
+  //   display: block;
+  //   white-space: pre; /* or `pre-wrap` if you want soft-wrapping */
+  // }
+
+  // ::ng-deep code {
+  //   // background-color: #e9f0e1 !important;
+  //   padding: 0.2em 0.4em;
+  //   border-radius: 4px;
+  //   font-size: 0.9em;
+  //   font-family: monospace;
+  // }
+
+
+
+
+  a {
+    color: #1677ff;
+    text-decoration: underline;
+  }
+  ul,
+  ol {
+    padding-left: 20px;
+    margin: 0.5em 0;
+  }
+  blockquote {
+    border-left: 4px solid #d9d9d9;
+    margin: 0.5em 0;
+    padding-left: 10px;
+    color: #666;
+  }
+
+
+}
+
+
+/* ---------- IMAGE RESIZING / STYLES ---------- */
+
+/* Works for GIFs, JPGs, PNGs, etc. */
+.markdown-container img,
+.markdown-container picture > img,
+.markdown-container a > img {
+  max-width: min(100%, calc(var(--md-max-image-width) - 20px)) !important;
+  width: auto !important;   // never upscale small images
+  height: auto !important;  // preserve aspect ratio
+  display: block;
+  margin: 1rem auto 0;      // optional
+}
+
+/* If you ever need GIF-specific tweaks */
+// .markdown-container img[src$=".gif" i] { }
+
+
+/* ---------- CODE STYLES ---------- */
+
+/* Block code (triple backticks) */
+.markdown-container pre {
+  box-sizing: border-box;
+  margin: 1rem 0;
+  padding: 12px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #cbeecb;
+  overflow: auto;           /* horizontal scroll for long lines */
+  white-space: pre;         /* preserve spaces/newlines */
+  tab-size: 2;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+               "Liberation Mono", "Courier New", monospace !important;
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+/* Remove double-styling when <code> is inside <pre> */
+.markdown-container pre > code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  white-space: inherit;
+  font: inherit;
+}
+
+/* Inline code (single backticks) */
+.markdown-container :not(pre) > code {
+  display: inline;
+  padding: 0.15em 0.35em;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  background: rgba(27, 31, 35, 0.06);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+               "Liberation Mono", "Courier New", monospace !important;
+  font-size: 0.95em;
+}
