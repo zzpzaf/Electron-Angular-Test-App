@@ -2,6 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <!-- If we uncomment the following meta-line: -->
+  <!-- <meta http-equiv="Content-Security-Policy"
+      content="default-src 'self' db:; img-src 'self' data: db:; media-src 'self' db:; connect-src 'self' db:; style-src 'self' 'unsafe-inline';"> -->
+  <!-- Then we get errors similar to the following error: -->
+  <!-- Refused to load the image 'https://miro.medium.com/v2/resize:fit:560/0*yHuBTa4hFOgeyeaJ' because it violates the following Content Security Policy directive: "img-src 'self' data: db:". -->
   <title>Electronang1</title>
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">

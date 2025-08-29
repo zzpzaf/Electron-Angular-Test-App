@@ -79,6 +79,16 @@ export class BackEnd {
     return this.ipcInvoke<number>('sqlite:insert-articles-from-json-array', posts);
   }
 
+  updateArticleContentById(id: number, newContent: string): Promise<boolean> {
+    const result = this.ipcInvoke<boolean>('sqlite:update-article-content-by-id', id, newContent);
+    return result;
+  }
+
+  updateArticleById(post: PostData): Promise<boolean> {
+    const result = this.ipcInvoke<boolean>('sqlite:update-article-by-id', post);
+    return result;
+  }
+
   checkUrlExists(link: string): Promise<boolean> {
     return this.ipcInvoke<boolean>('sqlite:check-if-url-exists', link);
   }

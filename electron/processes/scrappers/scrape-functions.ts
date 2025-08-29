@@ -132,7 +132,7 @@ export async function collectPostsFromUrlTabs(
           data.content = content;
 
           data.counter = p;
-          console.log(` Post: ${p} ${JSON.stringify(data)} `);
+          // console.log(` >===>> Post: ${p} ${JSON.stringify(data)} `);
           return data;
         } catch (err) {
           // console.error(`Failed to scrape ${url}:`, err.message || err);

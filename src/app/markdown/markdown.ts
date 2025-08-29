@@ -56,7 +56,7 @@ export class Markdown {
 
   public markdownString = signal<string>('');
   // public isSaveButtonEnabled = signal<boolean>(false);
-  public isAddedChecked = signal<boolean>(true); // Default to true
+  public isForcedChecked = signal<boolean>(true); // Default to true
   public linkURL = signal<string>('');
   private listurldata: listURLData = { listname: '', pubauthorslug: '' };
 
@@ -73,16 +73,18 @@ export class Markdown {
   private markedService = inject(Markshow);
   private backendService = inject(BackEnd);
   private loader = inject(LoaderService);
+  private articlebasicscraper = inject(Articlebasicscraper);
 
   public isNewArticle: boolean = false; // Flag to indicate if it's a new article
+  private existingArticleData: PostData | null = null;
 
   constructor() {}
 
   ngOnInit(): void {
     this.setupForm();
-    this.linkScrapeForm.get('add')?.valueChanges.subscribe((value) => {
+    this.linkScrapeForm.get('force')?.valueChanges.subscribe((value) => {
       console.log('Checkbox changed to:', value);
-      this.isAddedChecked.set(value); // Update the signal when checkbox changes
+      this.isForcedChecked.set(value); // Update the signal when checkbox changes
     });
     this.linkScrapeForm.get('url')?.valueChanges.subscribe((urlValue) => {
       if (urlValue.trim().length === 0 || !isValidUrl(urlValue.trim())) return;
@@ -90,7 +92,6 @@ export class Markdown {
       // this.loader.show(); // Show the loader when URL changes
 
       console.log('>===>> URL changed to:', urlValue);
-
 
       this.listurldata = { listname: '', pubauthorslug: '' };
       this.listurldata = analyzeListedLink(urlValue);
@@ -108,47 +109,51 @@ export class Markdown {
       this.safeHtmlContent.set(''); // Clear the markdown string
       // this.preview = false;
 
-      // this.convert(this.linkURL());
-      // Call the scraping function with the updated URL
-      // Adds/Sets the scraped data to the scrappedDataArray
-
-      console.log('>===>> Calling the function "getArticleDataBySlug" with: ', this.linkURL());
-      from(this.getArticleDataBySlug(this.linkURL())).subscribe({
-        next: (articleData) => {
-          console.log('>===>> URL Slug exists?', articleData?.title);
-          if (articleData) {
-            // this.loader.hide(); // Hide the loader if slug exists
-            console.warn('>===>> URL slug already exists in the database:', this.linkURL());
-            this.dlgService
-              .popup({
-                token: 'warn',
-                header: 'Slug Exists',
-                content: 'The URL Slug already exists in the database.',
-                posAnsMsg: 'OK',
-                negAnsMsg: '',
-                delay: 500,
-              })
-              .subscribe((result) => {
-                console.log('Dialog closed with:', result);
-              });
-            this.isNewArticle = false; // Set the flag to false for existing article
-            this.showArticleData(articleData); // Show the article data in the UI  
-
-          } else {
-            // this.srapeArticleData(this.linkURL());
-            // ** Use the Loader ***
-            // fire-and-forget (subscribe ignores returned Promise)
-            void this.loader.withLoader(
-              () => this.srapeArticleData(this.linkURL()),
-              'Scraping article data ...'
-            );
-          }
-        },
-        error: (err) => console.error('URL check failed:', err),
-      });
+      console.log(
+        '>===>> Calling the function "getArticleDataBySlug" with: ',
+        this.linkURL()
+      );
+      this.showExistingOrScrapeArticle();
+      // from(this.getArticleDataBySlug(this.linkURL())).subscribe({
+      //   next: (post) => {
+      //     this.existingArticleData = post;
+      //     console.log('>===>> URL Slug exists?', this.existingArticleData?.title);
+      //     if (this.existingArticleData) {
+      //       // this.loader.hide(); // Hide the loader if slug exists
+      //       console.warn(
+      //         '>===>> URL slug already exists in the database:',
+      //         this.linkURL()
+      //       );
+      //       this.dlgService
+      //         .popup({
+      //           token: 'warn',
+      //           header: 'Slug Exists',
+      //           content: 'The URL Slug already exists in the database.',
+      //           posAnsMsg: 'OK',
+      //           negAnsMsg: '',
+      //           delay: 500,
+      //         })
+      //         .subscribe((result) => {
+      //           console.log('Dialog closed with:', result);
+      //         });
+      //       this.isNewArticle = false; // Set the flag to false for existing article
+      //       // If the 'force' button is not checked and articleData is available, just show it
+      //       // Else, scrape the article (either new or existing)
+      //       if (this.isForcedChecked() === false) {
+      //         this.showArticleData(this.existingArticleData); // Show the article data in the UI
+      //       } else if (this.isForcedChecked() === true) {
+      //         // ** Use the Loader ***
+      //         // Scrape the Article!
+      //         void this.loader.withLoader(
+      //           () => this.srapeArticleData(this.linkURL()),
+      //           'Scraping article data ...'
+      //         );
+      //       }
+      //     }
+      //   },
+      //   error: (err) => console.error('URL check failed:', err),
+      // });
     });
-
-
 
     // It captures directly any Electron message sent and passed via the "message-channel"
     // window.electronAPI.on('message-channel', (message: string) => {
@@ -174,7 +179,7 @@ export class Markdown {
   setupForm() {
     this.linkScrapeForm = this.fb.group({
       url: this.fb.control('', [Validators.required]),
-      add: this.fb.control(true),
+      force: this.fb.control(true),
     });
   }
 
@@ -195,6 +200,57 @@ export class Markdown {
   //     });
   //   }
   // }
+
+  showExistingOrScrapeArticle() {
+    from(this.getArticleDataBySlug(this.linkURL())).subscribe({
+      next: (post) => {
+        this.existingArticleData = post;
+        console.log('>===>> URL Slug exists?', this.existingArticleData?.title);
+        if (this.existingArticleData) {
+          // this.loader.hide(); // Hide the loader if slug exists
+          console.warn(
+            '>===>> URL slug already exists in the database:',
+            this.linkURL()
+          );
+          this.dlgService
+            .popup({
+              token: 'warn',
+              header: 'Slug Exists',
+              content: 'The URL Slug already exists in the database.',
+              posAnsMsg: 'OK',
+              negAnsMsg: '',
+              delay: 500,
+            })
+            .subscribe((result) => {
+              console.log('Dialog closed with:', result);
+            });
+          this.isNewArticle = false; // Set the flag to false for existing article
+          // If the 'force' button is not checked and articleData is available, just show it
+          // Else, scrape the article (either new or existing)
+          if (this.isForcedChecked() === false) {
+            this.showArticleData(this.existingArticleData); // Show the article data in the UI
+          } else if (this.isForcedChecked() === true) {
+            // ** Use the Loader ***
+            // Scrape the Article!
+            void this.loader.withLoader(
+              () => this.srapeArticleData(this.linkURL()),
+              'Scraping article data ...'
+            );
+          }
+        } else {
+          this.isNewArticle = true;
+          this.existingArticleData = null;
+          // ** Use the Loader ***
+          // Scrape the Article!
+          void this.loader.withLoader(
+            () => this.srapeArticleData(this.linkURL()),
+            'Scraping article data ...'
+            );
+        }
+      },
+      error: (err) => console.error('URL check failed:', err),
+    });
+  }
 
   onDragOver(event: DragEvent): void {
     event.preventDefault(); // Allow drop
@@ -222,10 +278,10 @@ export class Markdown {
     // Toggle preview mode
     this.preview = !this.preview;
     if (this.markdownString().length === 0) return;
-    if (this.preview){
+    if (this.preview) {
       this.markdownPreview(this.markdownString());
     } else {
-      this.safeHtmlContent.set(""); // Clear the preview content
+      this.safeHtmlContent.set(''); // Clear the preview content
     }
   }
 
@@ -234,7 +290,7 @@ export class Markdown {
     this.postMetaDataString.set(''); // Clear the post metadata string
     this.safeHtmlContent.set(''); // Clear the markdown string
     // this.preview = false;
-    this.linkScrapeForm.reset(); // Reset the form
+    // this.linkScrapeForm.reset(); // Reset the form
   }
 
   onCopy() {
@@ -290,19 +346,6 @@ export class Markdown {
     }
   }
 
-  // async convert(url: string) {
-  //   console.log('>===>> URL changed to:', this.linkURL());
-  //   console.log('>===>> URL:', url);
-
-  //   if (!isValidUrl(url)) {
-  //     this.scrappedError.set('Invalid URL provided.');
-  //     console.error('❌ Invalid URL:', url);
-  //     return;
-  //   }
-  //   // const scrapedPostData = await this.srapeBasicData();
-  //   await this.srapeArticleData(url); // Adds/Sets the scraped data to the scrappedDataArray
-  // }
-
   async srapeArticleData(urlValue: string) {
     let loading = true;
     let result = null;
@@ -320,19 +363,44 @@ export class Markdown {
         }
         this.scrappedDataArray.set(result);
 
+        console.log('>===>> Scrapped Data Array length:', this.scrappedDataArray().length);
+        console.log('>===>> Scrapped Data Array[0]:', this.scrappedDataArray()[0]);
+
         if (this.scrappedDataArray().length < 1) return;
         const postData: PostData = this.scrappedDataArray()[0];
 
-        this.isNewArticle = true; // Set the flag to true for new article
+        // this.isNewArticle = true; // Set the flag to true for new article
 
-        this.showArticleData(postData); // Show the article data in the UI
-
-        if (
-          this.linkScrapeForm.get('add')?.value === true &&
-          this.scrappedDataArray().length > 0
-        ) {
+        // Insert scraped article(s) into DB
+        if (this.scrappedDataArray().length > 0) {
           // this.onDBInsert();
-          await this.insertScrapedArrayToDB(this.scrappedDataArray());
+
+          console.log('>===>> Is New Article? ', this.isNewArticle);
+          // console.log(
+          //   '>===>> Existing Article Data: ',
+          //   this.existingArticleData
+          // );
+
+          // To-Do .... array for updating multiple articles ??? updateScrapedArticleById
+          if (this.isNewArticle) {
+            await this.insertScrapedArticlesArrayToDB(this.scrappedDataArray());
+          } else if ( this.existingArticleData) {
+            this.scrappedDataArray()[0].id = this.existingArticleData.id;
+            console.log('>===>> Updating existing article ID:', this.scrappedDataArray()[0].id);
+
+            await this.updateScrapedArticleById(this.scrappedDataArray()[0]);
+          }
+
+          // for (let i = 0; i < this.scrappedDataArray().length; i++) {
+          //   const articleId = this.scrappedDataArray()[i].id;
+          //   console.log('>===> Inserted article ID:', i, ' - ', articleId);
+          // }
+
+          // To-Do:
+          // get the inserted article ids array
+
+          // Show the article data in the UI after we have inserted it into the main DB
+          this.showArticleData(postData);
         }
       } else {
         error = response.error;
@@ -344,10 +412,9 @@ export class Markdown {
     }
   }
 
-  showArticleData( postData: PostData) {
-
+  showArticleData(postData: PostData) {
     const postMetaData: PostData = {
-      id: postData.id,                // added on 250821
+      id: postData.id, // added on 250821
       listname: this.listurldata.listname,
       pubauthorslug: this.listurldata.pubauthorslug,
       hostname: postData.hostname,
@@ -360,30 +427,31 @@ export class Markdown {
       date: postData.date,
       likes: postData.likes,
       comments: postData.comments,
-      ranking: postData.ranking         // added on 250820
+      ranking: postData.ranking, // added on 250820
     };
     this.postMetaDataString.set(JSON.stringify(postMetaData, null, 2));
     // Set the (Markdown) content of the first item
-    this.markdownString.set(postData.content!);
+    // console.log('>===>> Article Content (postData.content): ', postData.content);
+    this.markdownString.set(postData!.content!);
+    // console.log(
+    //   '>===>> Article Content (markdownString): ',
+    //   this.markdownString()
+    // );
+
+    // *** To-Do:
+    //
+
     this.markdownPreview(this.markdownString());
 
-  // console.log(
-  //   '>===>> Article Scraped Data: ',
-  //   JSON.stringify(this.scrappedDataArray()[0])
-  // );
+    // console.log(
+    //   '>===>> Article Scraped Data: ',
+    //   JSON.stringify(this.scrappedDataArray()[0])
+    // );
+  }
 
-  // console.log(
-  //   '>===>> Add/Insert into DB? ',
-  //   this.linkScrapeForm.get('add')?.value
-  // );
-
-}
-
-
-
-  onDBInsert() {
+  async onDBInsert() {
     if (this.markdownString().length > 0) {
-      this.insertScrapedArrayToDB(this.scrappedDataArray());
+      await this.insertScrapedArticlesArrayToDB(this.scrappedDataArray());
     }
   }
 
@@ -392,11 +460,14 @@ export class Markdown {
    * Displays a dialog with the result of the insertion.
    * @param dataArray - The array of PostData to insert.
    */
-  async insertScrapedArrayToDB(dataArray: PostData[]) {
+  async insertScrapedArticlesArrayToDB(dataArray: PostData[]) {
     if (dataArray.length === 0) return;
     try {
       const insertedCount = await this.backendService.insertArticles(dataArray);
       if (insertedCount > 0) {
+        // 250827
+        this.processMarkdownContentImages(dataArray); // Process images after insertion
+
         this.dlgService
           .popup({
             token: 'succ',
@@ -412,7 +483,7 @@ export class Markdown {
           .popup({
             token: 'error',
             header: 'Error',
-            content: 'Failed to insert articles to the main DB.',
+            content: 'Failed to insert article(s) to the main DB.',
             posAnsMsg: 'OK',
             negAnsMsg: '',
           })
@@ -420,6 +491,48 @@ export class Markdown {
       }
     } catch (err) {
       console.error('Error inserting URLs to main DB:', err);
+    }
+  }
+
+  async updateScrapedArticleById(articleData: PostData) {
+    if (!articleData || articleData.id == null) return;
+
+    // console.log('>===>> Updating article ID:', articleData.id, '- Content:', articleData.content);
+
+    try {
+      const result = await this.backendService.updateArticleById(articleData);
+      if (result) {
+        // 250827
+        const dataArray: PostData[] = [articleData];
+        this.processMarkdownContentImages(dataArray); // Process images after insertion
+
+        console.log('>===>> Article updated successfully:', articleData.id);
+        this.dlgService
+          .popup({
+            token: 'succ',
+            header: 'Article Updated!',
+            content:
+              'Article with id: ' +
+              articleData.id +
+              ' was updated to the main DB.',
+            posAnsMsg: 'OK',
+            negAnsMsg: '',
+          })
+          .subscribe((res) => console.log('Dialog closed with:', res));
+      } else {
+        console.error('>===>> Failed to update article by id:', articleData.id);
+        this.dlgService
+          .popup({
+            token: 'error',
+            header: 'Error',
+            content: 'Failed to update article with id: ' + articleData.id,
+            posAnsMsg: 'OK',
+            negAnsMsg: '',
+          })
+          .subscribe((res) => console.log('Dialog closed with:', res));
+      }
+    } catch (error) {
+      console.error('Error updating article by id:', error);
     }
   }
 
@@ -446,9 +559,9 @@ export class Markdown {
   }
 
   /**
-   * Returns article data (PostData) by its URL slug, or null if not found. 
+   * Returns article data (PostData) by its URL slug, or null if not found.
    * @param {string} urlString - The URL to check for existence.
-   * @returns {PostData | null} - Returns the article data if found, or null if not found. 
+   * @returns {PostData | null} - Returns the article data if found, or null if not found.
    */
   async getArticleDataBySlug(urlString: string): Promise<PostData | null> {
     if (!window.electronAPI) {
@@ -457,6 +570,7 @@ export class Markdown {
     }
 
     const urlSlug = getMediumSlugFromUrl(urlString);
+    console.log('>===>> URL slug to be checked: ', urlSlug);
 
     try {
       const articleData = await this.backendService.getPostDataBySlug(urlSlug);
@@ -468,5 +582,83 @@ export class Markdown {
     }
   }
 
+  // 250827
+  // Process images in the markdown content
+  // This function iterates over each article and processes its images
+  //
+  async processMarkdownContentImages(articles: PostData[]) {
+    console.log('>===>> Starting processMarkdownContentImage() ...');
+    for (const article of articles) {
+      const urlSlug = getMediumSlugFromUrl(article.link);
+      // Process each article's content images
+      const articleData = await this.backendService.getPostDataBySlug(urlSlug);
+      if (articleData && articleData.id && articleData.content) {
+        // Process images in the markdown content
+        const imageProcessingResult =
+          await this.articlebasicscraper.processImagesForArticleMarkdownContent(
+            articleData.id,
+            articleData.link,
+            articleData.content
+          );
+        if (imageProcessingResult) {
+          // Update the article content in the database if it has changed
+          for (const extracted of imageProcessingResult.extracted) {
+            // Process each extracted image
+            // extracted --> { orderIndx: number; imgUrl: string }
+            console.log('>===>> Extracted image:', JSON.stringify(extracted));
+          }
+          for (const result of imageProcessingResult.results) {
+            // Update the article content with the processed image
+            // result --> { orgImgUrl: string; orderIndx?: number } & ImageDownloadResult
+            // ImageDownloadResult --> {
+            //   - success: true/false
+            //   - aborted: true if the download was aborted (e.g., due to size limits)
+            //   - reason: explanation for failure (if any)
+            //   - imageId: ID of the inserted image (if successful)
+            //   - inserted: true if a new record was inserted
+            //   - mime_type: MIME type of the image (if available)
+            //   - byte_length: size of the image in bytes (if available)
+            //   - sha256_hex: SHA-256 hash of the image (if available)
+            //   - file_name: original file name of the image (if available)
+            // }
+            console.log(
+              '>===>> Image processing result:',
+              JSON.stringify(result)
+            );
+          }
 
+          // Update the article content in the database
+          const updatedContent =
+            await this.articlebasicscraper.rewriteMarkdownWithDbLinks(
+              articleData.content,
+              // [{ orderIndx: result.orderIndx!, imgUrl: result.orgImgUrl, imageId: result.imageId }]
+              imageProcessingResult.results
+            );
+          if (updatedContent && updatedContent !== articleData.content) {
+            // Only update if content has changed
+            const updateResult =
+              await this.backendService.updateArticleContentById(
+                articleData.id,
+                updatedContent
+              );
+            if (updateResult) {
+              console.log(
+                `>===>> Article ID ${articleData.id} content updated with processed image links.`
+              );
+              this.markdownString.set(updatedContent); // Update the preview with new content
+              console.log(
+                '>===>> Article Content (Updated markdownString): ',
+                this.markdownString()
+              );
+              this.markdownPreview(updatedContent); // Refresh the preview
+            } else {
+              console.error(
+                `Failed to update content for Article ID ${articleData.id}.`
+              );
+            }
+          }
+        }
+      }
+    }
+  }
 }

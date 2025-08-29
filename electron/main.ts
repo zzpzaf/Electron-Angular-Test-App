@@ -1,4 +1,4 @@
-import { HandlerDetails, type IpcMainInvokeEvent, dialog } from 'electron';
+import { HandlerDetails, type IpcMainInvokeEvent, dialog, protocol } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import {
@@ -23,6 +23,7 @@ import {
   CategoryNode,
   listURLData,
   PostData,
+  RewriteResultItem,
 } from '../shared/projectObjects/varObjects';
 import { getFileFullPathName } from './helpers/electron-utils';
 import {
@@ -46,6 +47,8 @@ import {
   insertArticlesFromJson,
   isSlugExisting,
   isUrlExisting,
+  updateArticleById,
+  updateArticleContentById,
 } from './dbs/sqlite/mandb_queries';
 import { attachContextMenu } from './context-menu';
 
@@ -54,17 +57,91 @@ const isDev = require('electron-is-dev');
 // const { app, BrowserWindow, ipcMain, Menu } = require('electron');
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { attachCopiedImages } from './context-copy-selected-images';
+import { createDbProtocolHandlerFetch } from './protocols/db-protocol';
+import { processMarkdownImagesForArticle, rewriteMarkdownImagesWithDbLinks } from './processes/manipulators/image-manipulator';
 
-let mainAppWin: any;
 
-  // ==========================================================================
-  // Define the path of ndex.html file of the running Angular app from the dist folder
-  // ==========================================================================
-  // Use path.join to ensure correct path resolution across platforms
-  const angularDistPath = path.join(
-    process.cwd(),
-    'dist/electronang1/browser/index.html'
-  );
+
+
+// ==========================================================================
+// Define the path of ndex.html file of the running Angular app from the dist folder
+// ==========================================================================
+// Use path.join to ensure correct path resolution across platforms
+const angularDistPath = path.join(
+  process.cwd(),
+  'dist/electronang1/browser/index.html'
+);
+
+
+
+// ==========================================================================
+// Register the scheme as privileged (top of main.ts, before app.whenReady()) 
+// ==========================================================================
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'db',
+    privileges: {
+      standard: true,        // enables URL parsing like http(s)
+      secure: true,          // treated as secure
+      supportFetchAPI: true, // allows fetch/XHR
+      stream: true,          // enables streaming bodies
+      corsEnabled: false     // often fine to keep false for app-internal
+    }
+  }
+]);
+
+
+
+// ======================================================================================================
+// Electron app initialization
+// ======================================================================================================
+app.whenReady().then(() => {
+  console.log('>===>> Electron app is ready');
+
+  // Register the 'db' protocol buffer BEFORE loading any BrowserWindow content using db://
+  const handler = createDbProtocolHandlerFetch();
+  protocol.handle('db', handler);
+
+
+  // Now create the main application window
+  createMainAppWindow();
+
+  // Activate the main window when the app is activated (e.g., from the dock on macOS)
+  // This is useful for macOS where the app can be activated without any windows open
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      console.log('>===>> Re-activating app, creating window');
+      createMainAppWindow();
+    }
+  });
+});
+// ======================================================================================================
+
+// ======================================================================================================
+// Quitting app
+// ======================================================================================================
+// Quit the app when all windows are closed (except on macOS)
+// On macOS, it's common to keep the app running even if no windows are open
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    console.log('>===>> All windows closed, quitting app');
+    app.quit();
+  }
+});
+// ======================================================================================================
+
+
+
+
+
+
+
+
+
+
+let mainAppWin: BrowserWindow | null = null;
+let markViewerWindow: BrowserWindow | null = null;
+
 
 // ======================================================================================================
 // The Main Function to create the main Electron application window
@@ -163,7 +240,9 @@ function createMainAppWindow() {
   // ==========================================================================
   mainAppWin.once('ready-to-show', () => {
     console.log('>===>> Main window ready to show');
-    mainAppWin.show();
+    if (mainAppWin) {
+      mainAppWin.show();
+    }
   });
   // ==========================================================================
 
@@ -190,44 +269,12 @@ function createMainAppWindow() {
 
 
 
-// ======================================================================================================
-// Electron app initialization
-// ======================================================================================================
-app.whenReady().then(() => {
-  console.log('>===>> Electron app is ready');
-  createMainAppWindow();
-
-  // Activate the main window when the app is activated (e.g., from the dock on macOS)
-  // This is useful for macOS where the app can be activated without any windows open
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      console.log('>===>> Re-activating app, creating window');
-      createMainAppWindow();
-    }
-  });
-});
-// ======================================================================================================
-
-// ======================================================================================================
-// Handle app quitting
-// ======================================================================================================
-// Quit the app when all windows are closed (except on macOS)
-// On macOS, it's common to keep the app running even if no windows are open
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    console.log('>===>> All windows closed, quitting app');
-    app.quit();
-  }
-});
-// ======================================================================================================
-
 
 
 // ======================================================================================================
 // Handle a NEW Electron window openning via a route path (defined in Angular app.route.ts) and pass data
 // ======================================================================================================
 //
-let markViewerWindow: BrowserWindow | null = null;
 ipcMain.handle('open-new-window', async (_event, data) => {
 
   const routePath: string = '/show-mark';
@@ -369,6 +416,78 @@ ipcMain.handle(
   }
 );
 
+
+// 250827 
+// Image processing for articles
+ipcMain.handle(
+  'images:process-markdown-for-article',
+  async (event: any, article_id: number, orgArticleUrl: string, markContent: string, opts?: any) => {
+    try {
+      if (article_id === null || !orgArticleUrl || !markContent) {
+        console.error(
+          '[images:process-markdown-for-article] Invalid args:',
+          { article_id, orgArticleUrl, markContent }
+        );
+        return { extracted: [], results: [] };
+      }
+      // Optionally sanitize opts
+      const safeOpts = {
+        maxBytes: typeof opts?.maxBytes === 'number' ? opts.maxBytes : undefined,
+        setOrder: typeof opts?.setOrder === 'boolean' ? opts.setOrder : undefined,
+        startOrder: Number.isInteger(opts?.startOrder) ? opts.startOrder : undefined,
+      };
+      const out = await processMarkdownImagesForArticle(article_id, orgArticleUrl, markContent, safeOpts);
+      return out; // { extracted, results }
+    } catch (err) {
+      console.error('>= *** ==>>> main.ts - [images:process-markdown-for-article - processMarkdownImagesForArticle] Failed:', err);
+      return { extracted: [], results: [] };
+    }
+  }
+);
+
+
+// 250827
+// Rewrite image links in markdown with database links
+ipcMain.handle(
+  'images:rewrite-markdown-with-db-links',
+  async (event: any, markContent: string, imagesArray:  RewriteResultItem[]): Promise<string> => {
+    try {
+      const rewritten = rewriteMarkdownImagesWithDbLinks(markContent, imagesArray);
+      return rewritten;
+    } catch (err) {
+      console.error('[images:rewrite-markdown-with-db-links] Failed:', err);
+      // On error, return the original markdown unchanged
+      return typeof markContent === 'string' ? markContent : '';
+    }
+  }
+);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // ipcMain.handle(
 //   'convert-html-to-markdown',
 //   async (event: any, args: { input: string; isRawHtml: boolean }) => {
@@ -407,7 +526,7 @@ ipcMain.handle(
     console.log(`Received scrape-list request for URL: ${url}`);
     try {
       const result = await scrapeList(url);
-      console.log('Scraping successful');
+      console.log('>= *** ==>> main.ts - scrape-list -Scraping successful');
       return { success: true, data: result };
     } catch (error: unknown) {
       console.error('Scraping (scrape-list) error:', error);
@@ -425,10 +544,10 @@ ipcMain.handle(
     console.log(`Received scrape-tabs request for  ${urls.length}  URLs`);
     try {
       const result: PostData[] = await collectPostsFromUrlTabs(urls);
-      console.log('Scraping successful');
+      console.log('>===>> main.ts - scrape-tabs - Scraping successful');
       return { success: true, data: result };
     } catch (error: unknown) {
-      console.error('Scraping (scrape-tabs) error:', error);
+      console.error('>===>> main.ts - scrape-tabs - Scraping error:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error),
@@ -512,6 +631,24 @@ ipcMain.handle(
 //   return getConnection1(filePath);
 // });
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ipcMain.handle(
   'sqlite:backup-places',
   async (event: any, sourcePath: string, targetPath: string) => {
@@ -549,6 +686,38 @@ ipcMain.handle(
   }
 );
 
+
+
+ipcMain.handle(
+  'sqlite:update-article-by-id',
+  (event: any, post: PostData) => {
+    try {
+      const result = updateArticleById( post);
+      return { success: true, message: result };
+    } catch (err: any) {
+      console.error('Error updating article by id:', post.id, err);
+      return { success: false, error: err.message };
+    }
+  }
+);
+
+
+ipcMain.handle(
+  'sqlite:update-article-content-by-id',
+  (event: any, id: number, newContent: string) => {
+    try {
+      const result = updateArticleContentById(id, newContent);
+      return { success: true, message: result };
+    } catch (err: any) {
+      console.error('Error updating article content by id:', id, err);
+      return { success: false, error: err.message };
+    }
+  }
+);
+
+
+
+
 ipcMain.handle('sqlite:check-if-url-exists', (event: any, link: string) => {
   try {
     const sanitized = (link ?? '').trim();
@@ -576,6 +745,7 @@ ipcMain.handle('sqlite:check-if-slug-exists', (event: any, slug: string) => {
 ipcMain.handle('sqlite:get-post-data-by-slug', (event: any, slug: string) => {
   try {
     const sanitized = (slug ?? '').trim();
+    console.log('>===>> (get-post-data-by-slug) - slug:', slug, ' sanitized:', sanitized);
     if (!sanitized) return false; // empty/invalid input → treat as not found
     const postData: PostData | null = getPostBySlug(sanitized);
     return postData; // PostData or null
@@ -700,6 +870,14 @@ ipcMain.handle(
     return qryResult;
   }
 );
+
+
+
+
+
+
+
+
 
 // Not-used so far ....
 ipcMain.handle('open-component-window', (event: any, data: any) => {

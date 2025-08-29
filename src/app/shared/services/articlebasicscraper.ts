@@ -1,6 +1,9 @@
+// src/app/shared/services/articlebasicscraper.ts
+// Article Basics Scraper Service
+
 import { Injectable } from '@angular/core';
 import { ScrapeResult } from '../../appObjects/angObjects';
-import { PostData } from '../../../../shared/projectObjects/varObjects';
+import { PostData, ProcessMarkdownResult, RewriteResultItem } from '../../../../shared/projectObjects/varObjects';
 
 const compName = 'Articlebasicscraper Service';
 
@@ -9,6 +12,16 @@ const compName = 'Articlebasicscraper Service';
 })
 export class Articlebasicscraper {
   constructor() {}
+
+
+  // Generic invoke wrapper (helper function) to avoid repeating
+  // the '... as Promise<string>' adition in return commands, everywhere
+  //-------------------------------------------------------------------------
+  private ipcInvoke<T>(channel: string, ...args: unknown[]): Promise<T> {
+    return window.electronAPI.invoke(channel, ...args) as Promise<T>;
+  }
+
+
 
   /**
    * Calls the Electron main process to scrape the basic (meta) data of an article.
@@ -60,6 +73,7 @@ export class Articlebasicscraper {
     }
   }
 
+  // ***
   async scrapeTabsList(
     urls: string[]
   ): Promise<{ success: boolean; data?: PostData[]; error?: string }> {
@@ -79,4 +93,66 @@ export class Articlebasicscraper {
       return { success: false, error: error.message || 'Unknown error' };
     }
   }
+
+
+
+
+
+
+  // 250827
+  // Process (gets and stores)images in markdown content for a given article
+  processImagesForArticleMarkdownContent(
+    articleId: number,
+    articleUrl: string,
+    markdown: string,
+    opts?: { maxBytes?: number; setOrder?: boolean; startOrder?: number }
+  ): Promise<ProcessMarkdownResult> {
+    return this.ipcInvoke<ProcessMarkdownResult>(
+      'images:process-markdown-for-article',
+      articleId,
+      articleUrl,
+      markdown,
+      opts
+    ).then((data: ProcessMarkdownResult) => {
+      // Log for debugging
+      console.log('>===>> services/articlebasicscraper.ts -  processImagesForArticleMarkdownContent result:', data);
+
+      // Return the typed result
+      return data;
+    });
+  }
+
+
+
+
+  
+  // 250827
+  // Rewrite image links in markdown with database links
+  // async rewriteMarkdownWithDbLinks(
+  // markdown: string,
+  // results: RewriteResultItem[]
+  // ): Promise<string> {
+  //   const updatedContent:string = await this.ipcInvoke<string>(
+  //     'images:rewrite-markdown-with-db-links',
+  //     markdown,
+  //     results
+  //   );
+  //   return updatedContent;
+  // }
+  rewriteMarkdownWithDbLinks(
+  markdown: string,
+  results: RewriteResultItem[]
+  ): Promise<string> {
+    return this.ipcInvoke<string>(
+      'images:rewrite-markdown-with-db-links',
+      markdown,
+      results
+    ).then((updatedContent: string) => {
+      // Log for debugging
+      // console.log('>===>> services/articlebasicscraper.ts -  rewriteMarkdownWithDbLinks Updated Content :', updatedContent);
+      // Return the typed result
+      return updatedContent;
+    });
+  }
+
 }

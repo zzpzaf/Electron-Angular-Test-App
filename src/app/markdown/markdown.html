@@ -32,8 +32,8 @@
   </nz-form-item>
 
   <nz-form-item>
-    <label nz-checkbox formControlName="add">
-      <span>Auto DB Insertion</span>
+    <label nz-checkbox formControlName="force">
+      <span>If existing, Force Update</span>
     </label>
   </nz-form-item>
 
@@ -109,7 +109,7 @@
       Save
     </button>
 
-    @if (!linkScrapeForm.get('add')?.value) {
+    @if (!linkScrapeForm.get('force')?.value) {
     <button
       nz-button
       nzType="primary"

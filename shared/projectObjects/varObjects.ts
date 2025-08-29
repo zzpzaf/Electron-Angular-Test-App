@@ -1,3 +1,5 @@
+import { Buffer } from 'buffer';
+
 export interface listURLData {
   listname: string;
   pubauthorslug: string;
@@ -20,6 +22,48 @@ export interface PostData extends listURLData{
   content?: string;
   ranking?: number;     // added on 250820
 }
+
+
+
+
+// ----------------- single-image: streamed with abort -----------------
+export type ImageDownloadResult = {
+  success: boolean;
+  aborted?: boolean;
+  reason?: string;
+  imageId?: number;
+  inserted?: boolean;
+  mime_type?: string;
+  byte_length?: number;
+  sha256_hex?: string;
+  file_name?: string;
+};
+
+export type RewriteResultItem = { orgImgUrl: string; orderIndx?: number } & ImageDownloadResult;
+
+export type ImageRow = {
+  mime_type: string;
+  imgBlob: Buffer;
+  alt_text: string | null;
+  byte_length: number | null;
+};
+
+export interface ExtractedImage {
+  orderIndx: number;
+  imgUrl: string;
+}
+
+export interface ProcessMarkdownResult {
+  extracted: ExtractedImage[];
+  results: RewriteResultItem[];
+}
+
+
+
+
+
+
+
 
 
 export interface Category {

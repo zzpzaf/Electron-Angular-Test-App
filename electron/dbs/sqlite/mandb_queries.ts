@@ -1,6 +1,6 @@
 // electron/dbs/sqlite/maindb_queries.ts
 
-import { PostData, Category, CategoryNode, CategoryRow } from '../../../shared/projectObjects/varObjects';
+import { PostData, Category, CategoryNode, CategoryRow, ImageRow } from '../../../shared/projectObjects/varObjects';
 import { getMainConnection } from './connections';
 
 const mainDb = getMainConnection();
@@ -147,8 +147,9 @@ export function getPostBySlug(urlSlug: string): PostData | null {
     `);
 
     const searchPattern = `%${urlSlug}%`;
-    const row = stmt.get(searchPattern);
-    console.log('>===>> "getPostBySlug" -> Post Fetched by slug:', JSON.stringify(row, null, 2 ));
+    const row = stmt.get(searchPattern) as PostData | undefined;
+    console.log('>===>> "getPostBySlug" -> Post' + "'" + ' s Title Fetched by slug:', row?.title );
+    // console.log('>===>> "getPostBySlug" -> Post Fetched by slug:', JSON.stringify(row, null, 2 ));
     if (!row) {
       return null;
     }
@@ -261,6 +262,99 @@ export function insertArticlesFromJson(posts: PostData[]): number {
     return 0;
   }
 }
+
+
+/**
+ * 250827
+ * Updates the content of an article by its ID.
+ * @param id 
+ * @returns 
+ */
+export function updateArticleContentById(id: number, newContent: string): boolean {
+  if (!mainDb) {
+    console.error('>===>> No Main DB connection.');
+    return false;
+  }
+
+  try {
+    const stmt = mainDb.prepare(`
+      UPDATE articles
+      SET content = @content
+      WHERE id = @id
+    `);
+    const result = stmt.run({ id, content: newContent });
+    console.log('>===>> "updateArticleContentById" -> Update Result:', result);
+    return result.changes === 1;
+  } catch (err) {
+    console.error('Error updating article content:', err);
+    return false;
+  }
+}
+
+
+/**
+ * 250827
+ * Updates the content of an article by its ID.
+ * @param id 
+ * @returns 
+ */
+export function updateArticleById(post: PostData): boolean {
+  if (!mainDb) {
+    console.error('>===>> No Main DB connection.');
+    return false;
+  }
+  // Guard: need a valid numeric id
+  if (post == null || typeof (post as any).id !== 'number' || !Number.isInteger((post as any).id)) {
+    console.error('>===>> updateArticleById: invalid post.id:', post && (post as any).id);
+    return false;
+  }
+
+  try {
+    const stmt = mainDb.prepare(`
+      UPDATE articles
+      SET
+        listname     = @listname,
+        pubauthorslug= @pubauthorslug,
+        hostname     = @hostname,
+        timestamp    = CURRENT_TIMESTAMP,  -- always update to current time
+        pubname      = @pubname,
+        authorname   = @authorname,
+        title        = @title,
+        linkurl      = @link,     -- NOTE: param @link maps to column linkurl
+        content      = @content,
+        imageurl     = @image,    -- NOTE: param @image maps to column imageurl
+        date         = @date,
+        likes        = @likes,
+        content      = @content,
+        comments     = @comments
+      WHERE id = @id
+    `);
+
+    const info = stmt.run({
+      id: (post as any).id,
+      listname:        post.listname ?? '',
+      pubauthorslug:   post.pubauthorslug ?? '',
+      hostname:        post.hostname ?? '',
+      timestamp:       post.timestamp ?? null,    // keep existing default logic if you prefer
+      pubname:         post.pubname ?? '',
+      authorname:      post.authorname ?? '',
+      title:           post.title ?? '',
+      link:            post.link ?? '',           // maps to linkurl
+      content:         post.content ?? '',
+      image:           post.image ?? '',          // maps to imageurl
+      date:            post.date ?? '',
+      likes:           typeof post.likes === 'number' ? post.likes : 0,
+      comments:        typeof post.comments === 'number' ? post.comments : 0,
+    });
+
+    console.log('>= *** ==>> "updateArticleById" -> Update Result:', info);
+    return info.changes === 1; // true if exactly one row updated
+  } catch (err) {
+    console.error('Error updating article:', err);
+    return false;
+  }
+}
+
 
 
 
@@ -608,4 +702,141 @@ export function getSubcategoryForest(parentId: number | null): CategoryNode[] {
     console.error('Error building subcategory forest:', err);
     return [];
   }
+}
+
+
+
+
+
+
+/**
+ * 250824
+ ** 'Upsert' function for 'images' table
+ * Insert (or find) an image row; dedupe per article by (article_id, sha256_hex)
+ * If a matching row is found, it will be returned instead of inserting a new one.
+ * If no matching row is found, a new row will be inserted.
+ * If the insert is ignored due to a conflict, the existing row will be returned.
+ * If the operation fails for any other reason, an error will be thrown.
+ * If the operation is successful, the newly inserted or found row will be returned.
+ * 
+ */
+export function upsertImageRecord(params: {
+  article_id: number;
+  orgArticleUrl: string | null;
+  orgImgUrl: string;
+  mime_type: string;
+  imgBlob: Buffer;
+  byte_length: number;
+  sha256_hex: string;
+  file_name: string | null;
+  orderIndx?: number | null;
+  alt_text?: string | null;
+  imgWidth?: number | null;
+  imgHeight?: number | null;
+}): { inserted: boolean; imageId: number } {
+  if (!mainDb) throw new Error('No Main DB connection');
+
+  console.log('>= *** ==>> upsertImageRecord Started ...');
+
+  const insert = mainDb.prepare(`
+    INSERT INTO images (
+      article_id, orgArticleUrl, orgImgUrl, mime_type,
+      imgBlob, byte_length, sha256_hex, file_name,
+      orderIndx, alt_text, imgWidth, imgHeight
+    ) VALUES (
+      @article_id, @orgArticleUrl, @orgImgUrl, @mime_type,
+      @imgBlob, @byte_length, @sha256_hex, @file_name,
+      @orderIndx, @alt_text, @imgWidth, @imgHeight
+    )
+    ON CONFLICT(article_id, sha256_hex) DO NOTHING
+  `);
+
+  const info = insert.run({
+    article_id: params.article_id,
+    orgArticleUrl: params.orgArticleUrl,
+    orgImgUrl: params.orgImgUrl,
+    mime_type: params.mime_type,
+    imgBlob: params.imgBlob,
+    byte_length: params.byte_length,
+    sha256_hex: params.sha256_hex,
+    file_name: params.file_name,
+    orderIndx: params.orderIndx ?? null,
+    alt_text: params.alt_text ?? '',
+    imgWidth: params.imgWidth ?? null,
+    imgHeight: params.imgHeight ?? null,
+  });
+
+  if (info.changes === 1) {
+    return { inserted: true, imageId: Number(info.lastInsertRowid) };
+  }
+
+  const row = mainDb.prepare(`
+    SELECT id FROM images
+    WHERE article_id = ? AND sha256_hex = ?
+    LIMIT 1
+  `).get(params.article_id, params.sha256_hex) as { id: number } | undefined;
+
+  if (!row) throw new Error('Insert ignored but existing row not found');
+
+  console.log('>= *** ==>> upsertImageRecord: ', row.id, ' - ', params.orgImgUrl, ' - ', params.mime_type, ' - ', params.byte_length);
+  return { inserted: false, imageId: row.id };
+}
+
+
+
+
+
+
+
+
+/**
+ * 250825
+ ** Load an image blob by DB id.
+ * Returns null if not found.
+ * Also indicates if this is an "aborted-too-large" placeholder
+ * (imgBlob is empty and alt_text starts with [ABORTED_TOO_LARGE:...]).
+ */
+export function getImageBlobById(
+  imageId: number
+): {
+  mime_type: string;
+  imgBlob: Buffer;
+  isAbortedTooLarge: boolean;
+  byte_length: number;
+} | null {
+  
+  console.log('>===>> getImageBlobById: Fetching image with id:', imageId);
+  if (!mainDb) {
+    console.error('>===>> No Main DB connection.');
+    return null;
+  }
+
+  // --- SQLite query (prepared once per call) ---
+  // You can copy-paste this SQL into any SQLite client:
+  // SELECT mime_type, imgBlob, alt_text, byte_length
+  // FROM images
+  // WHERE id = ? LIMIT 1;
+  const stmt = mainDb.prepare<number[], ImageRow>(`
+    SELECT mime_type, imgBlob, alt_text, byte_length
+    FROM images
+    WHERE id = ?
+    LIMIT 1
+  `);
+
+  const row = stmt.get(imageId);
+
+  // console.log('>===>> getImageBlobById: Fetched image row:', JSON.stringify(row));
+
+  if (!row) return null;
+
+  const blob = row.imgBlob ?? Buffer.alloc(0);
+  const isAborted =
+    blob.length === 0 && (row.alt_text ?? '').startsWith('[ABORTED_TOO_LARGE');
+
+  return {
+    mime_type: row.mime_type,
+    imgBlob: blob,
+    isAbortedTooLarge: isAborted,
+    byte_length: typeof row.byte_length === 'number' ? row.byte_length : blob.length,
+  };
 }

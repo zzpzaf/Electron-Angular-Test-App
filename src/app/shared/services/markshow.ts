@@ -6,18 +6,27 @@
 // and `DOMPurify` for sanitization.
 // It also provides a method to render the Markdown content as safe HTML.
 
-
 import { inject, Injectable } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 
-
 const VOID_TAGS = new Set([
-  'area','base','br','col','embed','hr','img','input','link','meta',
-  'param','source','track','wbr'
+  'area',
+  'base',
+  'br',
+  'col',
+  'embed',
+  'hr',
+  'img',
+  'input',
+  'link',
+  'meta',
+  'param',
+  'source',
+  'track',
+  'wbr',
 ]);
-
 
 /*
 backticks any <…> inline (not on its own line),
@@ -49,7 +58,7 @@ function backtickInlineAngles(src: string, strict = true): string {
 
     // Mask existing inline code spans so we don't touch them like: `code`, ``code``
     const masks: string[] = [];
-    text = text.replace(/(`+)([\s\S]*?)\1/g, m => {
+    text = text.replace(/(`+)([\s\S]*?)\1/g, (m) => {
       const t = `\uE000C${masks.length}\uE001`;
       masks.push(m);
       return t;
@@ -59,8 +68,14 @@ function backtickInlineAngles(src: string, strict = true): string {
     const openTags = new Set<string>();
     const closeTags = new Set<string>();
     if (!strict) {
-      text.replace(/<([A-Za-z][\w:-]*)\b[^>]*?>/g, (_m, n) => { openTags.add(n.toLowerCase()); return ''; });
-      text.replace(/<\/\s*([A-Za-z][\w:-]*)\s*>/g, (_m, n) => { closeTags.add(n.toLowerCase()); return ''; });
+      text.replace(/<([A-Za-z][\w:-]*)\b[^>]*?>/g, (_m, n) => {
+        openTags.add(n.toLowerCase());
+        return '';
+      });
+      text.replace(/<\/\s*([A-Za-z][\w:-]*)\s*>/g, (_m, n) => {
+        closeTags.add(n.toLowerCase());
+        return '';
+      });
     }
 
     text = text.replace(/<[^>\n]+>/g, (m, offset, str) => {
@@ -81,7 +96,7 @@ function backtickInlineAngles(src: string, strict = true): string {
         const isVoid = open && VOID_TAGS.has(open[1].toLowerCase());
         if (selfClosing) return m; // e.g., <br/>
         if (open && !isVoid && closeTags.has(open[1].toLowerCase())) return m; // paired inline HTML
-        if (close && openTags.has(close[1].toLowerCase())) return m;           // paired inline HTML
+        if (close && openTags.has(close[1].toLowerCase())) return m; // paired inline HTML
       }
 
       // wrap with backticks so it renders as literal text
@@ -95,46 +110,54 @@ function backtickInlineAngles(src: string, strict = true): string {
   };
 
   for (const line of lines) {
-    if (/^\s*(```|~~~)/.test(line)) { flushParagraph(); inFence = !inFence; out.push(line); continue; }
-    if (inFence) { out.push(line); continue; }
-    if (line.trim() === '') { flushParagraph(); out.push(line); } else { para.push(line); }
+    if (/^\s*(```|~~~)/.test(line)) {
+      flushParagraph();
+      inFence = !inFence;
+      out.push(line);
+      continue;
+    }
+    if (inFence) {
+      out.push(line);
+      continue;
+    }
+    if (line.trim() === '') {
+      flushParagraph();
+      out.push(line);
+    } else {
+      para.push(line);
+    }
   }
   flushParagraph();
   return out.join('\n');
 }
 
-
 // 250812
-// It normalizes the cases where a piece of angle-brackets text, surrounded by escaped (with backslashes), 
+// It normalizes the cases where a piece of angle-brackets text, surrounded by escaped (with backslashes),
 // single backticks, is found in a Markdown text paragraph/prose. It actually, removes the backslashes:
-//   \`<...>\` -> `<...>` 
+//   \`<...>\` -> `<...>`
 // It shoul do this BEFORE masking code spans.
 function unescapeBackslashedBackticksAroundAngles(text: string): string {
   // Matches a backslash-escaped single backtick, then a single-line <...>, then a backslash-escaped single backtick.
   // Examples matched: \`<title>\`, \`<script type="application/ld+json">\`
   // Allows optional surrounding spaces inside the backticks.
-  return text.replace(/\\`(\s*<[^>\n]+>\s*)\\`/g, (_m, inner) => '`' + inner + '`');
+  return text.replace(
+    /\\`(\s*<[^>\n]+>\s*)\\`/g,
+    (_m, inner) => '`' + inner + '`'
+  );
 }
 
-
-
-
-
-
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class Markshow {
-  
   private sanitizer = inject(DomSanitizer);
 
   constructor() {
-
     // marked settings/options
     marked.setOptions({
       gfm: true,
       breaks: true,
-      async: false
+      async: false,
     });
 
     // === choose behavior here ===
@@ -143,21 +166,34 @@ export class Markshow {
       hooks: {
         preprocess(src) {
           return backtickInlineAngles(src, STRICT_ANGLE_MODE);
-        }
-      }
+        },
+      },
     });
   }
-
 
   render(md: string): SafeHtml {
     const html = marked.parse(md, { async: false }) as string;
     const clean = DOMPurify.sanitize(html, {
       ADD_TAGS: ['iframe'],
-      ADD_ATTR: ['src','title','width','height','allow','allowfullscreen','frameborder','loading','referrerpolicy']
+      ADD_ATTR: [
+        'src',
+        'href',
+        'title',
+        'width',
+        'height',
+        'allow',
+        'allowfullscreen',
+        'frameborder',
+        'loading',
+        'referrerpolicy',
+      ],
+      // 250828 - It's 'must' to allow the custom 'db' protocol in URLs 
+      // e.g.:  <img src="db://image/1" alt=""> (and common ones)
+      ALLOWED_URI_REGEXP:
+        /^(?:(?:https?|mailto|tel|data|db):|[^a-z]|[a-z+.-]+(?:[^a-z+.-]|$))/i,
     });
     // return this.sanitizer.bypassSecurityTrustHtml(clean);
     const retText: SafeHtml = this.sanitizer.bypassSecurityTrustHtml(clean);
     return retText;
   }
-
 }
