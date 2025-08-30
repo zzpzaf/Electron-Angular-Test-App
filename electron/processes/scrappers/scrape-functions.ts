@@ -1,6 +1,7 @@
-// scrape-functions.ts
+// electron/processes/scrappers/scrape-functions.ts
+
 // This file is part of an Electron application that scrapes basic article data from a given URL.
-// 250715-08xx
+// 250715 - 250830
 
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
@@ -324,9 +325,13 @@ async function scrapeMediumMarkdownContent(
   // This is not officially supported and may break with future Puppeteer versions
   const browser = page.browserContext().browser();
 
+  // console.log('>= *** ==>> scrapeMediumMarkdownContent() - before getCleanedPageContent(), page: ', page);
+
   try {
     // Get cleaned HTML + captured gist iframe sources
     const { html: cleanedHtml, iframeSrcs } = await getCleanedPageContent(page);
+
+    // console.log('>= *** ==>> scrapeMediumMarkdownContent() - after getCleanedPageContent() 🔍 Cleaned HTML: ', cleanedHtml);
 
     // Process gists using existing browser connection
     const htmlWithGists = await processGists(browser, cleanedHtml, iframeSrcs);
@@ -369,7 +374,131 @@ async function scrapeMediumMarkdownContent(
 // Removes the div element, with an attributethat starts with "speechify-ignore", and is placed after the h1 Article Title
 // Extracts separately iframe src URLs for Gists
 // Returns both the cleaned HTML and the list of iframe sources
+//
+// Updated: 250830
+// If iframe tags that concern YouTube videos, are found, they are replaced by a div with an anchor a element, which has as href the youtube video link, 
+// and text the title of the video, extracted from the iframe tag's title attribute.
+// •	Detects Embedly YouTube iframes via schema=youtube and pulls the real video URL from the url query param (already decoded).
+// •	Fallbacks to direct youtube.com/embed/... iframes by converting to a watch?v= URL.
+// •	Replaces matches with:
+// •	<div class="youtube-video">
+// •	  <a href="https://www.youtube.com/watch?v=VIDEO_ID" target="_blank" rel="noopener">Title from iframe</a>
+// •	</div>
+// •	Removes all other iframes to keep your output clean (you can tweak this if you want to keep certain providers).
 // ------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+// export async function getCleanedPageContent(
+//   page: import('puppeteer').Page
+// ): Promise<{ html: string; iframeSrcs: string[] }> {
+//   await autoScrollArticlePage(page);
+
+//   try {
+//     // await page.waitForSelector("figure iframe", { timeout: 5000 });
+//     await page.waitForSelector('figure iframe', {
+//       timeout: AFTER_AUTOSCROLL_GIST_IFRAME_SELECTOR_DELAY,  // 1000 ms
+//     });
+//   } catch {
+//     console.warn('>= *** ==>> ⚠️ No gist iframes found within timeout');
+//   }
+
+//   const iframeSources: string[] = await page.evaluate(() => {
+//     return Array.from(document.querySelectorAll('figure iframe'))
+//       .map((iframe) => iframe.getAttribute('src') || '')
+//       .filter(Boolean);
+//   });
+
+//   console.log('>= *** ==>> 📌 Found gist iframe src:', iframeSources);
+
+//   const rawHTML = await page.evaluate(() => {
+//     // const removeSpecificText = (root: HTMLElement, textToRemove: string) => {
+//     // Instead of removing just a single text, we can remove multiple texts in an array
+//     const removeSpecificText = (root: HTMLElement, textsToRemove: string[]) => {
+//       root.querySelectorAll('*').forEach((el) => {
+//         el.childNodes.forEach((node) => {
+//           if (node.nodeType === Node.TEXT_NODE) {
+//             const text = node.textContent?.trim() || '';
+//             if (textsToRemove.includes(text)) {
+//               node.textContent = '';
+//             }
+//           }
+//         });
+//       });
+//       // Also remove elements that contain only any text specified in textsToRemove array
+//       textsToRemove.forEach((t) => {
+//         root.querySelectorAll('*').forEach((el) => {
+//           if (el.textContent?.trim() === t) {
+//             el.remove();
+//           }
+//         });
+//       });
+//     };
+
+//     const removeSpeechifyIgnoreDivs = (root: HTMLElement) => {
+//       root
+//         .querySelectorAll('div[class^="speechify-ignore"]')
+//         .forEach((el) => el.remove());
+//     };
+
+//     const fixHeadings = (root: HTMLElement) => {
+//       const h1s = root.querySelectorAll('h1');
+//       let firstFound = false;
+//       h1s.forEach((h1) => {
+//         if (!firstFound) {
+//           firstFound = true;
+//         } else {
+//           const h2 = document.createElement('h2');
+//           h2.innerHTML = h1.innerHTML;
+//           h1.replaceWith(h2);
+//         }
+//       });
+//     };
+
+//     const removeContentBeforeFirstHeading = (root: HTMLElement) => {
+//       const firstHeading = root.querySelector('h1');
+//       if (firstHeading) {
+//         let prev = firstHeading.previousSibling;
+//         while (prev) {
+//           const toRemove = prev;
+//           prev = prev.previousSibling;
+//           toRemove?.parentNode?.removeChild(toRemove);
+//         }
+//       }
+//     };
+
+//     const titleEl = document.querySelector('h1[data-testid="storyTitle"]');
+//     let container: HTMLElement;
+
+//     if (!titleEl) {
+//       container = document.body.cloneNode(true) as HTMLElement;
+//     } else {
+//       let articleContainer: HTMLElement | null =
+//         titleEl.closest('article') ||
+//         titleEl.closest('section') ||
+//         titleEl.closest('main') ||
+//         document.body;
+//       container = articleContainer.cloneNode(true) as HTMLElement;
+//     }
+
+//     container
+//       .querySelectorAll('script, style, noscript')
+//       .forEach((el) => el.remove());
+
+//     // removeSpecificText(container, 'Zoom image will be displayed');
+//     // Specify the array of multiple texts to remove
+//     removeSpecificText(container, [
+//       'Zoom image will be displayed',
+//       'Press enter or click to view image in full size'
+//     ]);
+
+//     removeContentBeforeFirstHeading(container);
+//     removeSpeechifyIgnoreDivs(container);
+//     fixHeadings(container);
+
+//     return container.innerHTML;
+//   });
+
+//   return { html: rawHTML, iframeSrcs: iframeSources };
+// }
 
 export async function getCleanedPageContent(
   page: import('puppeteer').Page
@@ -377,12 +506,11 @@ export async function getCleanedPageContent(
   await autoScrollArticlePage(page);
 
   try {
-    // await page.waitForSelector("figure iframe", { timeout: 5000 });
     await page.waitForSelector('figure iframe', {
-      timeout: AFTER_AUTOSCROLL_GIST_IFRAME_SELECTOR_DELAY,  // 1000 ms
+      timeout: AFTER_AUTOSCROLL_GIST_IFRAME_SELECTOR_DELAY, // 1000 ms
     });
   } catch {
-    console.warn('⚠️ No gist iframes found within timeout');
+    // console.warn('>= *** ==>> ⚠️ No gist iframes found within timeout');
   }
 
   const iframeSources: string[] = await page.evaluate(() => {
@@ -391,28 +519,23 @@ export async function getCleanedPageContent(
       .filter(Boolean);
   });
 
-  console.log('📌 Found gist iframe src:', iframeSources);
+  console.log('>= *** ==>> 📌 Found gist iframe src:', iframeSources);
 
   const rawHTML = await page.evaluate(() => {
-    // const removeSpecificText = (root: HTMLElement, textToRemove: string) => {
-    // Instead of removing just a single text, we can remove multiple texts in an array
+    // --- helpers -------------------------------------------------------------
+
     const removeSpecificText = (root: HTMLElement, textsToRemove: string[]) => {
       root.querySelectorAll('*').forEach((el) => {
         el.childNodes.forEach((node) => {
           if (node.nodeType === Node.TEXT_NODE) {
             const text = node.textContent?.trim() || '';
-            if (textsToRemove.includes(text)) {
-              node.textContent = '';
-            }
+            if (textsToRemove.includes(text)) node.textContent = '';
           }
         });
       });
-      // Also remove elements that contain only any text specified in textsToRemove array
       textsToRemove.forEach((t) => {
         root.querySelectorAll('*').forEach((el) => {
-          if (el.textContent?.trim() === t) {
-            el.remove();
-          }
+          if (el.textContent?.trim() === t) el.remove();
         });
       });
     };
@@ -449,13 +572,63 @@ export async function getCleanedPageContent(
       }
     };
 
+    // ⬇️ NEW: transform YouTube iframes into simple links, remove all others
+    const transformYouTubeIframes = (root: HTMLElement) => {
+      const iframes = Array.from(root.querySelectorAll('iframe'));
+
+      for (const iframe of iframes) {
+        const src = iframe.getAttribute('src') || '';
+        let youtubeUrl: string | null = null;
+
+        try {
+          const u = new URL(src, location.href);
+          const schema = u.searchParams.get('schema');
+          const urlParam = u.searchParams.get('url'); // embedly provides the real URL here
+
+          if (schema === 'youtube' && urlParam) {
+            // URLSearchParams already decodes percent-encoding; double-decoding is safe-guarded
+            youtubeUrl = decodeURIComponent(urlParam);
+          } else if (/youtube\.com\/embed\//i.test(src)) {
+            // Fallback for direct embed srcs without embedly
+            const id = src.match(/embed\/([^?&]+)/)?.[1];
+            if (id) youtubeUrl = `https://www.youtube.com/watch?v=${id}`;
+          }
+        } catch {
+          // ignore parse errors and treat as non-YouTube
+        }
+
+        if (youtubeUrl) {
+          const title =
+            iframe.getAttribute('title')?.trim() ||
+            'YouTube video';
+
+          const wrapper = document.createElement('div');
+          wrapper.className = 'youtube-video';
+
+          const a = document.createElement('a');
+          a.href = youtubeUrl;
+          a.textContent = title;
+          a.target = '_blank';
+          a.rel = 'noopener';
+
+          wrapper.appendChild(a);
+          iframe.replaceWith(wrapper);
+        } else {
+          // Not YouTube → drop the iframe entirely (since you consider iframes unwanted)
+          iframe.remove();
+        }
+      }
+    };
+
+    // --- scope target --------------------------------------------------------
+
     const titleEl = document.querySelector('h1[data-testid="storyTitle"]');
     let container: HTMLElement;
 
     if (!titleEl) {
       container = document.body.cloneNode(true) as HTMLElement;
     } else {
-      let articleContainer: HTMLElement | null =
+      const articleContainer: HTMLElement | null =
         titleEl.closest('article') ||
         titleEl.closest('section') ||
         titleEl.closest('main') ||
@@ -463,26 +636,35 @@ export async function getCleanedPageContent(
       container = articleContainer.cloneNode(true) as HTMLElement;
     }
 
+    // --- clean & transform ---------------------------------------------------
+
     container
       .querySelectorAll('script, style, noscript')
       .forEach((el) => el.remove());
 
-    // removeSpecificText(container, 'Zoom image will be displayed');
-    // Specify the array of multiple texts to remove
     removeSpecificText(container, [
       'Zoom image will be displayed',
-      'Press enter or click to view image in full size'
+      'Press enter or click to view image in full size',
     ]);
 
     removeContentBeforeFirstHeading(container);
     removeSpeechifyIgnoreDivs(container);
     fixHeadings(container);
 
+    // ⬅️ call the new transformer here
+    transformYouTubeIframes(container);
+
     return container.innerHTML;
   });
 
   return { html: rawHTML, iframeSrcs: iframeSources };
 }
+
+
+
+
+
+
 
 // ------------------------------------------------------------------------------------------------------------------------------------------------------------
 // processGists() - Helper function that finds the gist-met
