@@ -50,13 +50,13 @@ import {
   updateArticleById,
   updateArticleContentById,
 } from './dbs/sqlite/mandb_queries';
-import { attachContextMenu } from './context-menu';
+import { attachContextMenu } from './context/context-menu';
 
 const isDev = require('electron-is-dev');
 
 // const { app, BrowserWindow, ipcMain, Menu } = require('electron');
 import { app, BrowserWindow, ipcMain } from 'electron';
-import { attachCopiedImages } from './context-copy-selected-images';
+import { attachCopiedImages } from './context/context-copy-selected-images';
 import { createDbProtocolHandlerFetch } from './protocols/db-protocol';
 import { processMarkdownImagesForArticle, rewriteMarkdownImagesWithDbLinks } from './processes/manipulators/image-manipulator';
 

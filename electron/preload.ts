@@ -28,7 +28,7 @@ window.addEventListener('drop', (e) => {
 });
 
 // ===================== START: install scoped Select All ===================== //
-import { installScopedSelectAll } from './context-select-all-support';
+import { installScopedSelectAll } from './context/context-select-all-support';
 const disposeScopedSelectAll = installScopedSelectAll(); // optional: keep ref for cleanup
 // ========================================================================= //
 
