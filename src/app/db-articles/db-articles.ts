@@ -298,6 +298,7 @@ export class DbArticles {
       timestamp: postData.timestamp,
       pubname: postData.pubname,
       authorname: postData.authorname,
+      authorlink: postData.authorlink,
       title: postData.title,
       link: postData.link,
       image: postData.image,

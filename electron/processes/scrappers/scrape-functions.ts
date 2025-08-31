@@ -234,6 +234,29 @@ async function scrapeMediumArticle(page: Puppeteer.Page): Promise<PostData> {
     const authorname =
       authorEl && authorEl.textContent ? authorEl.textContent.trim() : '';
 
+
+
+
+    // 250831 Update: Adding Author's Link
+    let authorLink = '';
+    if (authorEl) {
+      const href = authorEl.getAttribute('href') || '';
+      try {
+        const u = new URL(href, location.href);
+        u.search = ''; // remove ?query
+        u.hash = '';   // remove #fragment (optional, in case you also want to drop these)
+        authorLink = u.href;
+      } catch {
+        // fallback if href is malformed
+        authorLink = href;
+      }
+    }
+    // console.log('>= *** ==>> Extracted authorLink:', authorLink); // console.log does not work here due to the Puppeteer context
+
+
+
+
+
     let rawDate = '';
 
     //250806 Update
@@ -302,6 +325,7 @@ async function scrapeMediumArticle(page: Puppeteer.Page): Promise<PostData> {
       image,
       pubname,
       authorname,
+      authorlink: authorLink,
       date: rawDate,
       likes,
       comments,
@@ -971,6 +995,24 @@ async function scrapeMediumList(page: Puppeteer.Page): Promise<PostData[]> {
         ? (authorNameEl as HTMLElement).innerText.trim()
         : '';
 
+
+      // 250831 Update: Adding Author's Link
+      let authorLink = '';
+      if (authorNameEl) {
+        const href = authorNameEl.closest('a')?.getAttribute('href') || '';
+        try {
+          const u = new URL(href, location.href);
+          u.search = ''; // remove ?query
+          u.hash = '';   // remove #fragment (optional, in case you also want to drop these)
+          authorLink = u.href;
+        } catch {
+          // fallback if href is malformed
+          authorLink = href;
+        }
+      }
+
+
+
       const postData: PostData = {
         counter: index + 1,
         hostname,
@@ -979,6 +1021,7 @@ async function scrapeMediumList(page: Puppeteer.Page): Promise<PostData[]> {
         timestamp,
         pubname,
         authorname,
+        authorlink: authorLink,
         title,
         link,
         image,

@@ -13,6 +13,7 @@ export interface PostData extends listURLData{
   timestamp: string;
   pubname: string;
   authorname: string;
+  authorlink: string;
   title: string;
   link: string;
   image: string;

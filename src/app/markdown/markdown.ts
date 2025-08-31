@@ -421,6 +421,7 @@ export class Markdown {
       timestamp: postData.timestamp,
       pubname: postData.pubname,
       authorname: postData.authorname,
+      authorlink: postData.authorlink, // added on 250831
       title: postData.title,
       link: postData.link,
       image: postData.image,
