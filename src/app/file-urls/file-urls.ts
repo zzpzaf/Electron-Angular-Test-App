@@ -11,7 +11,7 @@ import { Articlebasicscraper } from '../shared/services/articlebasicscraper';
 import { PostData } from '../../../shared/projectObjects/varObjects';
 
 @Component({
-  selector: 'urls-file',
+  selector: 'file-urls',
   imports: [
     FormsModule,
     NzFormModule,
@@ -20,10 +20,10 @@ import { PostData } from '../../../shared/projectObjects/varObjects';
     NzButtonModule,
     StyleDrct,
   ],
-  templateUrl: './urls-file.html',
-  styleUrl: './urls-file.scss',
+  templateUrl: './file-urls.html',
+  styleUrl: './file-urls.scss',
 })
-export class UrlsFile {
+export class FileUrls {
   public importedUrlsArrayString = signal<string>('');
 
   public urlsArray = signal<string[]>([]);

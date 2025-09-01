@@ -26,7 +26,7 @@ import { DlgService } from '../shared/services/dlg-service';
 // Adjust the import path as necessary
 
 @Component({
-  selector: 'links',
+  selector: 'list-urls',
   imports: [
     ReactiveFormsModule,
     FormsModule,
@@ -35,10 +35,10 @@ import { DlgService } from '../shared/services/dlg-service';
     NzCheckboxModule,
     NzButtonModule,
   ],
-  templateUrl: './links.html',
-  styleUrl: './links.scss',
+  templateUrl: './list-urls.html',
+  styleUrl: './list-urls.scss',
 })
-export class Links {
+export class ListUrls {
   private fb = inject(NonNullableFormBuilder);
   public linkScrapeForm!: FormGroup;
   private scrapper = inject(Articlebasicscraper);

@@ -1,3 +1,5 @@
+// single-url.ts
+
 import { Component, inject, signal } from '@angular/core';
 import {
   FormGroup,
@@ -32,7 +34,7 @@ import { Markshow } from '../shared/services/markshow';
 import { LoaderService } from '../shared/services/loader-service';
 
 @Component({
-  selector: 'sel-html-markdown',
+  selector: 'single-url',
   imports: [
     ReactiveFormsModule,
     FormsModule,
@@ -41,10 +43,10 @@ import { LoaderService } from '../shared/services/loader-service';
     NzCheckboxModule,
     NzButtonModule,
   ],
-  templateUrl: './markdown.html',
-  styleUrl: './markdown.scss',
+  templateUrl: './single-url.html',
+  styleUrl: './single-url.scss',
 })
-export class Markdown {
+export class SingleUrl {
   private fb = inject(NonNullableFormBuilder);
   private scrapper = inject(Articlebasicscraper);
   public scrappedDataArray = signal<PostData[]>([]);

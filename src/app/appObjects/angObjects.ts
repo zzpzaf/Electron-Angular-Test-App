@@ -23,10 +23,10 @@ export const SiderArticlesMenuItems: SiderMenuItem[] = [
 
 // Scraping Menu Items
 export const SiderScrapeMenuItems: SiderMenuItem[] = [
-  { label: 'Links', icon: '', route: '/links' },
-  { label: 'File URLs', icon: '', route: '/urlsfile' },
+  { label: 'Single URL', icon: '', route: '/single-url' },
+  { label: 'List URLs', icon: '', route: '/list-urls' },
+  { label: 'File URLs', icon: '', route: '/file-urls' },
   { label: 'Bookmarks', icon: '', route: '/bookmarks' },
-  { label: 'Markdown', icon: '', route: '/markdown' },
   { label: 'Help', icon: '', route: '/help' }
 ];
 

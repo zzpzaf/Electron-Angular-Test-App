@@ -4,10 +4,10 @@
 // import { provideRouter, Routes } from '@angular/router';
 import { Routes } from '@angular/router';
 import { Home } from './home/home';
-import { Links } from './links/links';
-import { UrlsFile } from './urls-file/urls-file';
+import { ListUrls  } from './list-urls/list-urls';
+import { FileUrls } from './file-urls/file-urls';
 import { Bookmarks } from './bookmarks/bookmarks';
-import { Markdown } from './markdown/markdown';
+import { SingleUrl } from './single-url/single-url';
 import { DbArticles } from './db-articles/db-articles';
 import { MarkViewer } from './mark-viewer/mark-viewer';
 import { Layout } from './layout/layout';
@@ -30,16 +30,17 @@ export const appRoutes: Routes = [
     component: Layout,
     children: [
       { path: 'home', component: Home },
-      { path: 'links', component: Links },
-      { path: 'urlsfile', component: UrlsFile },
+      { path: 'single-url', component: SingleUrl },
+      { path: 'list-urls', component: ListUrls },
+      { path: 'file-urls', component: FileUrls },
       { path: 'bookmarks', component: Bookmarks },
-      { path: 'markdown', component: Markdown },
       { path: 'dbarticles', component: DbArticles },
       // { path: 'articles-table', component: ArticlesTable },
     ]
   }, 
   { path: 'show-mark', component: MarkViewer },  
-  { path: '**', redirectTo: 'home' }
+  { path: '**', redirectTo: 'home' },
+  // { path: '/', redirectTo: 'home' },
 
 
 ];
