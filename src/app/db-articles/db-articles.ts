@@ -7,20 +7,13 @@ import {
   PostData,
 } from '../../../shared/projectObjects/varObjects';
 import { BackEnd } from '../shared/services/back-end';
+import { ArticlesTable } from "../articles-table/articles-table";
 
 import { NzLayoutModule } from 'ng-zorro-antd/layout';
 import { NzMenuModule } from 'ng-zorro-antd/menu';
 import { NzCheckboxModule } from 'ng-zorro-antd/checkbox';
 import { NzButtonModule } from 'ng-zorro-antd/button';
-import { NzRateModule } from 'ng-zorro-antd/rate';
 
-import {
-  NzTableModule,
-  NzTableSortFn,
-  NzTableFilterList,
-  NzTableFilterFn,
-  NzTableQueryParams,
-} from 'ng-zorro-antd/table';
 
 import {
   NzTreeModule,
@@ -31,6 +24,7 @@ import {
 import { NzTreeSelectModule } from 'ng-zorro-antd/tree-select';
 
 import { NzIconModule } from 'ng-zorro-antd/icon';
+
 
 function mapCategoryNodesToTree(nodes: CategoryNode[]): NzTreeNodeOptions[] {
   return nodes.map((n) => ({
@@ -58,10 +52,9 @@ function mapCategoryNodesToTree(nodes: CategoryNode[]): NzTreeNodeOptions[] {
     NzButtonModule,
     NzTreeModule,
     NzTreeSelectModule,
-    NzTableModule,
     NzIconModule,
-    NzRateModule,
-  ],
+    ArticlesTable
+],
   templateUrl: './db-articles.html',
   styleUrl: './db-articles.scss',
 })
@@ -83,34 +76,17 @@ export class DbArticles {
 
   @ViewChild(NzTreeComponent) nztree!: NzTreeComponent;
 
-  // 250821 - Added for table support.
-  // Pagination state (two-way bound)
-  pageIndex = 1;
-  pageSize = 10;
-  public nzRateToolTips: string[] = ['bad', 'ok', 'good', 'great', 'must'];
-  private str = (v: any) => (v ?? '').toString().toLowerCase();
-
-  // sortById: NzTableSortFn<PostData> = (a, b) => this.str(a.id).localeCompare(this.str(b.id));
-  sortById: NzTableSortFn<PostData> = (a, b) => a.id! - b.id!;
-  sortByTitle: NzTableSortFn<PostData> = (a, b) =>
-    this.str(a.title).localeCompare(this.str(b.title));
-  sortByLink: NzTableSortFn<PostData> = (a, b) =>
-    this.str(a.link).localeCompare(this.str(b.link));
-  sortByHostname: NzTableSortFn<PostData> = (a, b) =>
-    this.str(a.hostname).localeCompare(this.str(b.hostname));
-  sortByListname: NzTableSortFn<PostData> = (a, b) =>
-    this.str(a.listname).localeCompare(this.str(b.listname));
-  sortByDate: NzTableSortFn<PostData> = (a, b) => a.date.localeCompare(b.date);
-  sortByLikes: NzTableSortFn<PostData> = (a, b) => a.likes - b.likes;
-  sortByRanking: NzTableSortFn<PostData> = (a, b) =>
-    (a.ranking ?? 0) - (b.ranking ?? 0);
-
   constructor() {}
 
   ngOnInit() {
     this.getCategoryForestByParentId(null);
     // this.getArticlesById();
-    this.getUnassignedArticles();
+    // this.getUnassignedArticles();
+    this.backendService.setUncategorizedArticlesSignal();
+    // this.backendService.setUncategorizedArticlesSignal().then(() => {
+    //   this.$articles.set(this.backendService.$articles());
+    //   console.log('>===>> DbArticles - Uncategorized Articles fetched: ', this.$articles().length);
+    // });   
   }
 
   public isOnlyUnassignedToggle() {
@@ -152,7 +128,7 @@ export class DbArticles {
     }
   }
 
-  onCheckBoxChanged(event: NzFormatEmitEvent) {
+  onUnAssignedCheckBoxChanged(event: NzFormatEmitEvent) {
     const node = event.node;
     if (!node) return;
     console.log(
@@ -175,30 +151,6 @@ export class DbArticles {
     } else {
       this.expandedKeys = this.expandedKeys.filter((k) => k !== node.key);
     }
-  }
-
-  onMarkdown(row: PostData, index: number, e: MouseEvent) {
-
-    e.stopPropagation(); // avoid triggering row click/expand
-
-    // console.log('>===>> Markdown click', { row, index });
-
-    // const data: object = { postDataRow: row, message: 'Hello from DbArticles Window' };
-    const article: PostData = this.$articles().find(a => a.id === row.id)!;
-    if (window.electronAPI.openWindow) {
-      window.electronAPI.openWindow(article);
-    }
-  }
-
-  // immutable update when user changes the stars
-  onRankChange(row: PostData, value: number) {
-    // this.posts.update((arr) =>
-    //   arr.map((it) =>
-    //     it.id === row.id || it.link === row.link
-    //       ? { ...it, ranking: value }
-    //       : it
-    //   )
-    // );
   }
 
   async getCategoriesByParentId(parent_Id?: null | number) {
@@ -236,79 +188,6 @@ export class DbArticles {
         error
       );
     }
-  }
-
-  async getUnassignedArticles() {
-    let articles: PostData[] = [];
-    try {
-      articles = await this.backendService.getUncategorizedArticles();
-      if (articles.length > 0) {
-        this.$articles.set(articles);
-        // this.showArticlesMetaDataArray(articles);
-        this.$articlesMetaData.set(this.getArticlesMetaDataArray(articles));
-        // this.showArticlesMetaDataArray(articles);
-      }
-    } catch (error) {
-      console.log(
-        '>===>> Error fetching Un-Assigned / Un-Categorized Articles from BackEnd: ',
-        error
-      );
-    }
-  }
-
-  async getArticlesById(id?: number) {
-    let articles: PostData[] = [];
-    try {
-      articles = await this.backendService.getArticlesById(id);
-      if (articles.length > 0) {
-        this.showArticlesMetaDataArray(articles);
-        // To-Do
-        // fill the table with articles meta data array
-      }
-    } catch (error) {
-      console.log('>===>> Error fetching Article(s) from BackEnd: ', error);
-    }
-  }
-
-  showArticlesMetaDataArray(articles: PostData[]) {
-    const articleMetaDataArray: PostData[] =
-      this.getArticlesMetaDataArray(articles);
-    console.log(
-      '>===>> ',
-      articles.length,
-      ' Articles Fetched: ',
-      JSON.stringify(articleMetaDataArray)
-    );
-  }
-
-  getArticlesMetaDataArray(articles: PostData[]): PostData[] {
-    let articlesMetaDataArray: PostData[] = [];
-    for (let postData of articles) {
-      articlesMetaDataArray.push(this.getArticleMetaData(postData));
-    }
-    return articlesMetaDataArray;
-  }
-
-  getArticleMetaData(postData: PostData): PostData {
-    const postMetaData: PostData = {
-      id: postData.id, // added on 250821
-      listname: postData.listname,
-      pubauthorslug: postData.pubauthorslug,
-      hostname: postData.hostname,
-      timestamp: postData.timestamp,
-      pubname: postData.pubname,
-      authorname: postData.authorname,
-      authorlink: postData.authorlink,
-      title: postData.title,
-      link: postData.link,
-      image: postData.image,
-      date: postData.date,
-      likes: postData.likes,
-      comments: postData.comments,
-      ranking: postData.ranking, // added on 250820
-    };
-    return postMetaData;
-    //this.postMetaDataString.set(JSON.stringify(postMetaData, null, 2));
   }
 
   // If we want to expand all nodes that have children:

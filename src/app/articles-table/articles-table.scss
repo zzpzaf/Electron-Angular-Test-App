@@ -1,0 +1,60 @@
+
+// 250821 Table settings
+/* Let columns size to content and allow horizontal growth */
+:host ::ng-deep .ant-table table {
+  table-layout: auto !important;
+  width: max-content;         /* expands to fit widest cells */
+  min-width: 100%;            /* never shrink below container */
+}
+/* No truncation or ellipsis anywhere (headers and cells) */
+:host ::ng-deep .ant-table-thead > tr > th,
+:host ::ng-deep .ant-table-tbody > tr > td {
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+:host ::ng-deep .ant-table-tbody > tr > td {
+  padding: 1px;
+}
+
+:host ::ng-deep .ant-table-thead > tr > th {
+  padding: 2px;
+  background-color:#a1e3e5; 
+}
+
+:host ::ng-deep .ant-table-pagination.ant-pagination {
+    margin: 6px 0;
+}
+
+// 250822
+/* Set star rate font-size */
+:host ::ng-deep .ant-rate {
+  font-size: 12px;
+}
+/* Empty-unselected star color */
+// <nz-rate class="rate-cell" ... > 
+:host ::ng-deep .rate-cell .ant-rate-star-first,
+:host ::ng-deep .rate-cell .ant-rate-star-second {
+  color: #c7cbcf !important;
+}
+/* Colored-selected star color */
+// <nz-rate class="rate-cell" ... > 
+:host ::ng-deep .rate-cell .ant-rate-star-full .ant-rate-star-first,
+:host ::ng-deep .rate-cell .ant-rate-star-full .ant-rate-star-second,
+:host ::ng-deep .rate-cell .ant-rate-star-half .ant-rate-star-first {
+  color: #f59e0b !important;
+}
+
+/* Add some space (20px) between columns */
+// <nz-table class="col-balanced-gap" ... >
+:host ::ng-deep .col-balanced-gap .ant-table-thead > tr > th,
+:host ::ng-deep .col-balanced-gap .ant-table-tbody > tr > td {
+  padding-right: 0;     /* avoid double padding */
+}
+:host ::ng-deep .col-balanced-gap .ant-table-thead > tr > th:not(:first-child),
+:host ::ng-deep .col-balanced-gap .ant-table-tbody > tr > td:not(:first-child) {
+  padding-left: 20px;   /* the actual inter-column gap */
+}
+
+

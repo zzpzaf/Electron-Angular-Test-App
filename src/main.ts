@@ -12,6 +12,7 @@ import {
   SettingOutline,
   HomeOutline,
   FileMarkdownTwoTone,
+  FileMarkdownOutline,
 } from '@ant-design/icons-angular/icons';
 
 // bootstrapApplication(App, appConfig)
@@ -28,6 +29,7 @@ bootstrapApplication(App, {
       LogoutOutline,
       HomeOutline,
       FileMarkdownTwoTone,
+      FileMarkdownOutline,
     ]),
   ],
 }).catch((err) => console.error(err));

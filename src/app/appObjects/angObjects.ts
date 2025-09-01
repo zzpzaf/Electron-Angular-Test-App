@@ -6,12 +6,22 @@ export interface SiderMenuItem {
   route: string;
 }
 
+// Main Application Menu Items
+export const MainAppMenuItems :  MainAppMenuItem[] = [
+  { id: 1, label: 'Scraping', siderMenuName: 'SiderScrapeMenuItems' },
+  { id: 2, label: 'Articles', siderMenuName: 'SiderArticlesMenuItems'},
+  { id: 3, label: 'Other', siderMenuName: 'SiderArticlesMenuItems'}
+]
+
+// Articles Menu Items
 export const SiderArticlesMenuItems: SiderMenuItem[] = [
-  { label: 'Articles', icon: '', route: '/articles' },
-  { label: 'Categories', icon: '', route: 'categories' },
+  { label: 'Articles', icon: '', route: '/dbarticles' },
+  { label: 'Categories', icon: '', route: '/categories' },
   { label: 'Help', icon: '', route: '/help' }
+  // { label: 'Table', icon: '', route: '/articles-table' }
 ];
 
+// Scraping Menu Items
 export const SiderScrapeMenuItems: SiderMenuItem[] = [
   { label: 'Links', icon: '', route: '/links' },
   { label: 'File URLs', icon: '', route: '/urlsfile' },
@@ -34,11 +44,7 @@ export interface MainAppMenuItem {
   siderMenuName: SiderMenuKey;
 }
 
-export const MainAppMenuItems :  MainAppMenuItem[] = [
-  { id: 1, label: 'Scraping', siderMenuName: 'SiderScrapeMenuItems' },
-  { id: 2, label: 'Articles', siderMenuName: 'SiderArticlesMenuItems'},
-  { id: 3, label: 'Other', siderMenuName: 'SiderArticlesMenuItems'}
-]
+
 
 
 

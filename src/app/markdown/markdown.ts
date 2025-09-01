@@ -96,6 +96,9 @@ export class Markdown {
       this.listurldata = { listname: '', pubauthorslug: '' };
       this.listurldata = analyzeListedLink(urlValue);
 
+      // console.log('>===>> Analyzed List URL Data:', this.listurldata);
+      // return;
+
       // Get the clean URL without the query parameters part
       const fullUrl = new URL(urlValue.trim());
       const clearUrl = fullUrl.origin + fullUrl.pathname;

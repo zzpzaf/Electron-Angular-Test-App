@@ -1,0 +1,201 @@
+<!-- <p>articles-table works!</p> -->
+
+
+    <!-- <div class="inner-content"> -->
+      <nz-table
+        #table
+        class="col-balanced-gap"
+        [nzData]="$articles()"
+        [nzScroll]="{ x: 'max-content' }"
+        [nzPageIndex]="pageIndex"
+        [(nzPageIndex)]="pageIndex"
+        [nzPageSize]="pageSize"
+        [(nzPageSize)]="pageSize"
+        [nzShowPagination]="true"
+      >
+        <!-- ------------------------------------------------------- -->
+        <!--                       Table Header                      -->
+        <!-- ------------------------------------------------------- -->
+        <thead>
+          <tr>
+            <!-- 1 -->
+            <th
+              nzColumnKey="id"
+              [nzSortFn]="sortById"
+              [nzSortDirections]="['ascend', 'descend', null]"
+            >
+              Id
+            </th>
+            <!-- 2 -->
+            <th nzAlign="center">MD</th>
+            <!-- 3 -->
+            <th
+              nzColumnKey="title"
+              [nzSortFn]="sortByTitle"
+              [nzSortDirections]="['ascend', 'descend', null]"
+            >
+              Article Title
+            </th>
+            <!-- 4 -->
+            <th nzColumnKey="image">Image</th>
+            <!-- 5 -->
+            <th
+              nzColumnKey="date"
+              [nzSortFn]="sortByDate"
+              [nzSortDirections]="['ascend', 'descend', null]"
+            >
+              Date (YYMMDD)
+            </th>
+            <!-- 6 -->
+            <th
+              nzColumnKey="hostname"
+              [nzSortFn]="sortByHostname"
+              [nzSortDirections]="['ascend', 'descend', null]"
+            >
+              Hostname
+            </th>
+            <!-- 7 -->
+            <th nzColumnKey="pubname">Publication</th>
+            <!-- 8 -->
+            <th nzColumnKey="authorname" [nzShowFilter]="true">Author</th>
+            <!-- 9 -->
+            <th nzColumnKey="pubauthorslug" [nzShowFilter]="true">
+              Author's Slug
+            </th>
+            <!-- 10 -->
+            <th
+              nzColumnKey="listname"
+              [nzSortFn]="sortByListname"
+              [nzSortDirections]="['ascend', 'descend', null]"
+            >
+              Medium List name
+            </th>
+
+            <!-- 11 -->
+            <th
+              nzColumnKey="likes"
+              [nzSortFn]="sortByLikes"
+              [nzSortDirections]="['descend', 'ascend', null]"
+            >
+              Likes
+            </th>
+            <!-- 12 -->
+            <th nzColumnKey="comments">Comments</th>
+            <!-- 13 -->
+            <!-- <th nzColumnKey="ranking">Ranking</th> -->
+            <th
+              nzColumnKey="ranking"
+              [nzSortFn]="sortByRanking"
+              [nzSortDirections]="['descend', 'ascend', null]"
+              nzAlign="center"
+            >
+              Ranking
+            </th>
+            <!-- 14 -->
+            <th nzColumnKey="timestamp">Time Stamp</th>
+          </tr>
+        </thead>
+
+        <!-- ------------------------------------------------------- -->
+        <!--                      Table Rows                         -->
+        <!-- ------------------------------------------------------- -->
+        <tbody>
+          @for (row of table.data; track row.id ?? row.link; let i = $index) {
+          <tr>
+            <!-- 1 -->
+            <td nzAlign="center">{{ row.id }}</td>
+            <!-- 2 -->
+
+            @if (row.content && row.content.trim()!.length > 0 ) {
+              <td nzAlign="center">
+                <button
+                  nz-button
+                  nzType="text"
+                  nzShape="circle"
+                  nzSize="small"
+                  aria-label="Open markdown"
+                  (click)="onMarkdown(row, i, $event)"
+                >
+                  <span nz-icon nzType="file-markdown" nzTheme="twotone"></span>
+                </button>
+              </td>
+            } @else {
+              <td nzAlign="center"> <span nz-icon nzType="file-markdown" nzTheme="outline" ></span> </td>
+            }
+
+
+
+            <!-- 3 -->
+            <td>
+              <a [href]="row.link" target="_blank" rel="noopener noreferrer">{{
+                row.title
+              }}</a>
+            </td>
+            <!-- 4 -->
+            <td nzAlign="center">
+              <img
+                [src]="row.image"
+                alt=""
+                referrerpolicy="no-referrer"
+                style="height: 20px; width: auto"
+              />
+            </td>
+            <!-- 5 -->
+            <td nzAlign="center">{{ row.date }}</td>
+            <!-- 6 -->
+            <!-- <td>{{ row.hostname }}</td> -->
+            <td>
+              <a
+                [href]="
+                  row.hostname.startsWith('http://') ||
+                  row.hostname.startsWith('https://')
+                    ? row.hostname
+                    : 'http://' + row.hostname
+                "
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {{ row.hostname }}
+              </a>
+            </td>
+            <!-- 7 -->
+            <td>{{ row.pubname }}</td>
+            <!-- 8 -->
+            @if (row.authorlink) {
+              <td>
+                <a [href]="row.authorlink" target="_blank" rel="noopener noreferrer">{{
+                  row.authorname
+                }}</a>
+              </td>
+            } @else {
+            <td>{{ row.authorname }}</td>
+            }  
+            <!-- 9 -->
+            <td>{{ row.pubauthorslug }}</td>
+            <!-- 10 -->
+            <td>{{ row.listname }}</td>
+            <!-- 11 -->
+            <td nzAlign="center">{{ row.likes }}</td>
+            <!-- 12 -->
+            <td nzAlign="center">{{ row.comments }}</td>
+            <!-- 13 -->
+            <!-- <td nzAlign="center">{{ row.ranking }}</td> -->
+            <td nzAlign="center">
+              <nz-rate
+                class="rate-cell"
+                [ngModel]="row.ranking ?? 0"
+                (ngModelChange)="onRankChange(row, $event)"
+                [nzCount]="5"
+                [nzAllowClear]="false"
+                [nzTooltips]="nzRateToolTips"
+              >
+              </nz-rate>
+            </td>
+
+            <!-- 14  -->
+            <td>{{ row.timestamp }}</td>
+          </tr>
+          }
+        </tbody>
+      </nz-table>
+    <!-- </div> -->

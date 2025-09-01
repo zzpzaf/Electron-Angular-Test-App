@@ -68,11 +68,10 @@ export class Links {
     });
     this.linkScrapeForm.get('url')?.valueChanges.subscribe((urlValue) => {
       this.linkURL.set(urlValue);
+      
       this.listurldata = { listname: '', pubauthorslug: '' };
       if (urlValue.trim().length > 0 && isValidUrl(urlValue.trim())) {      
         console.log('URL changed to:', this.linkURL());
-        this.listurldata = analyzeListedLink(urlValue);
-        // console.log('List Name (if):', this.listurldata.listname.trim());
         this.listurldata = analyzeListedLink(urlValue);
         // console.log('List Name (if):', this.listurldata.listname.trim());
       }

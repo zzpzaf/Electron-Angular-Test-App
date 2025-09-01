@@ -11,6 +11,7 @@ import { Markdown } from './markdown/markdown';
 import { DbArticles } from './db-articles/db-articles';
 import { MarkViewer } from './mark-viewer/mark-viewer';
 import { Layout } from './layout/layout';
+// import { ArticlesTable } from './articles-table/articles-table';
 
 
 export const appRoutes: Routes = [
@@ -33,7 +34,8 @@ export const appRoutes: Routes = [
       { path: 'urlsfile', component: UrlsFile },
       { path: 'bookmarks', component: Bookmarks },
       { path: 'markdown', component: Markdown },
-      { path: 'articles', component: DbArticles },
+      { path: 'dbarticles', component: DbArticles },
+      // { path: 'articles-table', component: ArticlesTable },
     ]
   }, 
   { path: 'show-mark', component: MarkViewer },  

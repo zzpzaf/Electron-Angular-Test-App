@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, signal } from '@angular/core';
 import { Category, CategoryNode, PostData } from '../../../../shared/projectObjects/varObjects';
 
 interface DeleteFilesResult {
@@ -10,6 +10,14 @@ interface DeleteFilesResult {
   providedIn: 'root',
 })
 export class BackEnd {
+
+  // 250901 - Articles Signal
+  public $articles = signal<PostData[]>([]);
+
+
+
+
+
 
   // Generic invoke wrapper (helper function) to avoid repeating
   // the '... as Promise<string>' adition in return commands, everywhere
@@ -105,9 +113,20 @@ export class BackEnd {
      return this.ipcInvoke<PostData[]>('sqlite:get-articles-by-id', id);
   }
 
-  getUncategorizedArticles(): Promise<PostData[]> {
-     return this.ipcInvoke<PostData[]>('sqlite:get-uncategorized-articles');
+
+
+  // 250901 - Set Uncategorized Articles Signal
+  async setUncategorizedArticlesSignal(): Promise<void> {
+    this.$articles.set(await this.getUncategorizedArticles());
   }
+  // 250901
+  getUncategorizedArticles(): Promise<PostData[]> {
+    const result = this.ipcInvoke<PostData[]>('sqlite:get-uncategorized-articles');
+    return result;
+  }
+
+
+
 
 
   getCategoriesByParentId(parent_id? : null | number): Promise<Category[]> {
