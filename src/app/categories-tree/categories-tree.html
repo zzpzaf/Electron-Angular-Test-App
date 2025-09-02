@@ -1,0 +1,13 @@
+<!-- <p>categories-sider works!</p> -->
+
+      <nz-tree
+        [nzData]="$treeNodes()"
+        [nzExpandedKeys]="expandedKeys"
+        [nzSelectedKeys]="selectedKeys"
+        nzBlockNode
+        (nzClick)="onTreeNodeClick($event)"
+        (nzExpandChange)="onTreeNodeExpandChange($event)"
+      >
+
+      </nz-tree>
+

@@ -2,32 +2,14 @@
   <!-- Sidebar -->
   <nz-sider nzCollapsible nzWidth="180px" class="comp-sider">
     <div class="sider-header">Categories</div>
-
-    <div
-      class="sider-menu"
-      [class.tree-disabled]="treeDisabled"
-      role="navigation"
-      aria-label="Sidebar menu scroll area"
-    >
-      <!-- <ul>
-        @for (cat of $categories(); track cat.id) {
-          <li>{{ cat.name }}</li>
-        }
-      </ul> -->
-      <nz-tree
-        [nzData]="$treeNodes()"
-        [nzExpandedKeys]="expandedKeys"
-        [nzSelectedKeys]="selectedKeys"
-        nzBlockNode
-        (nzClick)="onTreeNodeClick($event)"
-        (nzExpandChange)="onTreeNodeExpandChange($event)"
+      <div
+        class="sider-menu"
+        [class.tree-disabled]="treeDisabled"
+        role="navigation"
+        aria-label="Sidebar menu scroll area"
       >
-        <!-- <ng-template #nzTreeTemplate let-node>
-          <span class="tree-title">{{ node.title }}</span>
-        </ng-template> -->
-      </nz-tree>
+      <categories-tree />
     </div>
-
     <div class="sider-footer">
       <!-- Sider Footer -->
       <label
@@ -39,12 +21,6 @@
     </div>
   </nz-sider>
 
-  <!-- Header -->
-  <!-- <nz-header class="comp-header">
-      <div class="header-content">
-      </div>
-    </nz-header> -->
-
   <!-- Content -->
   <nz-content class="comp-content">
     <div class="inner-content">
@@ -54,6 +30,5 @@
 
   <!-- Footer -->
   <!-- <nz-footer class="app-footer">
-     
     </nz-footer> -->
 </nz-layout>

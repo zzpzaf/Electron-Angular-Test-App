@@ -30,8 +30,6 @@
     Make it a flex column so header/menu/footer lay out correctly. 
     IMPORTANT: don't force height:100% unless ALL parents set height. 
 */
-// :host ::ng-deep .comp-sider .ant-layout-sider-children {
-// :host ::ng-deep nz-sider.comp-sider > .ant-layout-sider-children {
 :host ::ng-deep nz-sider.comp-sider.ant-layout-sider.ant-layout-sider-dark > .ant-layout-sider-children {
 display: flex;
 flex-direction: column;
@@ -79,13 +77,6 @@ padding: 0 !important;
   .ant-checkbox-wrapper {
     color:aquamarine !important;
     font-size: 14px;
-    // font-variant: tabular-nums;
-    // line-height: 1.5715;
-    // list-style: none;
-    // font-feature-settings: "tnum";
-    // display: inline-flex;
-    // align-items: baseline;
-    // line-height: unset;
     cursor: pointer;
   }
 }
@@ -109,88 +100,8 @@ padding: 0 !important;
   &::-webkit-scrollbar-track {
     background: rgba(255, 255, 255, 0.1);
   }
-
-  // ul {
-  //   list-style: none;
-  //   margin: 0;
-  //   padding: 0;
-  // }
-
-  // li {
-  //   padding: 6px 12px;
-  //   color: #6ed0c5; /* ensure visible on dark background */
-  //   cursor: pointer;
-
-  //   &:hover {
-  //     background: rgba(255, 255, 255, 0.1);
-  //   }
-  // }
 }
 
-// .tree-title {
-//   font-size: 10px;   /* your size */
-//   min-height: 8px !important;
-//   line-height: 8px !important;  /* optional: match your row height */
-//   padding-bottom: 1px !important;
-//   padding-top: 1px !important;
-// }
-
-/* One place to change the size for the whole tree */
-// :host ::ng-deep .sider-menu .ant-tree {
-//   font-size: 10px; /* set your size here */
-// }
-// /* (Optional) keep rows tidy when changing font-size */
-// :host ::ng-deep .sider-menu .ant-tree-node-content-wrapper,
-// :host ::ng-deep .sider-menu .ant-tree-title,
-// :host ::ng-deep .sider-menu .ant-tree-switcher,
-// :host ::ng-deep .sider-menu .ant-tree-iconEle {
-//   line-height: 9px;  /* adjust to taste */
-//   min-height: 18px !important;
-//   height: 18px;       /* match the line-height for nice alignment */
-// }
-
-
-// Wrap the long tree node titles to multiple lines
-:host ::ng-deep .sider-menu .ant-tree-treenode {
-  display: flex;
-  align-items: flex-start;
-}
-:host ::ng-deep .sider-menu .ant-tree-node-content-wrapper {
-  flex: 1 1 auto;
-  min-width: 0;
-  line-height: 1.25;
-  padding-top: 2px;
-  padding-bottom: 2px;
-}
-:host ::ng-deep .sider-menu .ant-tree-title {
-  white-space: normal;
-  word-break: break-word;   /* or overflow-wrap: anywhere; */
-}
-
-
-// Overriding Ant’s defaults for background color
-// // /* Reach into NG-Zorro tree and remove its own backgrounds */
-// :host ::ng-deep .comp-sider .sider-menu .ant-tree,
-// :host ::ng-deep .comp-sider .sider-menu .ant-tree-list,
-// :host ::ng-deep .comp-sider .sider-menu .ant-tree-list-holder,
-// :host ::ng-deep .comp-sider .sider-menu .ant-tree-list-holder-inner {
-//   background: inherit !important;   /* inherit from .comp-sider */
-// }
-// /* Each row/content wrapper transparent (prevents white “chips”) */
-// :host ::ng-deep .comp-sider .ant-tree-node-content-wrapper {
-//   background: transparent !important;
-// }
-// /* Dark-hover and selected state that sit on top of the sider color */
-// :host ::ng-deep .comp-sider .ant-tree-node-content-wrapper:hover {
-//   background-color: rgba(255, 255, 255, 0.06);
-// }
-// :host ::ng-deep .comp-sider .ant-tree-treenode-selected > .ant-tree-node-content-wrapper {
-//   background-color: rgba(24, 144, 255, 0.18); /* tweak or set to transparent if you want no chip */
-// }
-// // Also set the text color
-// :host ::ng-deep .comp-sider .ant-tree .ant-tree-title {
-//   color:aquamarine !important;
-// }
 
 
 /* Make the tree inherit the sider look */
@@ -233,7 +144,6 @@ padding: 0 !important;
   cursor: not-allowed;
   opacity: 0.6;           /* optional visual cue */
 }
-
 
 .comp-content {
   margin-left: 0.5px;

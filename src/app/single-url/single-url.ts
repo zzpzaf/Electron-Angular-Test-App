@@ -1,6 +1,6 @@
 // single-url.ts
 
-import { Component, inject, signal } from '@angular/core';
+import { Component, effect, inject, signal } from '@angular/core';
 import {
   FormGroup,
   NonNullableFormBuilder,
@@ -12,6 +12,7 @@ import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzCheckboxModule } from 'ng-zorro-antd/checkbox';
 import { NzFormModule } from 'ng-zorro-antd/form';
 import { NzInputModule } from 'ng-zorro-antd/input';
+import { NzTreeSelectModule } from 'ng-zorro-antd/tree-select';
 
 import { Articlebasicscraper } from '../shared/services/articlebasicscraper';
 import {
@@ -32,6 +33,9 @@ import { BackEnd } from '../shared/services/back-end';
 import { from } from 'rxjs';
 import { Markshow } from '../shared/services/markshow';
 import { LoaderService } from '../shared/services/loader-service';
+import { CategoryNodes } from '../shared/services/category-nodes';
+import { NzTreeNodeOptions } from 'ng-zorro-antd/tree';
+
 
 @Component({
   selector: 'single-url',
@@ -42,6 +46,7 @@ import { LoaderService } from '../shared/services/loader-service';
     NzInputModule,
     NzCheckboxModule,
     NzButtonModule,
+    NzTreeSelectModule,
   ],
   templateUrl: './single-url.html',
   styleUrl: './single-url.scss',
@@ -76,13 +81,24 @@ export class SingleUrl {
   private backendService = inject(BackEnd);
   private loader = inject(LoaderService);
   private articlebasicscraper = inject(Articlebasicscraper);
+  private categoryNodesService = inject(CategoryNodes);
 
   public isNewArticle: boolean = false; // Flag to indicate if it's a new article
   private existingArticleData: PostData | null = null;
+  public categoryNodes: NzTreeNodeOptions[] = [];
 
-  constructor() {}
+  constructor() {
+    effect(() => {
+      this.categoryNodes = this.categoryNodesService.$catTreeNodes();
+    });
+  }
 
   ngOnInit(): void {
+
+    if (this.categoryNodesService.$catTreeNodes().length === 0) {
+      this.categoryNodesService.setCategoryTreeNodesSignal();
+    }
+
     this.setupForm();
     this.linkScrapeForm.get('force')?.valueChanges.subscribe((value) => {
       console.log('Checkbox changed to:', value);
@@ -668,3 +684,5 @@ export class SingleUrl {
     }
   }
 }
+
+
