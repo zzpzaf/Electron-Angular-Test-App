@@ -13,7 +13,7 @@ export class BackEnd {
 
   // 250901 - Articles Signal
   public $articles = signal<PostData[]>([]);
-
+  public $selectedCategoryId = signal<number>(0);
 
 
 
@@ -126,16 +126,44 @@ export class BackEnd {
   }
 
 
+  // 250903
+  async setArticlesByCategoryIdSignal(category_id: number): Promise<void> {
+    this.$articles.set(await this.getArticlesByCategoryId(category_id));
+  }
+  getArticlesByCategoryId(category_id: number): Promise<PostData[]> {
+    return this.ipcInvoke<PostData[]>('sqlite:get-articles-by-category-id', category_id);
+  }
+
+
+
+
+
+
 
 
 
   getCategoriesByParentId(parent_id? : null | number): Promise<Category[]> {
      return this.ipcInvoke<Category[]>('sqlite:get-categories-by-parent-id', parent_id);
   }
-
   getCategoryForestByParentId(parent_id? : null | number): Promise<CategoryNode[]> {
      return this.ipcInvoke<CategoryNode[]>('sqlite:get-sub-category-forest-by-parent-id', parent_id);
   }
+
+
+  // 250902
+  // insertArticleCategories(articleCategoryData: { article_id: number; category_ids: number[] }): Promise<boolean> {
+  //   const retval: Promise<boolean> = this.ipcInvoke<boolean>('sqlite:insert-Article-Categories', articleCategoryData);
+  //   return retval;
+  // }
+  async insertArticleCategories(article_id: number, category_ids: number[]): Promise<boolean> {
+    console.log('>===>> Backend - insertArticleCategories called with article_id:', article_id, 'category_ids:', category_ids);
+    const retval: boolean = await this.ipcInvoke<boolean>('sqlite:insert-Article-Categories', article_id, category_ids);
+    return retval;
+  }
+
+
+
+
 
   /*
   * Application wide functions

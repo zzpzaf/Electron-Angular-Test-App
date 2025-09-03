@@ -13,10 +13,15 @@ export class CategoryNodes {
   private categoryForest: CategoryNode[] = [];
   private backendService = inject(BackEnd);
 
-  constructor() {}
+  constructor() {
+    // if (this.categoryForest.length === 0) {
+    //   this.setCategoryTreeNodesSignal();
+    // }
+  }
 
-  public setCategoryTreeNodesSignal(): void {
+  public setCategoryTreeNodesSignal(parent_Id?: null | number): void {
     // this.$catTreeNodes = this.mapCategoryNodesToTree(nodes);
+    console.log('>===>> Setting Category Tree Nodes signal with parent_Id:', parent_Id);
     this.getCategoryForestByParentId();
   }
 

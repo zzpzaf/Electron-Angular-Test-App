@@ -63,22 +63,36 @@ export class DbArticles {
     this.backendService.setUncategorizedArticlesSignal();
   }
 
+  ngOnDestroy() {
+    this.backendService.$selectedCategoryId.set(0);
+  }
+
   public isOnlyUnassignedToggle() {
     console.log('>===>> Unasigned Articles Only? ', this.unassignedOnly);
     if (this.unassignedOnly) {
       this.clearSelection(); // optional: also clear selection
       this.treeDisabled = true;
-      // To-Do:
-      // Select all articles with no category assigned
+      this.backendService.setUncategorizedArticlesSignal();
+      // this.backendService.$selectedCategoryId.set(0);
     } else {
       this.treeDisabled = false;
+      // We must select (click on) the Category - Then the $articles signal
+      // is set by calling the backend-service function: 'setArticlesByCategoryIdSignal()' 
+      // in  the  CategoriesTree component
+      // this.backendService.setArticlesByCategoryIdSignal(*** cat id ***);
+      if (this.backendService.$selectedCategoryId() > 0) {
+        this.backendService.setArticlesByCategoryIdSignal(this.backendService.$selectedCategoryId());
+      }
     }
   }
 
   private clearSelection() {
     this.selectedKeys = [];
     if (this.nztree) {
-      this.nztree.getSelectedNodeList().forEach((n) => (n.isSelected = false));
+      this.nztree.getSelectedNodeList().forEach((n) => {
+        console.log('>===>> DbArticles - Deselecting node: ', n.key, ' - ', n.title);
+        n.isSelected = false;
+      });
     }
   }
 
@@ -94,20 +108,20 @@ export class DbArticles {
     );
   }
 
-  async getCategoriesByParentId(parent_Id?: null | number) {
-    try {
-      const cats = await this.backendService.getCategoriesByParentId(parent_Id);
-      console.log(
-        '>===>> ',
-        cats.length,
-        ' Categories Fetched: ',
-        JSON.stringify(cats)
-      );
-      if (cats.length > 0) this.$categories.set(cats);
-    } catch (error) {
-      console.log('>===>> Error fetching Categories from BackEnd: ', error);
-    }
-  }
+  // async getCategoriesByParentId(parent_Id?: null | number) {
+  //   try {
+  //     const cats = await this.backendService.getCategoriesByParentId(parent_Id);
+  //     console.log(
+  //       '>===>> ',
+  //       cats.length,
+  //       ' Categories Fetched: ',
+  //       JSON.stringify(cats)
+  //     );
+  //     if (cats.length > 0) this.$categories.set(cats);
+  //   } catch (error) {
+  //     console.log('>===>> Error fetching Categories from BackEnd: ', error);
+  //   }
+  // }
 
 
   // If we want to expand all nodes that have children:

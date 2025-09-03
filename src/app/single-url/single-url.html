@@ -39,17 +39,13 @@
 
   <nz-form-item class="simple-select-input-row"
   >
-    <!-- <nz-tree-select
-      style="width: 100%"
-      [nzNodes]="categoryNodes"
-      nzPlaceHolder="Select a Category"
-      [(ngModel)]="selectedCategoryName"
-      (ngModelChange)="onTreeSelectCategoryChange($event)"
-    > -->
     <nz-tree-select
+      #catSel="nzTreeSelect"
+      formControlName="selectCategory"
       style="width: 100%"
       nzPlaceHolder="Select a Category for the Article to be Scraped"
-      [nzNodes]="categoryNodes"
+      [nzNodes]="$categoryNodes()"
+      [nzDefaultExpandAll]="true"
     >
     </nz-tree-select>
   </nz-form-item>

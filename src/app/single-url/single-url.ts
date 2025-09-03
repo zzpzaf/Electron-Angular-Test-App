@@ -1,6 +1,6 @@
 // single-url.ts
 
-import { Component, effect, inject, signal } from '@angular/core';
+import { afterNextRender, Component, effect, inject, signal, ViewChild } from '@angular/core';
 import {
   FormGroup,
   NonNullableFormBuilder,
@@ -12,7 +12,7 @@ import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzCheckboxModule } from 'ng-zorro-antd/checkbox';
 import { NzFormModule } from 'ng-zorro-antd/form';
 import { NzInputModule } from 'ng-zorro-antd/input';
-import { NzTreeSelectModule } from 'ng-zorro-antd/tree-select';
+import { NzTreeSelectComponent, NzTreeSelectModule } from 'ng-zorro-antd/tree-select';
 
 import { Articlebasicscraper } from '../shared/services/articlebasicscraper';
 import {
@@ -30,11 +30,12 @@ import { DlgService } from '../shared/services/dlg-service';
 // import { marked } from 'marked';
 import { SafeHtml } from '@angular/platform-browser';
 import { BackEnd } from '../shared/services/back-end';
-import { from } from 'rxjs';
+import { from, Subscription } from 'rxjs';
 import { Markshow } from '../shared/services/markshow';
 import { LoaderService } from '../shared/services/loader-service';
 import { CategoryNodes } from '../shared/services/category-nodes';
-import { NzTreeNodeOptions } from 'ng-zorro-antd/tree';
+import { NzTreeNode, NzTreeNodeOptions } from 'ng-zorro-antd/tree';
+
 
 
 @Component({
@@ -85,11 +86,17 @@ export class SingleUrl {
 
   public isNewArticle: boolean = false; // Flag to indicate if it's a new article
   private existingArticleData: PostData | null = null;
-  public categoryNodes: NzTreeNodeOptions[] = [];
+  // public categoryNodes: NzTreeNodeOptions[] = []; //this.categoryNodesService.$catTreeNodes();
+  public $categoryNodes = signal<NzTreeNodeOptions[]>([]);
 
+  public selectedCategoryIds: number[] = [];
+  // selectedCategoryKey: string | null = null;
+  private categoryChangesSubscription?: Subscription;
+  @ViewChild('catSel', { static: false }) catSel!: NzTreeSelectComponent;
+  
   constructor() {
     effect(() => {
-      this.categoryNodes = this.categoryNodesService.$catTreeNodes();
+      this.$categoryNodes.set(this.categoryNodesService.$catTreeNodes());
     });
   }
 
@@ -98,7 +105,7 @@ export class SingleUrl {
     if (this.categoryNodesService.$catTreeNodes().length === 0) {
       this.categoryNodesService.setCategoryTreeNodesSignal();
     }
-
+    
     this.setupForm();
     this.linkScrapeForm.get('force')?.valueChanges.subscribe((value) => {
       console.log('Checkbox changed to:', value);
@@ -135,45 +142,6 @@ export class SingleUrl {
         this.linkURL()
       );
       this.showExistingOrScrapeArticle();
-      // from(this.getArticleDataBySlug(this.linkURL())).subscribe({
-      //   next: (post) => {
-      //     this.existingArticleData = post;
-      //     console.log('>===>> URL Slug exists?', this.existingArticleData?.title);
-      //     if (this.existingArticleData) {
-      //       // this.loader.hide(); // Hide the loader if slug exists
-      //       console.warn(
-      //         '>===>> URL slug already exists in the database:',
-      //         this.linkURL()
-      //       );
-      //       this.dlgService
-      //         .popup({
-      //           token: 'warn',
-      //           header: 'Slug Exists',
-      //           content: 'The URL Slug already exists in the database.',
-      //           posAnsMsg: 'OK',
-      //           negAnsMsg: '',
-      //           delay: 500,
-      //         })
-      //         .subscribe((result) => {
-      //           console.log('Dialog closed with:', result);
-      //         });
-      //       this.isNewArticle = false; // Set the flag to false for existing article
-      //       // If the 'force' button is not checked and articleData is available, just show it
-      //       // Else, scrape the article (either new or existing)
-      //       if (this.isForcedChecked() === false) {
-      //         this.showArticleData(this.existingArticleData); // Show the article data in the UI
-      //       } else if (this.isForcedChecked() === true) {
-      //         // ** Use the Loader ***
-      //         // Scrape the Article!
-      //         void this.loader.withLoader(
-      //           () => this.srapeArticleData(this.linkURL()),
-      //           'Scraping article data ...'
-      //         );
-      //       }
-      //     }
-      //   },
-      //   error: (err) => console.error('URL check failed:', err),
-      // });
     });
 
     // It captures directly any Electron message sent and passed via the "message-channel"
@@ -197,10 +165,32 @@ export class SingleUrl {
     // });
   }
 
+  ngAfterViewInit() {
+    // Capture and react to user selection changes
+    this.categoryChangesSubscription = this.linkScrapeForm.controls['selectCategory'].valueChanges.subscribe(key => {
+      const node: NzTreeNode | null = key ? this.catSel.getTreeNodeByKey(key) : null;
+      const original = node?.origin; // your original data object for that node
+      const title = original?.title || '';
+      const parentTitle = node?.parentNode?.title || '';
+
+      const catId = original?.key ? parseInt(original.key, 10) : null;
+      console.log('>===>> Selected Category Id:', catId, 'title:', title, 'parentTitle:', parentTitle);
+      this.selectedCategoryIds = catId ? [catId] : [];
+
+    });
+  }
+ 
+  
+  ngOnDestroy() {
+    this.categoryChangesSubscription?.unsubscribe();
+  }
+
+
   setupForm() {
     this.linkScrapeForm = this.fb.group({
       url: this.fb.control('', [Validators.required]),
       force: this.fb.control(true),
+      selectCategory: this.fb.control('' as string | null),
     });
   }
 
@@ -221,6 +211,16 @@ export class SingleUrl {
   //     });
   //   }
   // }
+
+  // onCategoryPicked() {
+  //   const selectedNodes: NzTreeNode[] = this.catSel.getSelectedNodeList();
+  //   const node = selectedNodes[0];               // single-select
+  //   // Full original data used to build the node:
+  //   const original = node?.origin;               // your { title, key, ...custom }
+  //   console.log('>===>> Selected Category: node:', node, 'origin:', original);
+  // }
+
+
 
   showExistingOrScrapeArticle() {
     from(this.getArticleDataBySlug(this.linkURL())).subscribe({
@@ -408,7 +408,6 @@ export class SingleUrl {
           } else if ( this.existingArticleData) {
             this.scrappedDataArray()[0].id = this.existingArticleData.id;
             console.log('>===>> Updating existing article ID:', this.scrappedDataArray()[0].id);
-
             await this.updateScrapedArticleById(this.scrappedDataArray()[0]);
           }
 
@@ -487,8 +486,27 @@ export class SingleUrl {
     try {
       const insertedCount = await this.backendService.insertArticles(dataArray);
       if (insertedCount > 0) {
+
+        
+
         // 250827
+        // Insert images
         this.processMarkdownContentImages(dataArray); // Process images after insertion
+
+        // 250902
+        // Set article categories
+        console.log('>===>> Setting categories for article ID:', dataArray[0].id, ' - Categories:', this.selectedCategoryIds);
+        if (this.selectedCategoryIds.length > 0) {
+          // this.setArticleCategories(dataArray[0].id!, this.selectedCategoryIds);
+          this.backendService.insertArticleCategories(
+            dataArray[0].id!,
+            this.selectedCategoryIds,
+          ).then((res) => {
+            console.log('>===>> Article categories inserted successfully?', res);
+          });
+        }
+
+
 
         this.dlgService
           .popup({
@@ -524,9 +542,29 @@ export class SingleUrl {
     try {
       const result = await this.backendService.updateArticleById(articleData);
       if (result) {
+        
+        
         // 250827
         const dataArray: PostData[] = [articleData];
         this.processMarkdownContentImages(dataArray); // Process images after insertion
+
+        const urlSlug = getMediumSlugFromUrl(dataArray[0].link);
+        // Process each article's content images
+        const insertedArticleId = await this.backendService.getPostDataBySlug(urlSlug).then(addedArticle => addedArticle?.id);
+
+        // 250902
+        // Set article categories
+        console.log('>===>> Setting categories for article ID:', dataArray[0].id, ' - Categories:', this.selectedCategoryIds);
+        if (this.selectedCategoryIds.length > 0) {
+          // this.setArticleCategories(dataArray[0].id!, this.selectedCategoryIds);
+          this.backendService.insertArticleCategories(
+            insertedArticleId!,
+            this.selectedCategoryIds,
+          ).then((res) => {
+            console.log('>===>> Article categories inserted successfully?', res);
+          });
+        }
+
 
         console.log('>===>> Article updated successfully:', articleData.id);
         this.dlgService
@@ -604,6 +642,7 @@ export class SingleUrl {
     }
   }
 
+
   // 250827
   // Process images in the markdown content
   // This function iterates over each article and processes its images
@@ -668,10 +707,10 @@ export class SingleUrl {
                 `>===>> Article ID ${articleData.id} content updated with processed image links.`
               );
               this.markdownString.set(updatedContent); // Update the preview with new content
-              console.log(
-                '>===>> Article Content (Updated markdownString): ',
-                this.markdownString()
-              );
+              // console.log(
+              //   '>===>> Article Content (Updated markdownString): ',
+              //   this.markdownString()
+              // );
               this.markdownPreview(updatedContent); // Refresh the preview
             } else {
               console.error(
@@ -682,6 +721,19 @@ export class SingleUrl {
         }
       }
     }
+  }
+
+  // 250903
+  // Set/Update the article's category(-ies)
+  async setArticleCategories(articleId: number, categories: number[]) {
+    console.log('>===>> Setting/updating categories for Article ID:', articleId);
+    const result = await this.backendService.insertArticleCategories(articleId, categories);
+    if (result) {
+      console.log('>===>> Article Categories inserted/updated successfully:', categories);
+    } else {
+      console.error('>===>> Failed to insert/update categories for Article ID:', articleId);
+    }
+    return result;
   }
 }
 

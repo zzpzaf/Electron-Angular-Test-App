@@ -40,10 +40,12 @@ import { shell } from 'electron';
 import { closeDBConnections } from './dbs/sqlite/connections';
 import {
   getArticleById,
+  getArticlesByCategoryId,
   getCategoriesByParentId,
   getPostBySlug,
   getSubcategoryForest,
   getUncategorizedArticles,
+  insertArticleCategories,
   insertArticlesFromJson,
   isSlugExisting,
   isUrlExisting,
@@ -783,6 +785,23 @@ ipcMain.handle('sqlite:get-uncategorized-articles', (event: any) => {
   }
 });
 
+ipcMain.handle('sqlite:get-articles-by-category-id', (event: any, category_id: number) => {
+  try {
+    const articles = getArticlesByCategoryId(category_id);
+    return articles;
+  } catch (err) {
+    console.error('Error getting Articles by category_id: "', category_id, '" ', err);
+    return [];
+  }
+});
+
+
+
+
+
+
+
+
 
 ipcMain.handle(
   'sqlite:get-categories-by-parent-id',
@@ -871,6 +890,25 @@ ipcMain.handle(
   }
 );
 
+
+// 250902
+ipcMain.handle('sqlite:insert-Article-Categories', 
+  (event: any, article_id: number, category_ids: number[]) => {
+  console.log('>===>> IPC MAIN - sqlite:insert-Article-Categories - called with article_id:', article_id, 'category_ids:', category_ids);
+  try {
+    const params = { article_id: article_id, category_ids: category_ids };
+    const result: boolean = insertArticleCategories(params);
+    if (result) {
+      console.log('>===>> Article categories inserted successfully:', params);
+    } else {
+      console.error('>===>> Failed to insert article categories:', params);
+    }
+    return result;  //true or false
+  } catch (err) {
+    console.error('Error inserting article categories:', err);
+    return false;
+  }
+});
 
 
 

@@ -2,6 +2,7 @@ import { Component, effect, inject, signal, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { CategoryNodes } from '../shared/services/category-nodes';
+import { BackEnd } from '../shared/services/back-end';
 
 // import { NzLayoutModule } from 'ng-zorro-antd/layout';
 import { NzFormatEmitEvent, NzTreeComponent, NzTreeModule, NzTreeNodeOptions } from 'ng-zorro-antd/tree';
@@ -25,8 +26,10 @@ export class CategoriesTree {
   public $treeNodes = signal<NzTreeNodeOptions[]>([]);
   expandedKeys: string[] = [];
   selectedKeys: string[] = [];
+  selectedCategoryId: number = 0;
 
   private categoryNodesService = inject(CategoryNodes);
+  private backEndService = inject(BackEnd);
 
   @ViewChild(NzTreeComponent) nztree!: NzTreeComponent;
   
@@ -44,7 +47,9 @@ export class CategoriesTree {
     console.log('>===>> Node clicked: ', node.key, ' - ', node.title);
 
     // select the clicked node
-    this.selectedKeys = [node.key!];
+    this.selectedCategoryId = Number(node.key!);
+    this.backEndService.$selectedCategoryId.set(this.selectedCategoryId);
+    this.backEndService.setArticlesByCategoryIdSignal(this.selectedCategoryId);
 
     // emulate "expand on click": toggle expansion for non-leaf nodes
     if (!node.isLeaf) {

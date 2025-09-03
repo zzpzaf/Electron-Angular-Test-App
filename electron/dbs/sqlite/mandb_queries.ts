@@ -430,7 +430,7 @@ export function getArticleById(id?: number): PostData[] {
       `);
       rows = stmt.all({ id });
     }
-    return rows;
+    return rows.flat();
   } catch (err) {
     console.error('Error fetching categories:', err);
     return [];
@@ -481,11 +481,45 @@ export function getUncategorizedArticles(): PostData[] {
   }
 }
 
+// 250903
+export async function getArticlesByCategoryId(category_id: number): Promise<PostData[]> {
+  if (!mainDb) {
+    console.error('>===>> No Main DB connection.');
+    return [];
+  }
 
-
-
-
-
+  try {
+    let rows: PostData[] = [];
+    const stmt = mainDb.prepare<{ category_id: number } >(`
+      SELECT
+        a.id,
+        a.listname,
+        a.pubauthorslug,
+        a.hostname,
+        a.timestamp,
+        a.pubname,
+        a.authorname,
+        a.authorlink,
+        a.title,
+        a.linkurl AS link,
+        a.imageurl AS image,
+        a.date,
+        a.likes,
+        a.comments,
+        a.content,
+        a.ranking
+      FROM articles a
+      JOIN article_categories ac ON a.id = ac.article_id
+      WHERE ac.category_id = @category_id
+      ORDER BY a.title
+    `);
+    rows = stmt.all({ category_id }) as PostData[];
+    return rows;
+  } catch (err) {
+    console.error('Error fetching articles by category_id:', err);
+    return [];
+  }
+}
 
 
 
@@ -848,4 +882,80 @@ export function getImageBlobById(
     isAbortedTooLarge: isAborted,
     byte_length: typeof row.byte_length === 'number' ? row.byte_length : blob.length,
   };
+}
+
+
+// 250902
+// Insert a row in article_categories table
+export function insertArticleCategory(params: {
+  article_id: number;
+  category_id: number;
+}): boolean {
+  if (!mainDb) throw new Error('No Main DB connection');
+
+  const insert = mainDb.prepare(`
+    INSERT INTO article_categories (article_id, category_id)
+    VALUES (?, ?)
+  `);
+  const info = insert.run(params.article_id, params.category_id);
+  return info.changes === 1;
+
+}
+
+// 250902
+// Assign multiple categories for a given article id into article_categories table
+export function insertArticleCategories(params: {
+  article_id: number;
+  category_ids: number[];
+}): boolean {
+  if (!mainDb) throw new Error('No Main DB connection');
+
+  console.log('>===>> Trying to insert article categories with parameters:', params);
+
+  const insert = mainDb.prepare(`
+    INSERT INTO article_categories (article_id, category_id)
+    VALUES (?, ?)
+  `);
+
+  for (const category_id of params.category_ids) {
+    insert.run(params.article_id, category_id);
+  }
+
+  console.log('>===>> Article categories inserted successfully:', { article_id: params.article_id, category_ids: params.category_ids });
+
+  return true;
+}
+
+
+
+
+
+// 250902
+// Delete a row from article_categories table
+export function deleteArticleCategory(params: {
+  article_id: number;
+  category_id: number;
+}): boolean {
+  if (!mainDb) throw new Error('No Main DB connection');
+
+  const del = mainDb.prepare(`
+    DELETE FROM article_categories
+    WHERE article_id = ? AND category_id = ?
+  `);
+  const info = del.run(params.article_id, params.category_id);
+  return info.changes === 1;
+}
+
+
+// 250902
+// Remove (delete) all articles for a given category id
+export function deleteArticlesByCategoryId(category_id: number): boolean {
+  if (!mainDb) throw new Error('No Main DB connection');
+
+  const del = mainDb.prepare(`
+    DELETE FROM article_categories
+    WHERE category_id = ?
+  `);
+  const info = del.run(category_id);
+  return info.changes > 0;
 }
