@@ -12,12 +12,21 @@
     </div>
     <div class="sider-footer">
       <!-- Sider Footer -->
-      <label
+      <!-- <label
         nz-checkbox
         [(ngModel)]="unassignedOnly"
         (ngModelChange)="isOnlyUnassignedToggle()"
         >Unassigned</label
+      > -->
+      <nz-radio-group
+        [(ngModel)]="articlesFilter"
+        (ngModelChange)="onArticlesFilterChange($event)"
+        nzSize="small"
       >
+        <label nz-radio [nzValue]="'unassigned'">Unassigned Articles</label>
+        <label nz-radio [nzValue]="'all'">All Articles</label>
+        <label nz-radio [nzValue]="'byCategory'">By Category</label>
+      </nz-radio-group>
     </div>
   </nz-sider>
 

@@ -440,6 +440,10 @@ export function getArticleById(id?: number): PostData[] {
 /**
  * 250821
  * Returns an array of all articles that have NO category assigned (no entry in the article-categories join table).
+ * LEFT JOIN ensures all articles are included.
+ * If no match is found in article_categories, then ac.article_id will be NULL.
+ * The WHERE ac.article_id IS NULL filters to those without matches.
+ * 
  * 
  */
 export function getUncategorizedArticles(): PostData[] {
@@ -469,8 +473,7 @@ export function getUncategorizedArticles(): PostData[] {
         a.content, 
         a.ranking
       FROM articles a
-      LEFT JOIN "article_categories" ac 
-        ON a.id = ac.article_id
+      LEFT JOIN article_categories ac ON a.id = ac.article_id
       WHERE ac.article_id IS NULL
     `);
     rows = stmt.all() as PostData[];
@@ -481,7 +484,51 @@ export function getUncategorizedArticles(): PostData[] {
   }
 }
 
-// 250903
+/**
+ * 250904 
+ * @returns Returns an array of all articles
+ */
+export function getAllArticles(): PostData[] {
+  if (!mainDb) {
+    console.error('>===>> No Main DB connection.');
+    return [];
+  }
+
+  try {
+    let rows: PostData[] = [];
+    const stmt = mainDb.prepare<PostData[]>(`
+      SELECT
+        id,
+        listname,
+        pubauthorslug,
+        hostname,
+        timestamp,
+        pubname,
+        authorname,
+        authorlink,
+        title,
+        linkurl AS link,
+        imageurl AS image,
+        date,
+        likes,
+        comments,
+        content,
+        ranking
+      FROM articles
+    `);
+    rows = stmt.all() as PostData[];
+    return rows;
+  } catch (err) {
+    console.error('Error fetching all articles:', err);
+    return [];
+  }
+}
+
+/**
+ * 250903
+ * @param category_id 
+ * @returns Returns an array of all articles in the specified category
+ */
 export async function getArticlesByCategoryId(category_id: number): Promise<PostData[]> {
   if (!mainDb) {
     console.error('>===>> No Main DB connection.');

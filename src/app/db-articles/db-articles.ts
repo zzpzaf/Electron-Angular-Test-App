@@ -11,7 +11,8 @@ import { CategoriesTree } from '../categories-tree/categories-tree';
 
 import { NzLayoutModule } from 'ng-zorro-antd/layout';
 import { NzMenuModule } from 'ng-zorro-antd/menu';
-import { NzCheckboxModule } from 'ng-zorro-antd/checkbox';
+// import { NzCheckboxModule } from 'ng-zorro-antd/checkbox';
+import { NzRadioModule } from 'ng-zorro-antd/radio';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 
 
@@ -33,7 +34,8 @@ import { CategoryNodes } from '../shared/services/category-nodes';
     CategoriesTree,
     NzLayoutModule,
     NzMenuModule,
-    NzCheckboxModule,
+    // NzCheckboxModule,
+    NzRadioModule,
     NzButtonModule,
     // NzTreeModule,
     // NzTreeSelectModule,
@@ -50,6 +52,7 @@ export class DbArticles {
 
   public unassignedOnly: boolean = true; // All Unassigned Articles
   public treeDisabled: boolean = true; // when true: the whole tree is disabled
+  public articlesFilter: 'unassigned' | 'all' | 'byCategory' = 'unassigned';
 
   expandedKeys: string[] = [];
   selectedKeys: string[] = [];
@@ -67,34 +70,57 @@ export class DbArticles {
     this.backendService.$selectedCategoryId.set(0);
   }
 
-  public isOnlyUnassignedToggle() {
-    console.log('>===>> Unasigned Articles Only? ', this.unassignedOnly);
-    if (this.unassignedOnly) {
-      this.clearSelection(); // optional: also clear selection
-      this.treeDisabled = true;
-      this.backendService.setUncategorizedArticlesSignal();
-      // this.backendService.$selectedCategoryId.set(0);
-    } else {
-      this.treeDisabled = false;
-      // We must select (click on) the Category - Then the $articles signal
-      // is set by calling the backend-service function: 'setArticlesByCategoryIdSignal()' 
-      // in  the  CategoriesTree component
-      // this.backendService.setArticlesByCategoryIdSignal(*** cat id ***);
-      if (this.backendService.$selectedCategoryId() > 0) {
-        this.backendService.setArticlesByCategoryIdSignal(this.backendService.$selectedCategoryId());
-      }
+  // public isOnlyUnassignedToggle() {
+  //   console.log('>===>> Unasigned Articles Only? ', this.unassignedOnly);
+  //   if (this.unassignedOnly) {
+  //     this.clearSelection(); // optional: also clear selection
+  //     this.treeDisabled = true;
+  //     this.backendService.setUncategorizedArticlesSignal();
+  //     // this.backendService.$selectedCategoryId.set(0);
+  //   } else {
+  //     this.treeDisabled = false;
+  //     // We must select (click on) the Category - Then the $articles signal
+  //     // is set by calling the backend-service function: 'setArticlesByCategoryIdSignal()' 
+  //     // in  the  CategoriesTree component
+  //     // this.backendService.setArticlesByCategoryIdSignal(*** cat id ***);
+  //     if (this.backendService.$selectedCategoryId() > 0) {
+  //       this.backendService.setArticlesByCategoryIdSignal(this.backendService.$selectedCategoryId());
+  //     }
+  //   }
+  // }
+
+  // private clearSelection() {
+  //   this.selectedKeys = [];
+  //   if (this.nztree) {
+  //     this.nztree.getSelectedNodeList().forEach((n) => {
+  //       console.log('>===>> DbArticles - Deselecting node: ', n.key, ' - ', n.title);
+  //       n.isSelected = false;
+  //     });
+  //   }
+  // }
+
+  onArticlesFilterChange(filter: 'unassigned' | 'all' | 'byCategory') {
+    console.log('>===>> Articles Filter changed to: ', filter);
+    switch (filter) {
+      case 'unassigned':
+        this.treeDisabled = true;
+        this.backendService.setUncategorizedArticlesSignal();
+        break;
+      case 'all':
+        this.treeDisabled = true;
+        this.backendService.setAllArticlesSignal();
+        break;
+      case 'byCategory':
+        this.treeDisabled = false;
+        // if (this.backendService.$selectedCategoryId() > 0) {
+          this.backendService.setArticlesByCategoryIdSignal(this.backendService.$selectedCategoryId());
+        // }
+        break;
     }
   }
 
-  private clearSelection() {
-    this.selectedKeys = [];
-    if (this.nztree) {
-      this.nztree.getSelectedNodeList().forEach((n) => {
-        console.log('>===>> DbArticles - Deselecting node: ', n.key, ' - ', n.title);
-        n.isSelected = false;
-      });
-    }
-  }
+
+
 
   onUnAssignedCheckBoxChanged(event: NzFormatEmitEvent) {
     const node = event.node;

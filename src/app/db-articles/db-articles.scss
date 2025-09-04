@@ -74,11 +74,20 @@ padding: 0 !important;
 .sider-footer {
   // color:aquamarine !important;
   border-top: 1px solid rgba(255, 255, 255, 0.15);
-  .ant-checkbox-wrapper {
-    color:aquamarine !important;
-    font-size: 14px;
+  min-height: 80px;
+  // .ant-checkbox-wrapper {
+  //   color:aquamarine !important;
+  //   font-size: 14px;
+  //   cursor: pointer;
+  // }
+  .ant-radio-wrapper {
+    color: aquamarine !important;
+    font-size: 10px;
     cursor: pointer;
   }
+}
+:host ::ng-deep .ant-radio-group {
+  display: grid !important;
 }
 
 /* Middle section fills available space and scrolls */

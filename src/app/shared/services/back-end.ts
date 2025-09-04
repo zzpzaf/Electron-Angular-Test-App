@@ -134,10 +134,13 @@ export class BackEnd {
     return this.ipcInvoke<PostData[]>('sqlite:get-articles-by-category-id', category_id);
   }
 
-
-
-
-
+  // 250904
+  async setAllArticlesSignal(): Promise<void> {
+    this.$articles.set(await this.getAllArticles());
+  }
+  getAllArticles(): Promise<PostData[]> {
+    return this.ipcInvoke<PostData[]>('sqlite:get-all-articles');
+  }
 
 
 

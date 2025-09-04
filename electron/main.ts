@@ -39,6 +39,7 @@ import { backupOrgPlacesSQLite } from './dbs/sqlite/sqlite3-utils';
 import { shell } from 'electron';
 import { closeDBConnections } from './dbs/sqlite/connections';
 import {
+  getAllArticles,
   getArticleById,
   getArticlesByCategoryId,
   getCategoriesByParentId,
@@ -782,6 +783,16 @@ ipcMain.handle('sqlite:get-uncategorized-articles', (event: any) => {
   } catch (err) {
     console.error('Error getting Uncategorized Articles: ', err);
     return articles;
+  }
+});
+
+ipcMain.handle('sqlite:get-all-articles', (event: any) => {
+  try {
+    const articles = getAllArticles();
+    return articles;
+  } catch (err) {
+    console.error('Error getting All Articles: ', err);
+    return [];
   }
 });
 
