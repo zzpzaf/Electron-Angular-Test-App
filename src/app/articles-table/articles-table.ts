@@ -10,6 +10,8 @@ import {
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzRateModule } from 'ng-zorro-antd/rate';
+import { NzDrawerModule, NzDrawerService } from 'ng-zorro-antd/drawer';
+import { ArticleCategoriesSelection } from '../article-categories-selection/article-categories-selection';
 
 @Component({
   selector: 'articles-table',
@@ -19,6 +21,7 @@ import { NzRateModule } from 'ng-zorro-antd/rate';
     NzButtonModule,
     NzIconModule,
     NzRateModule,
+    NzDrawerModule,
   ],
   templateUrl: './articles-table.html',
   styleUrl: './articles-table.scss'
@@ -27,6 +30,10 @@ export class ArticlesTable {
 
   // Articles signal
   public $articles = signal<PostData[]>([]);
+
+
+  private readonly drawer = inject(NzDrawerService);
+
   
   private backendService = inject(BackEnd);
   // Pagination state (two-way bound)
@@ -52,6 +59,7 @@ export class ArticlesTable {
   sortByLikes: NzTableSortFn<PostData> = (a, b) => a.likes - b.likes;
   sortByRanking: NzTableSortFn<PostData> = (a, b) =>
     (a.ranking ?? 0) - (b.ranking ?? 0);
+  
 
   constructor() {
     // Obtain articles from backend service corresponding articles signal
@@ -84,11 +92,48 @@ export class ArticlesTable {
   onMarkdown(row: PostData, index: number, e: MouseEvent) {
     e.stopPropagation(); // avoid triggering row click/expand
     // console.log('>===>> Markdown click', { row, index });
-    // const data: object = { postDataRow: row, message: 'Hello from DbArticles Window' };
     const article: PostData = this.$articles().find(a => a.id === row.id)!;
     if (window.electronAPI.openWindow) {
       window.electronAPI.openWindow(article);
     }
+  }
+
+  // 250904
+  // Create and open a category selection drawer and pass it the ArticleCategoriesSelection
+  // component and initial keys
+  async openCategoryDrawer(row: PostData): Promise<void> {
+    // 1) Get the article id from the row (adjust the property if needed)
+
+    const articleId: number = row.id!;
+
+    // 2) Fetch initial category ids 
+    // const initialKeys: number[]  = [41, 44, 97];
+    const initialKeys: number[] = await this.backendService.getCategoryIdsOfAnArticle(articleId);
+    console.log('>===>> Initial category keys for article id', articleId, ':', initialKeys);
+
+    // 3) Create the drawer and pass the initial keys to the content component
+    const drawerRef = this.drawer.create<
+      ArticleCategoriesSelection,
+      { initialKeys: number[] },
+      number[] | undefined
+    >({
+      nzTitle: 'Select/Unselect article categories',
+      nzWidth: 520,
+      nzHeight: 200,
+      nzClosable: true,
+      nzMaskClosable: true,
+      nzContent: ArticleCategoriesSelection,
+      nzContentParams: { initialKeys }
+    });
+
+    // 4) On close, persist the final selection 
+    drawerRef.afterClose.subscribe(async (selectedKeys) => {
+      if (!selectedKeys) return; // user cancelled
+      console.log('>===>> Selected category keys:', selectedKeys);
+      // Persist the selected category ids for the article
+      const result = await this.backendService.updateArticleCategories(articleId, selectedKeys);
+      console.log('>===>> Update article categories result:', result);
+    });
   }
 
 }

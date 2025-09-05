@@ -13,6 +13,9 @@ import {
   HomeOutline,
   FileMarkdownTwoTone,
   FileMarkdownOutline,
+  TagsOutline,
+  TagsTwoTone,
+  ClearOutline,
 } from '@ant-design/icons-angular/icons';
 
 // bootstrapApplication(App, appConfig)
@@ -30,6 +33,9 @@ bootstrapApplication(App, {
       HomeOutline,
       FileMarkdownTwoTone,
       FileMarkdownOutline,
+      TagsTwoTone,
+      TagsOutline,
+      ClearOutline,
     ]),
   ],
 }).catch((err) => console.error(err));

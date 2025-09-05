@@ -1,0 +1,45 @@
+<!-- <p>article-categories-selection works!</p> -->
+ <div class="p-3">
+  <div class="mb-2 flex gap-8 items-center">
+    <button nz-button nzType="default" (click)="$checkedKeys.set([])">
+      <span nz-icon nzType="clear"></span> Clear
+    </button>
+    <button nz-button nzType="default" (click)="cancel()">Cancel</button>
+    <button nz-button nzType="primary" (click)="applyAndClose()">Apply</button>
+   <!-- 
+    <label class="flex items-center gap-2">
+      <input type="checkbox" [checked]="checkStrictly" (change)="checkStrictly = !checkStrictly" />
+      Check strictly
+    </label> 
+    -->
+  </div>
+
+  <nz-tree
+    [nzData]="$treeNodes()"
+    [nzExpandedKeys]="$expandedKeys()"
+    [nzSelectedKeys]="$selectedKeys()"
+    [nzCheckedKeys]="$checkedKeys()"
+    [nzCheckable]="true"
+    [nzCheckStrictly]="true"
+    nzBlockNode
+    (nzClick)="onTreeNodeClick($any($event))"
+    (nzExpandChange)="onTreeNodeExpandChange($event)"
+    (nzCheckboxChange)="onCheck($any($event))">
+    <!-- <ng-template #nzTreeTemplate let-node>
+      <span 
+        [attr.title]="null"
+        nz-tooltip 
+        [nzTooltipTitle]="node.title + ' - ' + node.key">
+        {{ node.title }}
+      </span>
+    </ng-template> -->
+  </nz-tree>
+
+
+  <!-- Footer actions inside the component so it works both embedded and in a drawer -->
+  <!-- <div class="mt-4 flex justify-end gap-2">
+    <button nz-button nzType="default" (click)="cancel()">Cancel</button>
+    <button nz-button nzType="primary" (click)="applyAndClose()">Apply</button>
+  </div> -->
+</div>
+

@@ -39,10 +39,12 @@ import { backupOrgPlacesSQLite } from './dbs/sqlite/sqlite3-utils';
 import { shell } from 'electron';
 import { closeDBConnections } from './dbs/sqlite/connections';
 import {
+  deleteAllArticleCategories,
   getAllArticles,
   getArticleById,
   getArticlesByCategoryId,
   getCategoriesByParentId,
+  getCategoryIdsOfAnArticle,
   getPostBySlug,
   getSubcategoryForest,
   getUncategorizedArticles,
@@ -51,6 +53,7 @@ import {
   isSlugExisting,
   isUrlExisting,
   updateArticleById,
+  updateArticleCategories,
   updateArticleContentById,
 } from './dbs/sqlite/mandb_queries';
 import { attachContextMenu } from './context/context-menu';
@@ -921,11 +924,38 @@ ipcMain.handle('sqlite:insert-Article-Categories',
   }
 });
 
+// 250905
+ipcMain.handle('sqlite:get-category-ids-of-article', (event: any, article_id: number) => {
+  try {
+    const categoryIds = getCategoryIdsOfAnArticle(article_id);
+    return categoryIds;
+  } catch (err) {
+    console.error('Error getting category IDs for article:', err);
+    return [];
+  }
+});
 
+// 250905
+ipcMain.handle('sqlite:delete-all-article-categories', (event: any, article_id: number) => {
+  try {
+    const result = deleteAllArticleCategories(article_id);
+    return result;
+  } catch (err) {
+    console.error('Error deleting all categories for article:', err);
+    return false;
+  }
+});
 
-
-
-
+// 250905
+ipcMain.handle('sqlite:update-article-categories', (event: any, article_id: number, category_ids: number[]) => {
+  try {
+    const result = updateArticleCategories(article_id, category_ids);
+    return result;
+  } catch (err) {
+    console.error('Error updating article categories:', err);
+    return { success: false, removed: 0, inserted: 0 };
+  }
+});
 
 
 // Not-used so far ....

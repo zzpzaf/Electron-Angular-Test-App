@@ -799,6 +799,14 @@ export function getSubcategoryForest(parentId: number | null): CategoryNode[] {
 
 
 
+
+
+
+
+
+
+
+
 /**
  * 250824
  ** 'Upsert' function for 'images' table
@@ -932,6 +940,17 @@ export function getImageBlobById(
 }
 
 
+
+
+
+
+
+
+
+
+
+
+
 // 250902
 // Insert a row in article_categories table
 export function insertArticleCategory(params: {
@@ -950,7 +969,7 @@ export function insertArticleCategory(params: {
 }
 
 // 250902
-// Assign multiple categories for a given article id into article_categories table
+// Assign multiple categories to a given article id into article_categories table
 export function insertArticleCategories(params: {
   article_id: number;
   category_ids: number[];
@@ -974,7 +993,28 @@ export function insertArticleCategories(params: {
 }
 
 
-
+/**
+ * 250905
+ * @param article_id
+ * @returns Returns an array of all categories of the specified article
+ */
+export function getCategoryIdsOfAnArticle(article_id: number): number[] {
+  if (!mainDb) {
+    console.error('>===>> No Main DB connection.');
+    return [];
+  }
+  try {
+    const stmt = mainDb.prepare<number[], { category_id: number }>(`
+      SELECT category_id FROM article_categories
+      WHERE article_id = ?
+    `);
+    const rows = stmt.all(article_id) as { category_id: number }[];
+    return rows.map(r => r.category_id);
+  } catch (err) {
+    console.error('Error fetching category IDs for article:', err);
+    return [];
+  }
+}
 
 
 // 250902
@@ -992,6 +1032,82 @@ export function deleteArticleCategory(params: {
   const info = del.run(params.article_id, params.category_id);
   return info.changes === 1;
 }
+
+
+// 250905
+// Remove (delete) all categories for a given article id
+export function deleteAllArticleCategories(article_id: number): boolean {
+  if (!mainDb) throw new Error('No Main DB connection');
+
+  const del = mainDb.prepare(`
+    DELETE FROM article_categories
+    WHERE article_id = ?
+  `);
+  const info = del.run(article_id);
+  return info.changes > 0;
+}
+
+
+
+
+// 250905
+// Update/Sync article categories - it uses transaction
+// DELETE ... NOT IN (...) removes any row where the category_id is not among the selected_ids.
+// INSERT OR IGNORE ensures you don’t insert duplicates (because of the PRIMARY KEY (article_id, category_id) constraint).
+// Wrapping in a transaction ensures atomicity — either all changes happen, or none if an error occurs.
+// Returns a summary: number of rows removed and inserted.
+export function updateArticleCategories(
+  article_id: number,
+  selected_ids: number[]
+): { success: boolean; removed: number; inserted: number } {
+  if (!mainDb) throw new Error("No Main DB connection");
+
+  try {
+    const removeStmt = mainDb.prepare(`
+      DELETE FROM article_categories
+      WHERE article_id = ?
+      AND category_id NOT IN (${selected_ids.length > 0 ? selected_ids.map(() => "?").join(",") : "NULL"})
+    `);
+
+    const insertStmt = mainDb.prepare(`
+      INSERT OR IGNORE INTO article_categories (article_id, category_id)
+      VALUES (?, ?)
+    `);
+
+    let removed = 0;
+    let inserted = 0;
+
+    const tx = mainDb.transaction(() => {
+      // 1. Remove rows not in selected_ids
+      if (selected_ids.length > 0) {
+        const result = removeStmt.run(article_id, ...selected_ids);
+        removed = result.changes;
+      } else {
+        // if selected_ids is empty, remove all
+        const result = mainDb.prepare(
+          `DELETE FROM article_categories WHERE article_id = ?`
+        ).run(article_id);
+        removed = result.changes;
+      }
+
+      // 2. Insert rows for selected_ids
+      for (const catId of selected_ids) {
+        const result = insertStmt.run(article_id, catId);
+        inserted += result.changes;
+      }
+    });
+
+    tx(); // execute transaction
+
+    return { success: true, removed, inserted };
+  } catch (err) {
+    console.error("Error updating article_categories:", err);
+    return { success: false, removed: 0, inserted: 0 };
+  }
+}
+
+
+
 
 
 // 250902

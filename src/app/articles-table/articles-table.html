@@ -47,6 +47,8 @@
               Date (YYMMDD)
             </th>
             <!-- 6 -->
+            <th nzAlign="center">Categories</th>
+            <!-- 7 -->
             <th
               nzColumnKey="hostname"
               [nzSortFn]="sortByHostname"
@@ -54,15 +56,15 @@
             >
               Hostname
             </th>
-            <!-- 7 -->
-            <th nzColumnKey="pubname">Publication</th>
             <!-- 8 -->
-            <th nzColumnKey="authorname" [nzShowFilter]="true">Author</th>
+            <th nzColumnKey="pubname">Publication</th>
             <!-- 9 -->
+            <th nzColumnKey="authorname" [nzShowFilter]="true">Author</th>
+            <!-- 10 -->
             <th nzColumnKey="pubauthorslug" [nzShowFilter]="true">
               Author's Slug
             </th>
-            <!-- 10 -->
+            <!-- 11 -->
             <th
               nzColumnKey="listname"
               [nzSortFn]="sortByListname"
@@ -71,7 +73,7 @@
               Medium List name
             </th>
 
-            <!-- 11 -->
+            <!-- 12 -->
             <th
               nzColumnKey="likes"
               [nzSortFn]="sortByLikes"
@@ -79,9 +81,9 @@
             >
               Likes
             </th>
-            <!-- 12 -->
+            <!-- 13  -->
             <th nzColumnKey="comments">Comments</th>
-            <!-- 13 -->
+            <!-- 14 -->
             <!-- <th nzColumnKey="ranking">Ranking</th> -->
             <th
               nzColumnKey="ranking"
@@ -91,7 +93,7 @@
             >
               Ranking
             </th>
-            <!-- 14 -->
+            <!-- 15 -->
             <th nzColumnKey="timestamp">Time Stamp</th>
           </tr>
         </thead>
@@ -105,7 +107,6 @@
             <!-- 1 -->
             <td nzAlign="center">{{ row.id }}</td>
             <!-- 2 -->
-
             @if (row.content && row.content.trim()!.length > 0 ) {
               <td nzAlign="center">
                 <button
@@ -122,9 +123,6 @@
             } @else {
               <td nzAlign="center"> <span nz-icon nzType="file-markdown" nzTheme="outline" ></span> </td>
             }
-
-
-
             <!-- 3 -->
             <td>
               <a [href]="row.link" target="_blank" rel="noopener noreferrer">{{
@@ -143,7 +141,20 @@
             <!-- 5 -->
             <td nzAlign="center">{{ row.date }}</td>
             <!-- 6 -->
-            <!-- <td>{{ row.hostname }}</td> -->
+            <td nzAlign="center">
+              <button
+                nz-button
+                nzType="text"
+                nzShape="circle"
+                nzSize="small"
+                aria-label="Open Category selection drawer"
+                (click)="openCategoryDrawer(row)"
+              >
+                <span nz-icon nzType="tags" nzTheme="twotone"></span>
+              </button>
+            </td>
+            
+            <!-- 7 -->
             <td>
               <a
                 [href]="
@@ -158,9 +169,9 @@
                 {{ row.hostname }}
               </a>
             </td>
-            <!-- 7 -->
-            <td>{{ row.pubname }}</td>
             <!-- 8 -->
+            <td>{{ row.pubname }}</td>
+            <!-- 9 -->
             @if (row.authorlink) {
               <td>
                 <a [href]="row.authorlink" target="_blank" rel="noopener noreferrer">{{
@@ -169,16 +180,16 @@
               </td>
             } @else {
             <td>{{ row.authorname }}</td>
-            }  
-            <!-- 9 -->
-            <td>{{ row.pubauthorslug }}</td>
+            }
             <!-- 10 -->
-            <td>{{ row.listname }}</td>
+            <td>{{ row.pubauthorslug }}</td>
             <!-- 11 -->
-            <td nzAlign="center">{{ row.likes }}</td>
+            <td>{{ row.listname }}</td>
             <!-- 12 -->
-            <td nzAlign="center">{{ row.comments }}</td>
+            <td nzAlign="center">{{ row.likes }}</td>
             <!-- 13 -->
+            <td nzAlign="center">{{ row.comments }}</td>
+            <!-- 14 -->
             <!-- <td nzAlign="center">{{ row.ranking }}</td> -->
             <td nzAlign="center">
               <nz-rate
@@ -192,7 +203,7 @@
               </nz-rate>
             </td>
 
-            <!-- 14  -->
+            <!-- 15 -->
             <td>{{ row.timestamp }}</td>
           </tr>
           }

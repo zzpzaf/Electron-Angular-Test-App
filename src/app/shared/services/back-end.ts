@@ -142,6 +142,10 @@ export class BackEnd {
     return this.ipcInvoke<PostData[]>('sqlite:get-all-articles');
   }
 
+  
+
+
+
 
 
 
@@ -165,8 +169,23 @@ export class BackEnd {
   }
 
 
+  // 250905
+  async getCategoryIdsOfAnArticle(article_id: number): Promise<number[]> {
+    const categoryIds = await this.ipcInvoke<number[]>('sqlite:get-category-ids-of-article', article_id);
+    return categoryIds;
+  }
 
+  //250905
+  async deleteAllArticleCategories(article_id: number): Promise<boolean> {
+    const result = await this.ipcInvoke<boolean>('sqlite:delete-all-article-categories', article_id);
+    return result;
+  }
 
+  // 250905
+  async updateArticleCategories(article_id: number, category_ids: number[]): Promise<boolean> {
+    const result = await this.ipcInvoke<boolean>('sqlite:update-article-categories', article_id, category_ids);
+    return result;
+  }
 
   /*
   * Application wide functions
