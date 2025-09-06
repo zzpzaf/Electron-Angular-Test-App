@@ -67,8 +67,9 @@ export function formatDate(input: string): string {
     )}${pad(pastDate.getDate())}`;
   }
 
-  // if (/^\d+d ago$/.test(input)) {
-  if (/^\d+\s*(d|days)\s+ago$/.test(input)) {
+ 
+  // 250906 - Updated to capture also 1 day ago
+  if (/^\d+\s*(d|day|days)\s+ago$/.test(input)) {
     const daysAgo = parseInt(input);
     const pastDate = new Date(now);
     pastDate.setDate(now.getDate() - daysAgo);

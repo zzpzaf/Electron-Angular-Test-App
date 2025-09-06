@@ -23,16 +23,12 @@ import { extractFirstPathPart } from '../../../shared/utils/shared-utils';
 
 import {
   BROWSER_URLPORT,
-  MAX_ARTICLES_NUMBER,
-  SCROLL_DELAY,
-  DEFAULT_AUTOSCROLL_DELAY,
-  ADDITIONAL_PAGE_DELAY,
-  GIST_IFRAME_SELECTOR_DELAY,
-  GIST_PAGE_LOADING_DELAY,
-  OPEN_NEW_TAB_DELAY,
-  TAB_INITIAL_PAGE_LOADING_DELAY,
-  AFTER_AUTOSCROLL_GIST_IFRAME_SELECTOR_DELAY,
+  timeConst,
+  metaSEL,
+  cleanSEL,
+  listSEL,
 } from './scrape-constants';
+ 
 
 // ========================================================================================================
 
@@ -117,13 +113,13 @@ export async function collectPostsFromUrlTabs(
         try {
           // Optional delay to avoid rapid tab creation
           // await new Promise((res) => setTimeout(res, 500));
-          await new Promise((res) => setTimeout(res, OPEN_NEW_TAB_DELAY));
+          await new Promise((res) => setTimeout(res, timeConst.OPEN_NEW_TAB_DELAY));
 
           page = await browser.newPage();
           console.log(`Opening: ${url}`);
           await page.goto(url, {
             waitUntil: 'domcontentloaded',
-            timeout: TAB_INITIAL_PAGE_LOADING_DELAY, //15000,   /****** */
+            timeout: timeConst.TAB_INITIAL_PAGE_LOADING_DELAY, //15000,   /****** */
           });
 
           // Scrape the article data by calling the scrapeMediumArticle() key-function
@@ -178,6 +174,7 @@ export async function collectPostsFromUrlTabs(
       if (post) {
         i = i + 1;
         post.counter = i;
+        console.log(` >= *** ==>> Post Raw Date: ${post.date} `);
         if (post.date && post.date.length) {
           post.date = formatDate(post.date);
         }
@@ -202,7 +199,7 @@ async function scrapeMediumArticle(page: Puppeteer.Page): Promise<PostData> {
   );
   
   // await new Promise((resolve) => setTimeout(resolve, 1000));
-  await new Promise((resolve) => setTimeout(resolve, ADDITIONAL_PAGE_DELAY)); // 1000 ms delay for additional page loading
+  await new Promise((resolve) => setTimeout(resolve, timeConst.ADDITIONAL_PAGE_DELAY)); // 1000 ms delay for additional page loading
 
   // Cloudflare challenge detection
   const challenge = await page.evaluate(() =>
@@ -215,22 +212,22 @@ async function scrapeMediumArticle(page: Puppeteer.Page): Promise<PostData> {
   // Scraping Basic Article Data
   // We use the page.evaluate() function to run the code in the browser context
   // This allows us to access the DOM and extract the required data
-  const postData = await page.evaluate(() => {
+  const postData = await page.evaluate((SEL) => {
     const link = window.location.href;
     const hostname = new URL(link).hostname;
     const pubauthorslug = ''; //extractFirstPathPart(new URL(link).pathname);
-    const pubEl = document.querySelector('h2 > div');
+    const pubEl = document.querySelector(SEL.publication);
     const pubname = pubEl && pubEl.textContent ? pubEl.textContent.trim() : '';
-    const titleEl = document.querySelector('h1[data-testid="storyTitle"]');
+    const titleEl = document.querySelector(SEL.title);
     let title =
       titleEl && titleEl.textContent ? titleEl.textContent.trim() : '';
     // If empty, fallback to the page <title> tag
     if (!title) {
       title = document.title ? document.title.trim() : '';
     }
-    const imgEl = document.querySelector('figure img');
+    const imgEl = document.querySelector(SEL.leadImage);
     const image = imgEl ? imgEl.getAttribute('src') || '' : '';
-    const authorEl = document.querySelector('a[data-testid="authorName"]');
+    const authorEl = document.querySelector(SEL.author);
     const authorname =
       authorEl && authorEl.textContent ? authorEl.textContent.trim() : '';
 
@@ -257,12 +254,15 @@ async function scrapeMediumArticle(page: Puppeteer.Page): Promise<PostData> {
 
 
 
-    let rawDate = '';
 
-    //250806 Update
-    const outerContainer = document.querySelector('div.speechify-ignore.bh.m');
+
+    // 250806 Update
+    // 250905 Selectors Update : bh.m -> bi.m and ac.af -> ac.ag
+
+    let rawDate = '';
+    const outerContainer = document.querySelector(SEL.dateOuter);
     if (outerContainer) {
-      const dateContainer = outerContainer.querySelector('div.ac.af');
+      const dateContainer = outerContainer.querySelector(SEL.dateInner);
       if (dateContainer) {
         const childNodes = Array.from(dateContainer.childNodes);
         for (let i = childNodes.length - 1; i >= 0; i--) {
@@ -291,16 +291,14 @@ async function scrapeMediumArticle(page: Puppeteer.Page): Promise<PostData> {
 
     // console.log('>===>> Extracted date:', rawDate); // console.log does not work here due to the Puppeteer context
 
-    const likesBtn = document.querySelector('.pw-multi-vote-count button');
+    const likesBtn = document.querySelector(SEL.likesButton);
     let likes = 0;
     if (likesBtn) {
       const likesText = (likesBtn.textContent ?? '').trim();
       likes = parseInt(likesText.replace(/\D/g, ''), 10) || 0;
     }
 
-    const commentsEl = document.querySelector(
-      'button[aria-label="responses"] .pw-responses-count'
-    );
+    const commentsEl = document.querySelector(SEL.commentsCount);
     let comments = 0;
     if (commentsEl) {
       const commentsText = commentsEl.textContent
@@ -331,10 +329,15 @@ async function scrapeMediumArticle(page: Puppeteer.Page): Promise<PostData> {
       comments,
       content,
     };
-  });
+  }, metaSEL);
 
   return postData;
 }
+
+
+
+
+
 
 // ==========================================================================================
 // 250808
@@ -411,119 +414,6 @@ async function scrapeMediumMarkdownContent(
 // •	Removes all other iframes to keep your output clean (you can tweak this if you want to keep certain providers).
 // ------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-// export async function getCleanedPageContent(
-//   page: import('puppeteer').Page
-// ): Promise<{ html: string; iframeSrcs: string[] }> {
-//   await autoScrollArticlePage(page);
-
-//   try {
-//     // await page.waitForSelector("figure iframe", { timeout: 5000 });
-//     await page.waitForSelector('figure iframe', {
-//       timeout: AFTER_AUTOSCROLL_GIST_IFRAME_SELECTOR_DELAY,  // 1000 ms
-//     });
-//   } catch {
-//     console.warn('>= *** ==>> ⚠️ No gist iframes found within timeout');
-//   }
-
-//   const iframeSources: string[] = await page.evaluate(() => {
-//     return Array.from(document.querySelectorAll('figure iframe'))
-//       .map((iframe) => iframe.getAttribute('src') || '')
-//       .filter(Boolean);
-//   });
-
-//   console.log('>= *** ==>> 📌 Found gist iframe src:', iframeSources);
-
-//   const rawHTML = await page.evaluate(() => {
-//     // const removeSpecificText = (root: HTMLElement, textToRemove: string) => {
-//     // Instead of removing just a single text, we can remove multiple texts in an array
-//     const removeSpecificText = (root: HTMLElement, textsToRemove: string[]) => {
-//       root.querySelectorAll('*').forEach((el) => {
-//         el.childNodes.forEach((node) => {
-//           if (node.nodeType === Node.TEXT_NODE) {
-//             const text = node.textContent?.trim() || '';
-//             if (textsToRemove.includes(text)) {
-//               node.textContent = '';
-//             }
-//           }
-//         });
-//       });
-//       // Also remove elements that contain only any text specified in textsToRemove array
-//       textsToRemove.forEach((t) => {
-//         root.querySelectorAll('*').forEach((el) => {
-//           if (el.textContent?.trim() === t) {
-//             el.remove();
-//           }
-//         });
-//       });
-//     };
-
-//     const removeSpeechifyIgnoreDivs = (root: HTMLElement) => {
-//       root
-//         .querySelectorAll('div[class^="speechify-ignore"]')
-//         .forEach((el) => el.remove());
-//     };
-
-//     const fixHeadings = (root: HTMLElement) => {
-//       const h1s = root.querySelectorAll('h1');
-//       let firstFound = false;
-//       h1s.forEach((h1) => {
-//         if (!firstFound) {
-//           firstFound = true;
-//         } else {
-//           const h2 = document.createElement('h2');
-//           h2.innerHTML = h1.innerHTML;
-//           h1.replaceWith(h2);
-//         }
-//       });
-//     };
-
-//     const removeContentBeforeFirstHeading = (root: HTMLElement) => {
-//       const firstHeading = root.querySelector('h1');
-//       if (firstHeading) {
-//         let prev = firstHeading.previousSibling;
-//         while (prev) {
-//           const toRemove = prev;
-//           prev = prev.previousSibling;
-//           toRemove?.parentNode?.removeChild(toRemove);
-//         }
-//       }
-//     };
-
-//     const titleEl = document.querySelector('h1[data-testid="storyTitle"]');
-//     let container: HTMLElement;
-
-//     if (!titleEl) {
-//       container = document.body.cloneNode(true) as HTMLElement;
-//     } else {
-//       let articleContainer: HTMLElement | null =
-//         titleEl.closest('article') ||
-//         titleEl.closest('section') ||
-//         titleEl.closest('main') ||
-//         document.body;
-//       container = articleContainer.cloneNode(true) as HTMLElement;
-//     }
-
-//     container
-//       .querySelectorAll('script, style, noscript')
-//       .forEach((el) => el.remove());
-
-//     // removeSpecificText(container, 'Zoom image will be displayed');
-//     // Specify the array of multiple texts to remove
-//     removeSpecificText(container, [
-//       'Zoom image will be displayed',
-//       'Press enter or click to view image in full size'
-//     ]);
-
-//     removeContentBeforeFirstHeading(container);
-//     removeSpeechifyIgnoreDivs(container);
-//     fixHeadings(container);
-
-//     return container.innerHTML;
-//   });
-
-//   return { html: rawHTML, iframeSrcs: iframeSources };
-// }
-
 export async function getCleanedPageContent(
   page: import('puppeteer').Page
 ): Promise<{ html: string; iframeSrcs: string[] }> {
@@ -531,7 +421,7 @@ export async function getCleanedPageContent(
 
   try {
     await page.waitForSelector('figure iframe', {
-      timeout: AFTER_AUTOSCROLL_GIST_IFRAME_SELECTOR_DELAY, // 1000 ms
+      timeout: timeConst.AFTER_AUTOSCROLL_GIST_IFRAME_SELECTOR_DELAY, // 1000 ms
     });
   } catch {
     // console.warn('>= *** ==>> ⚠️ No gist iframes found within timeout');
@@ -545,7 +435,7 @@ export async function getCleanedPageContent(
 
   console.log('>= *** ==>> 📌 Found gist iframe src:', iframeSources);
 
-  const rawHTML = await page.evaluate(() => {
+  const rawHTML = await page.evaluate((SEL) => {
     // --- helpers -------------------------------------------------------------
 
     const removeSpecificText = (root: HTMLElement, textsToRemove: string[]) => {
@@ -566,12 +456,12 @@ export async function getCleanedPageContent(
 
     const removeSpeechifyIgnoreDivs = (root: HTMLElement) => {
       root
-        .querySelectorAll('div[class^="speechify-ignore"]')
+        .querySelectorAll(SEL.speechifyIgnoreDivs)
         .forEach((el) => el.remove());
     };
 
     const fixHeadings = (root: HTMLElement) => {
-      const h1s = root.querySelectorAll('h1');
+      const h1s = root.querySelectorAll(SEL.headings);
       let firstFound = false;
       h1s.forEach((h1) => {
         if (!firstFound) {
@@ -585,7 +475,7 @@ export async function getCleanedPageContent(
     };
 
     const removeContentBeforeFirstHeading = (root: HTMLElement) => {
-      const firstHeading = root.querySelector('h1');
+      const firstHeading = root.querySelector(SEL.headings);
       if (firstHeading) {
         let prev = firstHeading.previousSibling;
         while (prev) {
@@ -598,7 +488,7 @@ export async function getCleanedPageContent(
 
     // ⬇️ NEW: transform YouTube iframes into simple links, remove all others
     const transformYouTubeIframes = (root: HTMLElement) => {
-      const iframes = Array.from(root.querySelectorAll('iframe'));
+      const iframes = Array.from(root.querySelectorAll(SEL.iframes));
 
       for (const iframe of iframes) {
         const src = iframe.getAttribute('src') || '';
@@ -646,7 +536,7 @@ export async function getCleanedPageContent(
 
     // --- scope target --------------------------------------------------------
 
-    const titleEl = document.querySelector('h1[data-testid="storyTitle"]');
+    const titleEl = document.querySelector(SEL.title);
     let container: HTMLElement;
 
     if (!titleEl) {
@@ -663,7 +553,7 @@ export async function getCleanedPageContent(
     // --- clean & transform ---------------------------------------------------
 
     container
-      .querySelectorAll('script, style, noscript')
+      .querySelectorAll(SEL.cleanTags)
       .forEach((el) => el.remove());
 
     removeSpecificText(container, [
@@ -679,7 +569,7 @@ export async function getCleanedPageContent(
     transformYouTubeIframes(container);
 
     return container.innerHTML;
-  });
+  }, cleanSEL);
 
   return { html: rawHTML, iframeSrcs: iframeSources };
 }
@@ -823,7 +713,7 @@ export async function extractCodeFromIframe(
     // await page.goto(iframeUrl, { waitUntil: "networkidle0", timeout: 20000 });
     await page.goto(iframeUrl, {
       waitUntil: 'networkidle0',
-      timeout: GIST_PAGE_LOADING_DELAY,  //******/
+      timeout: timeConst.GIST_PAGE_LOADING_DELAY,  //******/
     });
 
     // Find the raw code link
@@ -897,8 +787,8 @@ export async function scrapeList(url: string): Promise<PostData[]> {
 
     const totalArticles = await autoScrollToEnd(
       page,
-      MAX_ARTICLES_NUMBER,
-      SCROLL_DELAY
+      timeConst.MAX_ARTICLES_NUMBER,
+      timeConst.SCROLL_DELAY
     );
 
     const scrapedData = await scrapeMediumList(page);
@@ -927,9 +817,9 @@ async function scrapeMediumList(page: Puppeteer.Page): Promise<PostData[]> {
     page.url.toString
   );
 
-  return await page.evaluate(() => {
+  return await page.evaluate((SEL) => {
     // Extract listname and timestamp
-    const listnameEl = document.querySelector('h1');
+    const listnameEl = document.querySelector(SEL.headings);
     const rawlistname = listnameEl
       ? listnameEl.innerText.trim()
       : document.title.trim();
@@ -939,7 +829,7 @@ async function scrapeMediumList(page: Puppeteer.Page): Promise<PostData[]> {
       .trim();
     const timestamp = new Date().toISOString();
 
-    const posts = Array.from(document.querySelectorAll('article'));
+    const posts = Array.from(document.querySelectorAll(SEL.allArticle));
 
     // *** Iterate through the displayed list posts ***
     const results: PostData[] = posts.map((post, index) => {
@@ -965,7 +855,7 @@ async function scrapeMediumList(page: Puppeteer.Page): Promise<PostData[]> {
       }
 
       // Extract date (raw date), likes, comments, pubname, and authorname
-      const infoEl = post.querySelector('span:has(svg[width="16"])');
+      const infoEl = post.querySelector(SEL.postInfoBlock);
       let rawDate = '',
         date = '',
         likes = 0,
@@ -986,8 +876,8 @@ async function scrapeMediumList(page: Puppeteer.Page): Promise<PostData[]> {
       }
 
       // Extract pubname and authorname
-      const pubNameEl = post.querySelector('div a[href*="medium.com"] p');
-      const authorNameEl = post.querySelector('div a[href^="/@"] p');
+      const pubNameEl = post.querySelector(SEL.pubName);
+      const authorNameEl = post.querySelector(SEL.authorName);
       const pubname = pubNameEl
         ? (pubNameEl as HTMLElement).innerText.trim()
         : '';
@@ -1034,7 +924,7 @@ async function scrapeMediumList(page: Puppeteer.Page): Promise<PostData[]> {
     });
 
     return results;
-  });
+  }, listSEL);
 }
 
 
@@ -1056,7 +946,7 @@ async function scrapeMediumList(page: Puppeteer.Page): Promise<PostData[]> {
 export async function autoScrollArticlePage(
   page: import('puppeteer').Page,
   distance = 200,
-  delay = DEFAULT_AUTOSCROLL_DELAY //100
+  delay = timeConst.DEFAULT_AUTOSCROLL_DELAY //100
 ): Promise<void> {
   await page.evaluate(
     async (scrollDistance: number, stepDelay: number) => {
