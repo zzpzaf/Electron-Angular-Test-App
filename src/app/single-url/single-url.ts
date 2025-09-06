@@ -86,7 +86,7 @@ export class SingleUrl {
 
   public isNewArticle: boolean = false; // Flag to indicate if it's a new article
   private existingArticleData: PostData | null = null;
-  // public categoryNodes: NzTreeNodeOptions[] = []; //this.categoryNodesService.$catTreeNodes();
+
   public $categoryNodes = signal<NzTreeNodeOptions[]>([]);
 
   public selectedCategoryIds: number[] = [];
@@ -167,16 +167,10 @@ export class SingleUrl {
 
   ngAfterViewInit() {
     // Capture and react to user selection changes
-    this.categoryChangesSubscription = this.linkScrapeForm.controls['selectCategory'].valueChanges.subscribe(key => {
-      const node: NzTreeNode | null = key ? this.catSel.getTreeNodeByKey(key) : null;
-      const original = node?.origin; // your original data object for that node
-      const title = original?.title || '';
-      const parentTitle = node?.parentNode?.title || '';
-
-      const catId = original?.key ? parseInt(original.key, 10) : null;
-      console.log('>===>> Selected Category Id:', catId, 'title:', title, 'parentTitle:', parentTitle);
-      this.selectedCategoryIds = catId ? [catId] : [];
-
+    this.categoryChangesSubscription = this.linkScrapeForm.controls['selectCategory'].valueChanges.subscribe((keys: string[]) => {
+      // console.log('>===>> SingleUrl - ngAfterViewInit() - selected keys changed:', keys);
+      this.selectedCategoryIds = keys.map(key => parseInt(key, 10)).filter(id => !isNaN(id));
+      console.log('>===>> SingleUrl - ngAfterViewInit() - selectedCategoryIds:', this.selectedCategoryIds);
     });
   }
  
@@ -190,7 +184,7 @@ export class SingleUrl {
     this.linkScrapeForm = this.fb.group({
       url: this.fb.control('', [Validators.required]),
       force: this.fb.control(true),
-      selectCategory: this.fb.control('' as string | null),
+      selectCategory: this.fb.control<string[]>([]),
     });
   }
 
@@ -493,16 +487,22 @@ export class SingleUrl {
         // Insert images
         this.processMarkdownContentImages(dataArray); // Process images after insertion
 
+
+        const urlSlug = getMediumSlugFromUrl(dataArray[0].link);
+        // Process each article's content images
+        const insertedArticleId = await this.backendService.getPostDataBySlug(urlSlug).then(addedArticle => addedArticle?.id);
+
+
         // 250902
         // Set article categories
-        console.log('>===>> Setting categories for article ID:', dataArray[0].id, ' - Categories:', this.selectedCategoryIds);
+        console.log('>===>> Setting categories for article ID:', insertedArticleId, ' - Categories:', this.selectedCategoryIds);
         if (this.selectedCategoryIds.length > 0) {
           // this.setArticleCategories(dataArray[0].id!, this.selectedCategoryIds);
-          this.backendService.insertArticleCategories(
-            dataArray[0].id!,
+          this.backendService.updateArticleCategories(
+            insertedArticleId!,
             this.selectedCategoryIds,
           ).then((res) => {
-            console.log('>===>> Article categories inserted successfully?', res);
+            console.log('>===>> Article categories updated successfully?', res);
           });
         }
 
@@ -550,18 +550,18 @@ export class SingleUrl {
 
         const urlSlug = getMediumSlugFromUrl(dataArray[0].link);
         // Process each article's content images
-        const insertedArticleId = await this.backendService.getPostDataBySlug(urlSlug).then(addedArticle => addedArticle?.id);
+        const updatedArticleId = await this.backendService.getPostDataBySlug(urlSlug).then(addedArticle => addedArticle?.id);
 
         // 250902
         // Set article categories
         console.log('>===>> Setting categories for article ID:', dataArray[0].id, ' - Categories:', this.selectedCategoryIds);
         if (this.selectedCategoryIds.length > 0) {
           // this.setArticleCategories(dataArray[0].id!, this.selectedCategoryIds);
-          this.backendService.insertArticleCategories(
-            insertedArticleId!,
+          this.backendService.updateArticleCategories(
+            updatedArticleId!,
             this.selectedCategoryIds,
           ).then((res) => {
-            console.log('>===>> Article categories inserted successfully?', res);
+            console.log('>===>> Article categories updated successfully?', res);
           });
         }
 
