@@ -48,7 +48,8 @@ export class CategoriesTree {
 
     // select the clicked node
     this.selectedCategoryId = Number(node.key!);
-    this.backEndService.$selectedCategoryId.set(this.selectedCategoryId);
+    // this.backEndService.$selectedCategoryId.set(this.selectedCategoryId);
+    this.backEndService.setSelectedCategorySignal(this.selectedCategoryId);
     this.backEndService.setArticlesByCategoryIdSignal(this.selectedCategoryId);
 
     // emulate "expand on click": toggle expansion for non-leaf nodes

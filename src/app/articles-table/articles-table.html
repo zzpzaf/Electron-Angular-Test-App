@@ -1,9 +1,22 @@
 <!-- <p>articles-table works!</p> -->
 
 
+    <ng-template #tableHeader>
+      <div class="table-header">
+        <h3>Filter: {{ filter }}{{ selectedCategory }},  Nr of articles: {{ $articles().length }}</h3>
+        <div class="table-actions">
+          <button nz-button nzType="primary" (click)="updateArticlesTable()">
+            <span nz-icon nzType="reload" nzTheme="outline"></span>
+            Refresh
+          </button>
+        </div>
+      </div>
+    </ng-template>  
+    
     <!-- <div class="inner-content"> -->
       <nz-table
         #table
+        [nzTitle]="tableHeader"
         class="col-balanced-gap"
         [nzData]="$articles()"
         [nzScroll]="{ x: 'max-content' }"
@@ -210,3 +223,4 @@
         </tbody>
       </nz-table>
     <!-- </div> -->
+    

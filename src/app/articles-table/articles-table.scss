@@ -1,4 +1,39 @@
 
+// 250906
+.table-header {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  // padding: 8px 0;
+  /* optional cosmetics */
+  /* border-bottom: 1px solid #f0f0f0; */
+}
+
+.table-header > h3 {
+  margin: 0;
+  font-weight: 600;
+}
+
+ .table-actions {
+  margin-left: auto;            /* pushes actions to the right */
+  display: flex;
+  align-items: center;
+  gap: 8px;                      /* space between buttons if you add more */
+  white-space: nowrap;           /* keep button(s) on one line */
+}
+
+// Optional: keep the bar visible while scrolling
+.table-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fff;
+}
+
+
+
+
+
 // 250821 Table settings
 /* Let columns size to content and allow horizontal growth */
 :host ::ng-deep .ant-table table {

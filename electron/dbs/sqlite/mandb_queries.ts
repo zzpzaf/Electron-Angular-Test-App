@@ -633,6 +633,31 @@ export function getCategoriesByParentId(parentId?: number | null): Category[] {
 }
 
 
+/**
+ * 250906
+ * Fetch a category by its ID.
+ * @param id 
+ * @returns a Category object or null if not found
+ */
+export function getCategoryById(id: number): Promise<Category | null> {
+  if (!mainDb) {
+    console.error('>===>> No Main DB connection.');
+    return Promise.resolve(null);
+  }
+
+  try {
+    const stmt = mainDb.prepare<{ id: number }, Category>(`
+      SELECT id, name, description, parent_id
+      FROM categories
+      WHERE id = @id
+    `);
+    const row = stmt.get({ id });
+    return Promise.resolve(row ?? null);
+  } catch (err) {
+    console.error('Error fetching category by id:', err);
+    return Promise.resolve(null);
+  }
+}
 
 
 

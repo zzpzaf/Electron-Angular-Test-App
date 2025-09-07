@@ -67,7 +67,9 @@ export class DbArticles {
   }
 
   ngOnDestroy() {
-    this.backendService.$selectedCategoryId.set(0);
+    // this.backendService.$selectedCategoryId.set(0);
+    this.backendService.setSelectedCategorySignal(0);
+
   }
 
   // public isOnlyUnassignedToggle() {
@@ -104,16 +106,20 @@ export class DbArticles {
     switch (filter) {
       case 'unassigned':
         this.treeDisabled = true;
+        this.backendService.$categoriesFilter.set('unassigned');
         this.backendService.setUncategorizedArticlesSignal();
         break;
       case 'all':
         this.treeDisabled = true;
+        this.backendService.$categoriesFilter.set('all');
         this.backendService.setAllArticlesSignal();
         break;
       case 'byCategory':
         this.treeDisabled = false;
+        this.backendService.$categoriesFilter.set('byCategory');
         // if (this.backendService.$selectedCategoryId() > 0) {
-          this.backendService.setArticlesByCategoryIdSignal(this.backendService.$selectedCategoryId());
+          // this.backendService.setArticlesByCategoryIdSignal(this.backendService.$selectedCategoryId());
+          this.backendService.setArticlesByCategoryIdSignal(this.backendService.$selectedCategory()?.id ?? 0);
         // }
         break;
     }

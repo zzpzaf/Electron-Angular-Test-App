@@ -30,7 +30,8 @@ export class ArticlesTable {
 
   // Articles signal
   public $articles = signal<PostData[]>([]);
-
+  public filter: 'unassigned' | 'all' | 'byCategory' = 'unassigned';
+  public selectedCategory: string  = '';
 
   private readonly drawer = inject(NzDrawerService);
 
@@ -67,6 +68,11 @@ export class ArticlesTable {
       if (this.backendService.$articles()) {
         this.$articles.set(this.backendService.$articles());
       }
+      this.filter = this.backendService.$categoriesFilter();
+      // this.selectedCategory = this.backendService.$selectedCategoryId() > 0 ?
+      if (this.backendService.$selectedCategory()) {
+        this.selectedCategory = ': ' + this.backendService.$selectedCategory()!.name;
+      }
       console.log('>===>> ArticlesTable - Articles signal updated, count=', this.$articles().length);
     });
   }
@@ -74,8 +80,6 @@ export class ArticlesTable {
   ngOnInit() {
     // this.getUnassignedArticles();
   }
-
-
 
   // immutable update when user changes the stars
   onRankChange(row: PostData, value: number) {
@@ -87,6 +91,9 @@ export class ArticlesTable {
     //   )
     // );
   }
+
+
+
 
   // Open a new Electron Window for showing Markdown content
   onMarkdown(row: PostData, index: number, e: MouseEvent) {
@@ -133,7 +140,25 @@ export class ArticlesTable {
       // Persist the selected category ids for the article
       const result = await this.backendService.updateArticleCategories(articleId, selectedKeys);
       console.log('>===>> Update article categories result:', result);
+      this.updateArticlesTable();
     });
+  }
+
+  // 250906
+  updateArticlesTable() {
+    switch (this.filter) {
+      case 'all':
+        this.backendService.setAllArticlesSignal();
+        break;
+      case 'unassigned':
+        this.backendService.setUncategorizedArticlesSignal();
+        break;
+      case 'byCategory':
+         this.backendService.setArticlesByCategoryIdSignal(this.backendService.$selectedCategory()?.id ?? 0);
+        break;
+      default:
+        this.$articles.set(this.backendService.$articles());
+    }
   }
 
 }

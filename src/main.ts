@@ -16,6 +16,7 @@ import {
   TagsOutline,
   TagsTwoTone,
   ClearOutline,
+  ReloadOutline,
 } from '@ant-design/icons-angular/icons';
 
 // bootstrapApplication(App, appConfig)
@@ -36,6 +37,7 @@ bootstrapApplication(App, {
       TagsTwoTone,
       TagsOutline,
       ClearOutline,
+      ReloadOutline,
     ]),
   ],
 }).catch((err) => console.error(err));

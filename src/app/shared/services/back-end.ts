@@ -11,10 +11,11 @@ interface DeleteFilesResult {
 })
 export class BackEnd {
 
-  // 250901 - Articles Signal
-  public $articles = signal<PostData[]>([]);
-  public $selectedCategoryId = signal<number>(0);
-
+  
+  public $articles = signal<PostData[]>([]);       // 250901 - Articles Signal
+  // public $selectedCategoryId = signal<number>(0);  // 250903 - Selected Category ID Signal
+  public $selectedCategory = signal<Category | null>(null);  // 250906 - Selected Category Signal
+  public $categoriesFilter = signal<'unassigned' | 'all' | 'byCategory'>('unassigned');  // 250906 - Categories Filter Signal
 
 
 
@@ -125,6 +126,13 @@ export class BackEnd {
     return result;
   }
 
+  // 250906 - Set Selected Category Signal
+  async setSelectedCategorySignal(category_id: number): Promise<void> {
+    this.$selectedCategory.set(await this.getCategoryById(category_id));
+  }
+  getCategoryById(id: number): Promise<Category | null> {
+    return this.ipcInvoke<Category | null>('sqlite:get-category-by-id', id);
+  }
 
   // 250903
   async setArticlesByCategoryIdSignal(category_id: number): Promise<void> {
@@ -143,6 +151,7 @@ export class BackEnd {
   }
 
   
+
 
 
 

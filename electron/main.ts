@@ -44,6 +44,7 @@ import {
   getArticleById,
   getArticlesByCategoryId,
   getCategoriesByParentId,
+  getCategoryById,
   getCategoryIdsOfAnArticle,
   getPostBySlug,
   getSubcategoryForest,
@@ -813,9 +814,16 @@ ipcMain.handle('sqlite:get-articles-by-category-id', (event: any, category_id: n
 
 
 
-
-
-
+// 250906
+ipcMain.handle('sqlite:get-category-by-id', (event: any, id: number) => {
+  try {
+    const category = getCategoryById(id);
+    return category;
+  } catch (err) {
+    console.error('Error getting Category by id: "', id, '" ', err);
+    return null;
+  }
+});
 
 ipcMain.handle(
   'sqlite:get-categories-by-parent-id',
