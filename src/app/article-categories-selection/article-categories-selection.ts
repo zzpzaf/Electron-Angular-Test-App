@@ -6,6 +6,8 @@ import { NzTreeModule } from 'ng-zorro-antd/tree';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzToolTipModule } from 'ng-zorro-antd/tooltip';
+import { NzDividerModule } from 'ng-zorro-antd/divider';
+import { PostData } from '../../../shared/projectObjects/varObjects';
 
 
 @Component({
@@ -14,7 +16,8 @@ import { NzToolTipModule } from 'ng-zorro-antd/tooltip';
     NzTreeModule, 
     NzButtonModule, 
     NzIconModule,
-    NzToolTipModule
+    NzToolTipModule,
+    NzDividerModule,
   ],
   templateUrl: './article-categories-selection.html',
   styleUrl: './article-categories-selection.scss'
@@ -30,6 +33,7 @@ export class ArticleCategoriesSelection {
   readonly $selectedKeys = signal<string[]>([]); // (optional) highlight behavior
 
   @Input() initialKeys: number[] = [];
+  @Input() row: PostData | null = null; // optional, for context
   readonly $initialKeyStrings = computed(() => (this.initialKeys ?? []).map(String));
   readonly $checkedKeys = signal<string[]>([]);
 

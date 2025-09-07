@@ -121,7 +121,7 @@ export class ArticlesTable {
     // 3) Create the drawer and pass the initial keys to the content component
     const drawerRef = this.drawer.create<
       ArticleCategoriesSelection,
-      { initialKeys: number[] },
+      { initialKeys: number[], row: PostData },
       number[] | undefined
     >({
       nzTitle: 'Select/Unselect article categories',
@@ -130,7 +130,7 @@ export class ArticlesTable {
       nzClosable: true,
       nzMaskClosable: true,
       nzContent: ArticleCategoriesSelection,
-      nzContentParams: { initialKeys }
+      nzContentParams: { initialKeys, row }
     });
 
     // 4) On close, persist the final selection 

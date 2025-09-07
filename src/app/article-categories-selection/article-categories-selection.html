@@ -1,45 +1,55 @@
 <!-- <p>article-categories-selection works!</p> -->
- <div class="p-3">
-  <div class="mb-2 flex gap-8 items-center">
-    <button nz-button nzType="default" (click)="$checkedKeys.set([])">
-      <span nz-icon nzType="clear"></span> Clear
-    </button>
-    <button nz-button nzType="default" (click)="cancel()">Cancel</button>
-    <button nz-button nzType="primary" (click)="applyAndClose()">Apply</button>
-   <!-- 
-    <label class="flex items-center gap-2">
-      <input type="checkbox" [checked]="checkStrictly" (change)="checkStrictly = !checkStrictly" />
-      Check strictly
-    </label> 
-    -->
+ <div class="shell">
+
+
+  <div class="header">
+    <div class="header-left">
+      <img src="{{ row?.image }}" alt="icon" />
+    </div>
+    <div class="header-right">
+      <div class="title">{{ row?.title }}</div>
+      <!-- <div class="description">
+        This is a longer multi-line description.  
+        It can wrap to multiple lines.
+      </div> -->
+    </div>
   </div>
 
-  <nz-tree
-    [nzData]="$treeNodes()"
-    [nzExpandedKeys]="$expandedKeys()"
-    [nzSelectedKeys]="$selectedKeys()"
-    [nzCheckedKeys]="$checkedKeys()"
-    [nzCheckable]="true"
-    [nzCheckStrictly]="true"
-    nzBlockNode
-    (nzClick)="onTreeNodeClick($any($event))"
-    (nzExpandChange)="onTreeNodeExpandChange($event)"
-    (nzCheckboxChange)="onCheck($any($event))">
-    <!-- <ng-template #nzTreeTemplate let-node>
-      <span 
-        [attr.title]="null"
-        nz-tooltip 
-        [nzTooltipTitle]="node.title + ' - ' + node.key">
-        {{ node.title }}
-      </span>
-    </ng-template> -->
-  </nz-tree>
 
+  <div class="toolbar p-3">
+    <div class="buttons">
+      <button nz-button nzType="primary" (click)="applyAndClose()">Apply</button>
+      <button nz-button nzType="default" (click)="$checkedKeys.set([])">
+        <span nz-icon nzType="clear"></span> Clear
+      </button>
+      <button nz-button nzType="default" (click)="cancel()">Cancel</button>
+    </div>
+  </div>
 
-  <!-- Footer actions inside the component so it works both embedded and in a drawer -->
-  <!-- <div class="mt-4 flex justify-end gap-2">
-    <button nz-button nzType="default" (click)="cancel()">Cancel</button>
-    <button nz-button nzType="primary" (click)="applyAndClose()">Apply</button>
-  </div> -->
+  <nz-divider class="tight-divider" nzType="horizontal"></nz-divider>
+
+  <div class="tree-scroll">
+    <nz-tree
+      [nzData]="$treeNodes()"
+      [nzExpandedKeys]="$expandedKeys()"
+      [nzSelectedKeys]="$selectedKeys()"
+      [nzCheckedKeys]="$checkedKeys()"
+      [nzCheckable]="true"
+      [nzCheckStrictly]="true"
+      nzBlockNode
+      (nzClick)="onTreeNodeClick($any($event))"
+      (nzExpandChange)="onTreeNodeExpandChange($event)"
+      (nzCheckboxChange)="onCheck($any($event))">
+      <!-- <ng-template #nzTreeTemplate let-node>
+        <span 
+          [attr.title]="null"
+          nz-tooltip 
+          [nzTooltipTitle]="node.title + ' - ' + node.key">
+          {{ node.title }}
+        </span>
+      </ng-template> -->
+    </nz-tree>
+  </div>
+
 </div>
 
