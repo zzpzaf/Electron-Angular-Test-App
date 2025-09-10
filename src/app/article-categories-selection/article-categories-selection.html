@@ -36,6 +36,7 @@
       [nzCheckedKeys]="$checkedKeys()"
       [nzCheckable]="true"
       [nzCheckStrictly]="true"
+      [nzTreeTemplate]="nodeTpl"
       nzBlockNode
       (nzClick)="onTreeNodeClick($any($event))"
       (nzExpandChange)="onTreeNodeExpandChange($event)"
@@ -51,5 +52,48 @@
     </nz-tree>
   </div>
 
-</div>
+
+<ng-template #nodeTpl let-node>
+  <span
+    class="node-label"
+    (contextmenu)="onRightClick($event, node.origin)"  
+  >
+    <!-- {{ node.title }} ' - ' {{ node.key }} -->
+    {{ node.title }}  
+  </span>
+</ng-template>  
+
+
+
+<!-- Context menu -->
+<nz-dropdown-menu #ctxMenu="nzDropdownMenu">
+  <ul nz-menu class="ctx-item">
+    <li nz-menu-item (click)="openAddSubcategoryModal()">
+      ➕ Add/Insert a sub-category
+    </li>
+  </ul>
+</nz-dropdown-menu>
+
+<!-- Modal content (template reference for NzModalService) -->
+<ng-template #addSubcategoryTpl>
+  <form [formGroup]="popUpForm" (ngSubmit)="popUpFormSubmitAdd()" autocomplete="off">
+    <nz-form-item>
+      <nz-form-label>
+        <label>Name</label>
+      </nz-form-label>
+      <nz-form-control [nzValidateStatus]="popUpForm.controls.categoryName">
+        <input nz-input formControlName="categoryName" placeholder="New Category Name" />
+        @if (popUpForm.controls.categoryName.invalid && popUpForm.controls.categoryName.touched) {
+          <div class="ant-form-item-explain-error">
+            Category Name is required
+          </div>
+        }
+      </nz-form-control>
+    </nz-form-item>
+  </form>
+</ng-template>
+
+
+
+
 

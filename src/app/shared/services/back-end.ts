@@ -134,6 +134,12 @@ export class BackEnd {
     return this.ipcInvoke<Category | null>('sqlite:get-category-by-id', id);
   }
 
+  // 250907
+  addNewCategory(name: string, parentId: number): Promise<Category> {
+    return this.ipcInvoke<Category>('sqlite:add-new-category', name, parentId);
+  }
+
+
   // 250903
   async setArticlesByCategoryIdSignal(category_id: number): Promise<void> {
     this.$articles.set(await this.getArticlesByCategoryId(category_id));

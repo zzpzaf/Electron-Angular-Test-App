@@ -660,6 +660,75 @@ export function getCategoryById(id: number): Promise<Category | null> {
 }
 
 
+// 250907
+// Adds a new category to the database.
+// Returns the created category or null if it is failed.
+// Examples:
+// Root category with default description = ''
+// const cat1 = addNewCategory('AI');
+// Subcategory with explicit description
+// const cat2 = addNewCategory('Neural Networks', 1, 'Deep learning related topics');
+// Subcategory with parent but no description (defaults to '')
+// const cat3 = addNewCategory('Tools', 1);
+export function addNewCategory(
+  name: string,
+  parentId?: number,
+  description: string = ''
+): Category | null {
+  if (!mainDb) {
+    console.error('>===>> No Main DB connection.');
+    return null;
+  }
+
+  const trimmed = (name ?? '').trim();
+  if (!trimmed) {
+    console.error('>===>> addNewCategory: empty name is not allowed.');
+    return null;
+  }
+
+  const parent: number | null =
+    typeof parentId === 'number' && Number.isInteger(parentId) ? parentId : null;
+
+  if (parent !== null) {
+    const parentExists = mainDb.prepare('SELECT 1 FROM categories WHERE id = ? LIMIT 1').get(parent);
+    if (!parentExists) {
+      console.error(`>===>> addNewCategory: parent_id ${parent} does not exist.`);
+      return null;
+    }
+  }
+
+  try {
+    const insert = mainDb.prepare(`
+      INSERT INTO categories (name, description, parent_id)
+      VALUES (@name, @description, @parent_id)
+      ON CONFLICT(name, parent_id) DO NOTHING
+    `);
+
+    const info = insert.run({
+      name: trimmed,
+      description: description ?? '',
+      parent_id: parent,
+    });
+
+    if (info.changes !== 1) {
+      // duplicate or failed insert
+      return null;
+    }
+
+    // Correct generic order: [params], Row
+    const sel = mainDb.prepare<[number], Category>(
+      `SELECT id, name, description, parent_id FROM categories WHERE id = ?`
+    );
+    const row = sel.get(Number(info.lastInsertRowid));
+    return row ?? null;
+  } catch (err) {
+    console.error('>===>> addNewCategory error:', err);
+    return null;
+  }
+}
+
+
+
 
 /**
  * 250819

@@ -116,7 +116,7 @@ export class ArticlesTable {
     // 2) Fetch initial category ids 
     // const initialKeys: number[]  = [41, 44, 97];
     const initialKeys: number[] = await this.backendService.getCategoryIdsOfAnArticle(articleId);
-    console.log('>===>> Initial category keys for article id', articleId, ':', initialKeys);
+    console.log('>===>> ArticlesTable - openCategoryDrawer -Initial category keys for article id', articleId, ':', initialKeys);
 
     // 3) Create the drawer and pass the initial keys to the content component
     const drawerRef = this.drawer.create<
@@ -139,25 +139,30 @@ export class ArticlesTable {
       console.log('>===>> Selected category keys:', selectedKeys);
       // Persist the selected category ids for the article
       const result = await this.backendService.updateArticleCategories(articleId, selectedKeys);
-      console.log('>===>> Update article categories result:', result);
+      console.log('>===>> ArticlesTable - Update article categories result:', result);
       this.updateArticlesTable();
     });
   }
 
   // 250906
   updateArticlesTable() {
+    console.log('>===>> ArticlesTable - updateArticlesTable: Filter: ', this.filter);
     switch (this.filter) {
       case 'all':
         this.backendService.setAllArticlesSignal();
+        console.log('>===>> ArticlesTable - updateArticlesTable: ALL');
         break;
       case 'unassigned':
         this.backendService.setUncategorizedArticlesSignal();
+        console.log('>===>> ArticlesTable - updateArticlesTable: UNCATEGORIZED');
         break;
       case 'byCategory':
          this.backendService.setArticlesByCategoryIdSignal(this.backendService.$selectedCategory()?.id ?? 0);
+         console.log('>===>> ArticlesTable - updateArticlesTable: BYCATEGORY');
         break;
       default:
         this.$articles.set(this.backendService.$articles());
+         console.log('>===>> ArticlesTable - updateArticlesTable: DEFAULT ???');
     }
   }
 

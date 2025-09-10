@@ -25,22 +25,7 @@ export class CategoryNodes {
     this.getCategoryForestByParentId();
   }
 
-  private mapCategoryNodesToTree(nodes: CategoryNode[]): NzTreeNodeOptions[] {
-    const catTreeNodes: NzTreeNodeOptions[] = nodes.map((n) => ({
-      key: String(n.id),
-      // title: n.name ?? '(untitled)',
-      title:
-        // n.name !== null && n.name !== undefined
-        //   ? n.name + '-' + String(n.id)
-        //   : '(untitled)',
-        n.name !== null && n.name !== undefined ? n.name : '(untitled)',
-      children: n.subCategoryNode
-        ? this.mapCategoryNodesToTree(n.subCategoryNode)
-        : [],
-      isLeaf: !n.subCategoryNode || n.subCategoryNode.length === 0,
-    }));
-    return catTreeNodes;
-  }
+
 
   private async getCategoryForestByParentId(parent_Id?: null | number) {
     try {
@@ -56,6 +41,24 @@ export class CategoryNodes {
         error
       );
     }
+  }
+
+
+  private mapCategoryNodesToTree(nodes: CategoryNode[]): NzTreeNodeOptions[] {
+    const catTreeNodes: NzTreeNodeOptions[] = nodes.map((n) => ({
+      key: String(n.id),
+      // title: n.name ?? '(untitled)',
+      title:
+        // n.name !== null && n.name !== undefined
+        //   ? n.name + '-' + String(n.id)
+        //   : '(untitled)',
+        n.name !== null && n.name !== undefined ? n.name : '(untitled)',
+      children: n.subCategoryNode
+        ? this.mapCategoryNodesToTree(n.subCategoryNode)
+        : [],
+      isLeaf: !n.subCategoryNode || n.subCategoryNode.length === 0,
+    }));
+    return catTreeNodes;
   }
 
   

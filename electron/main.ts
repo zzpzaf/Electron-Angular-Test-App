@@ -39,6 +39,7 @@ import { backupOrgPlacesSQLite } from './dbs/sqlite/sqlite3-utils';
 import { shell } from 'electron';
 import { closeDBConnections } from './dbs/sqlite/connections';
 import {
+  addNewCategory,
   deleteAllArticleCategories,
   getAllArticles,
   getArticleById,
@@ -821,6 +822,17 @@ ipcMain.handle('sqlite:get-category-by-id', (event: any, id: number) => {
     return category;
   } catch (err) {
     console.error('Error getting Category by id: "', id, '" ', err);
+    return null;
+  }
+});
+
+// 250907
+ipcMain.handle('sqlite:add-new-category', (event: any, name: string, parentId: number) => {
+  try {
+    const category = addNewCategory(name, parentId);
+    return category;
+  } catch (err) {
+    console.error('Error adding new Category: "', name, '" ', err);
     return null;
   }
 });
