@@ -673,7 +673,7 @@ export function getCategoryById(id: number): Promise<Category | null> {
 export function addNewCategory(
   name: string,
   parentId?: number,
-  description: string = ''
+  description?: string
 ): Category | null {
   if (!mainDb) {
     console.error('>===>> No Main DB connection.');
@@ -727,8 +727,58 @@ export function addNewCategory(
   }
 }
 
+// 250910
+export function updateCategoryById(id: number, name: string, parentId: number | null, description?: string): boolean {
+  if (!mainDb) {
+    console.error('>===>> No Main DB connection.');
+    return false;
+  }
+
+  const trimmed = (name ?? '').trim();
+  if (!trimmed) {
+    console.error('>===>> updateCategoryById: empty name is not allowed.');
+    return false;
+  }
+
+  try {
+    const stmt = mainDb.prepare(`
+      UPDATE categories
+      SET name = @name, parent_id = @parent_id, description = @description
+      WHERE id = @id
+    `);
+    const result = stmt.run({
+      id,
+      name: trimmed,
+      parent_id: parentId,
+      description: description ?? '',
+    });
+    return result.changes === 1;
+  } catch (err) {
+    console.error('Error updating category by id:', err);
+    return false;
+  }
+}
 
 
+
+// 250910
+export function deleteCategoryById(id: number): boolean {
+  if (!mainDb) {
+    console.error('>===>> No Main DB connection.');
+    return false;
+  }
+
+  try {
+    const stmt = mainDb.prepare<{ id: number }, { changes: number }>(`
+      DELETE FROM categories WHERE id = @id
+    `);
+    const result = stmt.run({ id });
+    return result.changes === 1;
+  } catch (err) {
+    console.error('Error deleting category by id:', err);
+    return false;
+  }
+}
 
 /**
  * 250819

@@ -9,7 +9,7 @@ export interface SiderMenuItem {
 // Main Application Menu Items
 export const MainAppMenuItems :  MainAppMenuItem[] = [
   { id: 1, label: 'Scraping', siderMenuName: 'SiderScrapeMenuItems' },
-  { id: 2, label: 'Articles', siderMenuName: 'SiderArticlesMenuItems'},
+  { id: 2, label: 'Database', siderMenuName: 'SiderArticlesMenuItems'},
   { id: 3, label: 'Other', siderMenuName: 'SiderArticlesMenuItems'}
 ]
 

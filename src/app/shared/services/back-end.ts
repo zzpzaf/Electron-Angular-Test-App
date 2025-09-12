@@ -13,6 +13,8 @@ export class BackEnd {
 
   
   public $articles = signal<PostData[]>([]);       // 250901 - Articles Signal
+  public $categories = signal<Category[]>([]);   // 250901 - Categories Signal
+
   // public $selectedCategoryId = signal<number>(0);  // 250903 - Selected Category ID Signal
   public $selectedCategory = signal<Category | null>(null);  // 250906 - Selected Category Signal
   public $categoriesFilter = signal<'unassigned' | 'all' | 'byCategory'>('unassigned');  // 250906 - Categories Filter Signal
@@ -135,10 +137,21 @@ export class BackEnd {
   }
 
   // 250907
-  addNewCategory(name: string, parentId: number): Promise<Category> {
-    return this.ipcInvoke<Category>('sqlite:add-new-category', name, parentId);
+  addNewCategory(name: string, parentId: number, description?: string): Promise<Category> {
+    return this.ipcInvoke<Category>('sqlite:add-new-category', name, parentId, description);
   }
 
+  // 250910 - Delete Category By Id
+  async deleteCategoryById(id: number): Promise<boolean> {
+    const result = await this.ipcInvoke<boolean>('sqlite:delete-category-by-id', id);
+    return result;
+  }
+
+  // 250910
+  async updateCategoryById(id: number, name: string, parentId: number | null, description?: string): Promise<boolean> {
+    const result = await this.ipcInvoke<boolean>('sqlite:update-category-by-id', id, name, parentId, description);
+    return result;
+  }
 
   // 250903
   async setArticlesByCategoryIdSignal(category_id: number): Promise<void> {
@@ -147,6 +160,9 @@ export class BackEnd {
   getArticlesByCategoryId(category_id: number): Promise<PostData[]> {
     return this.ipcInvoke<PostData[]>('sqlite:get-articles-by-category-id', category_id);
   }
+  
+
+
 
   // 250904
   async setAllArticlesSignal(): Promise<void> {
@@ -159,14 +175,25 @@ export class BackEnd {
   
 
 
-
-
-
-
+  // 250910
+  async setAllCategoriesSignal(): Promise<void> {
+    const categories: Category[] = await this.getCategoriesByParentId();
+    this.$categories.set(categories);
+  }
+  async setRootCategoriesSignal(): Promise<void> {
+     const categories: Category[] = await this.getCategoriesByParentId(null);
+     this.$categories.set(categories);
+  }
+  async setSubCategoriesByParentIdSignal(parent_id: number): Promise<void> {
+    const categories: Category[] = await this.getCategoriesByParentId(parent_id);
+    this.$categories.set(categories);
+  }
 
   getCategoriesByParentId(parent_id? : null | number): Promise<Category[]> {
      return this.ipcInvoke<Category[]>('sqlite:get-categories-by-parent-id', parent_id);
   }
+
+
   getCategoryForestByParentId(parent_id? : null | number): Promise<CategoryNode[]> {
      return this.ipcInvoke<CategoryNode[]>('sqlite:get-sub-category-forest-by-parent-id', parent_id);
   }

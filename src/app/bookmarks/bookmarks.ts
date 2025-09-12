@@ -15,6 +15,7 @@ import {
 import { BackEnd } from '../shared/services/back-end';
 import { NzTreeNodeOptions } from 'ng-zorro-antd/tree';
 import { NzTreeSelectModule } from 'ng-zorro-antd/tree-select';
+import { CategoryNodes } from '../shared/services/category-nodes';
 
 const rootFolderName = 'unfiled'; // id = 5
 
@@ -66,7 +67,7 @@ export class Bookmarks {
   };
   private dlgService = inject(DlgService);
   private scrapper = inject(Articlebasicscraper);
-
+  private categoryNodesService = inject(CategoryNodes);
   // private backService = inject(BackEnd);
   // private workingPlacesSqliteFullPathName: string = '';
 
@@ -115,29 +116,29 @@ export class Bookmarks {
 
   onTreeSelectFolderChange(selectedId: string) {
     this.selectedFolderName = selectedId;
-    const result = this.findTreeSelectNodeWithAncestors(
-      this.treeNodes,
-      selectedId
-    );
+    // const result = this.findTreeSelectNodeWithAncestors(
+    //   this.treeNodes,
+    //   selectedId
+    // );
+    const fsnp = this.categoryNodesService.getFullAncestorsPath(this.treeNodes, selectedId);
+    // if (!result) {
+    //   this.bookmarkFolder = '';
+    //   console.warn('Selected folder not found');
+    //   return;
+    // }
 
-    if (!result) {
-      this.bookmarkFolder = '';
-      console.warn('Selected folder not found');
-      return;
-    }
-
-    const { node, ancestors } = result;
-    const selectedNodeTitle = node.title ?? '';
-    this.bookmarkFolder = selectedNodeTitle;
-    this.selectedfolderNodeId = node.key as unknown as number;
-    const ancestorTitles = ancestors.map((a) => a.title).filter(Boolean);
-    console.log('Selected folder:', node.title);
-    const ansectorsString = ancestorTitles.join(' > ');
-    console.log('Ancestor path:', ansectorsString); // or use array directly
-    const fsnp =
-      ansectorsString.length > 0
-        ? ansectorsString + ' > ' + selectedNodeTitle
-        : selectedNodeTitle;
+    // const { node, ancestors } = result;
+    // const selectedNodeTitle = node.title ?? '';
+    // this.bookmarkFolder = selectedNodeTitle;
+    // this.selectedfolderNodeId = node.key as unknown as number;
+    // const ancestorTitles = ancestors.map((a) => a.title).filter(Boolean);
+    // console.log('Selected folder:', node.title);
+    // const ansectorsString = ancestorTitles.join(' > ');
+    // console.log('Ancestor path:', ansectorsString); // or use array directly
+    // const fsnp =
+    //   ansectorsString.length > 0
+    //     ? ansectorsString + ' > ' + selectedNodeTitle
+    //     : selectedNodeTitle;
 
     this.fullSelectedNodePathLabel.set(
       'Bookmark Folder Name' + '  (' + fsnp + ')'
@@ -145,6 +146,14 @@ export class Bookmarks {
 
     this.getNumberOfUniqueLinksOfFolder(this.selectedfolderNodeId);
     this.getFolderLinksContentsById(this.selectedfolderNodeId);
+
+    let selectedNodeTitle = '';
+    if (fsnp && fsnp.length > 0) {
+      selectedNodeTitle = fsnp.lastIndexOf(' > ') === -1
+      ? fsnp
+      : fsnp.substring(fsnp.lastIndexOf(' > ') + 3);
+    }
+
 
     if (selectedNodeTitle.length > 0) {
       this.importedUrlsArrayString.set('');
@@ -188,27 +197,27 @@ export class Bookmarks {
     return undefined;
   }
 
-  private findTreeSelectNodeWithAncestors(
-    nodes: NzTreeNodeOptions[],
-    key: string,
-    path: NzTreeNodeOptions[] = []
-  ): { node: NzTreeNodeOptions; ancestors: NzTreeNodeOptions[] } | undefined {
-    for (const n of nodes) {
-      const newPath = [...path, n];
-      if (n.key === key) {
-        return { node: n, ancestors: path };
-      }
-      if (n.children) {
-        const result = this.findTreeSelectNodeWithAncestors(
-          n.children,
-          key,
-          newPath
-        );
-        if (result) return result;
-      }
-    }
-    return undefined;
-  }
+  // private findTreeSelectNodeWithAncestors(
+  //   nodes: NzTreeNodeOptions[],
+  //   key: string,
+  //   path: NzTreeNodeOptions[] = []
+  // ): { node: NzTreeNodeOptions; ancestors: NzTreeNodeOptions[] } | undefined {
+  //   for (const n of nodes) {
+  //     const newPath = [...path, n];
+  //     if (n.key === key) {
+  //       return { node: n, ancestors: path };
+  //     }
+  //     if (n.children) {
+  //       const result = this.findTreeSelectNodeWithAncestors(
+  //         n.children,
+  //         key,
+  //         newPath
+  //       );
+  //       if (result) return result;
+  //     }
+  //   }
+  //   return undefined;
+  // }
 
   async onScrape(): Promise<void> {
     let loading = true;

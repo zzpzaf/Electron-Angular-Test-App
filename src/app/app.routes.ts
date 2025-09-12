@@ -11,6 +11,7 @@ import { SingleUrl } from './single-url/single-url';
 import { DbArticles } from './db-articles/db-articles';
 import { MarkViewer } from './mark-viewer/mark-viewer';
 import { Layout } from './layout/layout';
+import { Categories } from './categories/categories';
 // import { ArticlesTable } from './articles-table/articles-table';
 
 
@@ -35,6 +36,7 @@ export const appRoutes: Routes = [
       { path: 'file-urls', component: FileUrls },
       { path: 'bookmarks', component: Bookmarks },
       { path: 'dbarticles', component: DbArticles },
+      { path: 'categories', component: Categories }
       // { path: 'articles-table', component: ArticlesTable },
     ]
   }, 

@@ -41,6 +41,7 @@ import { closeDBConnections } from './dbs/sqlite/connections';
 import {
   addNewCategory,
   deleteAllArticleCategories,
+  deleteCategoryById,
   getAllArticles,
   getArticleById,
   getArticlesByCategoryId,
@@ -57,6 +58,7 @@ import {
   updateArticleById,
   updateArticleCategories,
   updateArticleContentById,
+  updateCategoryById,
 } from './dbs/sqlite/mandb_queries';
 import { attachContextMenu } from './context/context-menu';
 
@@ -827,13 +829,35 @@ ipcMain.handle('sqlite:get-category-by-id', (event: any, id: number) => {
 });
 
 // 250907
-ipcMain.handle('sqlite:add-new-category', (event: any, name: string, parentId: number) => {
+ipcMain.handle('sqlite:add-new-category', (event: any, name: string, parentId: number, description?: string) => {
   try {
-    const category = addNewCategory(name, parentId);
+    const category = addNewCategory(name, parentId, description);
     return category;
   } catch (err) {
     console.error('Error adding new Category: "', name, '" ', err);
     return null;
+  }
+});
+
+// 250910
+ipcMain.handle('sqlite:update-category-by-id', (event: any, id: number, name: string, parentId: number | null, description?: string) => {
+  try {
+    const result = updateCategoryById(id, name, parentId, description);
+    return result;
+  } catch (err) {
+    console.error('Error updating Category by id: "', id, '" ', err);
+    return false;
+  }
+});
+
+// 250910
+ipcMain.handle('sqlite:delete-category-by-id', (event: any, id: number) => {
+  try {
+    const result = deleteCategoryById(id);
+    return result;
+  } catch (err) {
+    console.error('Error deleting Category by id: "', id, '" ', err);
+    return false;
   }
 });
 

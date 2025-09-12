@@ -1,0 +1,225 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  /* Fill available height provided by parent */
+  height: 100%;  /* must be constrained by a parent */
+  min-height: 0; /* critical for flex scrolling */
+  //   overflow: hidden; /* keep scroll only in the middle area */
+  background: #6caec9;
+}
+
+
+
+// .header-row {
+//   display: flex;
+//   align-items: center;
+//   justify-content: space-between;
+//   margin-bottom: 12px;
+//   gap: 12px;
+// }
+
+.header-row { 
+//  flex: 0 0 auto; 
+//   align-items: center;
+//   width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;            /* space between items */
+  margin: 8px;
+  height: 36px;
+  background-color: azure;
+  border-radius: 3px;
+}
+
+.header-row .left-text {
+  flex: 1 1 auto;
+  padding-left: 4px;
+}
+
+.header-row .right-checkbox-toggle {
+  flex: 0 0 auto;
+  margin-left: auto;      /* push to the right */
+  white-space: nowrap;    /* prevent wrapping */
+}
+
+.header-row .right-checkbox-toggle {
+  display: flex;
+  align-items: baseline !important;
+}
+
+/* Center the checkbox + label text */
+:host ::ng-deep .root-toggle.ant-checkbox-wrapper {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;                 /* avoid tall baseline pushing text up */
+}
+/* Center the text node span that NG-ZORRO inserts */
+:host ::ng-deep .root-toggle.ant-checkbox-wrapper > span:last-child {
+  display: inline-flex;
+  align-items: center;
+}
+
+
+
+.table-area {
+  flex: 1 1 auto;
+  min-height: 0;    /* critical so overflow works in flex */
+  overflow: auto;   /* scrolls here */
+  margin-left: 8px;
+  margin-right: 8px;
+  border-radius: 4px;
+}
+
+/* Adds inner padding on the left of the table content (header + body) */
+:host ::ng-deep .ant-table-container table > thead > tr > th:first-child,
+:host ::ng-deep .ant-table-container table > tbody > tr > td:first-child {
+  padding-left: 16px !important;
+}
+
+.actions-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;  /* space between buttons */
+  margin: 8px;
+}
+.actions-row .spacer {
+  flex: 1 1 auto; /* pushes buttons to the right */
+}
+
+
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+.table-area thead th {
+  position: sticky;
+  top: 0;
+  background: #c4dff1;
+  z-index: 1;
+}
+
+
+.table-area thead th {
+  z-index: 1;
+  border-bottom: 2px solid #1a1a44 !important;
+}
+
+thead tr {
+  height: 36px;
+  font-size: medium;  
+  border-radius: 3px;
+
+}
+
+
+tbody tr {
+  cursor: pointer;
+}
+tbody tr.selected {
+  background: rgba(24, 144, 255, 0.12);
+}
+.form-grid .grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+@media (min-width: 720px) {
+  .form-grid .grid {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+}
+.error {
+  color: #ff4d4f;
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+
+
+
+
+/* The modal host wrapper (optional, just keeps things neat) */
+.modal-container {
+  padding: 0 8px;
+}
+
+/* Form grid: single column, vertical spacing between items */
+.form-grid .grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;            /* space between fields */
+}
+
+/* Ensure each item spans full width */
+.form-grid nz-form-item {
+  width: 100%;
+}
+
+/* Make controls fill the row */
+.form-grid input[nz-input],
+.form-grid nz-select {
+  width: 100%;
+}
+
+/* If you previously had a media query that switches to 3 columns,
+   remove it or force single-column everywhere: */
+// @media (min-width: 720px) {
+//   .form-grid .grid { flex-direction: column; } /* keep stacked */
+// }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* Bold + optional color for root categories */
+.name.root {
+  font-weight: 700;          /* make it bold */
+  color: #052249;       
+}
+
+/* optional: keep non-roots normal weight */
+.name { font-weight: 400; }
+
+
+.no-wrap .ant-table-cell,
+.no-wrap .ant-table-thead > tr > th,
+.no-wrap .ant-table-tbody > tr > td {
+  white-space: nowrap !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;   /* don’t break at hyphens/long words */
+  text-overflow: clip;                /* no ellipsis */
+}
+
+.id-cell {
+  text-align: right;
+  padding-right: 8px;
+  /* optional: make digits align perfectly */
+  font-variant-numeric: tabular-nums;
+}
+
+
+
+.full-ancestors {
+  display: block;
+  font-size: 8px;
+  color: rgb(62, 61, 61);
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
