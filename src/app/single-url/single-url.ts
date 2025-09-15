@@ -54,7 +54,6 @@ import { NzTreeNode, NzTreeNodeOptions } from 'ng-zorro-antd/tree';
 })
 export class SingleUrl {
   private fb = inject(NonNullableFormBuilder);
-  private scrapper = inject(Articlebasicscraper);
   public scrappedDataArray = signal<PostData[]>([]);
   public postMetaDataString = signal<string>('');
   public linkScrapeForm!: FormGroup;
@@ -370,7 +369,7 @@ export class SingleUrl {
     let urlsArray: string[] = [];
     if (urlValue && urlValue.trim().length > 0) urlsArray.push(urlValue.trim());
     try {
-      const response = await this.scrapper.scrapeTabsList(urlsArray);
+      const response = await this.articlebasicscraper.scrapeTabsList(urlsArray);
       if (response.success) {
         let result: PostData[] = []; // default
         if (Array.isArray(response.data) && response.data.length > 0) {
@@ -464,11 +463,17 @@ export class SingleUrl {
     // );
   }
 
+
+
+
   async onDBInsert() {
     if (this.markdownString().length > 0) {
       await this.insertScrapedArticlesArrayToDB(this.scrappedDataArray());
     }
   }
+
+
+
 
   /**
    * Inserts the scraped data array into the main database.
@@ -533,6 +538,10 @@ export class SingleUrl {
       console.error('Error inserting URLs to main DB:', err);
     }
   }
+
+
+
+
 
   async updateScrapedArticleById(articleData: PostData) {
     if (!articleData || articleData.id == null) return;

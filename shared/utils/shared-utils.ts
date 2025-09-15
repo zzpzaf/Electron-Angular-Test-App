@@ -57,13 +57,13 @@ export function analyzeListedLink(url: string): listURLData {
 }
 
 export function getMediumSlugFromUrl(url: string): string {
-  console.log('Link to be analyzed for slug: ', url);
+  // console.log('Link to be analyzed for slug: ', url);
   if (url.trim().length === 0) return '';
   const urlObj = new URL(url);
   const pathname = urlObj.pathname;
-  console.log('Link Pathname: ', pathname);
+  // console.log('Link Pathname: ', pathname);
   const parts = getPathNameParts(pathname);
-  console.log('>===>> URL Path Name has: ', parts.length, ' - parts: ', parts);
+  // console.log('>===>> URL Path Name has: ', parts.length, ' - parts: ', parts);
   if (parts.length === 0) return '';
   return parts[parts.length-1];
 }

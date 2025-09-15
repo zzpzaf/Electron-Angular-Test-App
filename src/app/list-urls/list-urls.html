@@ -5,7 +5,7 @@
   class="login-form"
   (ngSubmit)="submitForm()"
 >
-  <nz-form-item class="login-form-spacer"></nz-form-item>
+  <!-- <nz-form-item class="login-form-spacer"></nz-form-item> -->
 
   <nz-form-item class="login-form-input">
     <nz-form-control nzErrorTip="Please input the URL" nzExtra="Enter/type, paste or drop a List URL here, e.g. a Medium List URL">
@@ -31,6 +31,23 @@
   <nz-form-item>
     <button nz-button [nzType]="'primary'">Scrape</button>
   </nz-form-item>
+
+  <nz-form-item class="simple-select-input-row">
+    <nz-tree-select
+      #catSel="nzTreeSelect"
+      formControlName="selectCategory"
+      style="width: 100%"
+      nzPlaceHolder="Select a Category for the Article to be Scraped"
+      [nzNodes]="$categoryNodes()"
+      [nzDefaultExpandAll]="true"
+      [nzCheckable]="true"
+      [nzMultiple]="true"
+      [nzCheckStrictly]="true"
+      [nzShowSearch]="true"
+    >
+    </nz-tree-select>
+  </nz-form-item>
+
 </form>
 
 <!-- @if (scrappedError().length > 0) {
@@ -46,20 +63,20 @@
 <div class="text-area-container">
   <textarea
     nz-input
-    [(ngModel)]="scrappedDataArrayString"
+    [(ngModel)]="$scrappedDataArrayString"
     class="stretch-textarea"
   ></textarea>
 
   <div class="button-container">
 
     <button nz-button nzType="primary"
-      [disabled]="scrappedDataArrayString().length === 0  && linkURL().length === 0" 
+      [disabled]="$scrappedDataArrayString().length === 0  && linkURL().length === 0" 
       (click)="onClearScrappedData()">
       Clear
     </button>
 
     <button nz-button nzType="primary"
-      [disabled]="scrappedDataArrayString().length === 0" 
+      [disabled]="$scrappedDataArrayString().length === 0" 
       (click)="onCopyScrappedData()">
       Copy
     </button>
@@ -67,7 +84,7 @@
     <button
       nz-button
       nzType="primary"
-      [disabled]="scrappedDataArrayString().length === 0" 
+      [disabled]="$scrappedDataArrayString().length === 0" 
       (click)="onSaveScrappedData()"
     >
       Save
