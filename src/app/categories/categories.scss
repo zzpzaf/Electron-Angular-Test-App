@@ -36,6 +36,12 @@
   padding-left: 4px;
 }
 
+.header-row .left-text .match-indicator {
+  color: #1890ff;
+  font-weight: 600;
+  margin-left: 8px;
+}
+
 .header-row .right-checkbox-toggle {
   flex: 0 0 auto;
   margin-left: auto;      /* push to the right */
@@ -45,6 +51,50 @@
 .header-row .right-checkbox-toggle {
   display: flex;
   align-items: baseline !important;
+}
+
+/* Search input styling */
+.header-row .search-container {
+  position: relative;
+  width: 250px;
+}
+
+.header-row .search-container .clear-button {
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.header-row .search-container input[nz-input] {
+  padding-right: 30px;
+}
+
+/* Search input border styling */
+:host ::ng-deep .header-row nz-input-group .ant-input {
+  border: 2px solid #d9d9d9 !important;
+  border-radius: 6px !important;
+  transition: border-color 0.3s ease !important;
+}
+
+:host ::ng-deep .header-row nz-input-group .ant-input:hover {
+  border-color: #40a9ff !important;
+}
+
+:host ::ng-deep .header-row nz-input-group .ant-input:focus,
+:host ::ng-deep .header-row nz-input-group .ant-input:focus-within {
+  border-color: #1890ff !important;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
+  outline: none !important;
 }
 
 /* Center the checkbox + label text */
@@ -222,4 +272,24 @@ tbody tr.selected {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Search highlighting styles */
+/* Text highlighting - this works */
+:host ::ng-deep .search-highlight {
+  background-color: #fffb8f !important;
+  color: #d46b08 !important;
+  font-weight: 600 !important;
+  padding: 1px 2px !important;
+  border-radius: 2px !important;
+}
+
+/* Row highlighting - target table cells directly (this works) */
+:host ::ng-deep tr.highlighted > td {
+  background-color: #a0d1e7 !important;
+  // border-left: 4px solid #faad14 !important;
+}
+
+:host ::ng-deep tr.highlighted:hover > td {
+  background-color: #fff1b8 !important;
 }

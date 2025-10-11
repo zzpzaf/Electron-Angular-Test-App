@@ -1,6 +1,37 @@
-<!-- Header row: count + Root Only toggle -->
+<!-- Header row: count + Search + Root Only toggle -->
 <div class="header-row">
-  <span class="left-text">Categories fetched: {{ $categories().length }}</span>
+  <span class="left-text">
+    Categories fetched: {{ $categories().length }}
+    @if ($searchText()) {
+      <span class="match-indicator"> | Matches: {{ $matchingRowsCount() }}</span>
+    }
+  </span>
+
+  <!-- Search input -->
+  <div style="position: relative; width: 250px;">
+    <nz-input-group nzSize="default">
+      <input 
+        type="text" 
+        nz-input 
+        placeholder="Search by name..." 
+        [ngModel]="$searchText()"
+        (ngModelChange)="$searchText.set($event)"
+        [ngModelOptions]="{ standalone: true }"
+        style="padding-right: 30px;"
+      />
+    </nz-input-group>
+    @if ($searchText()) {
+      <button 
+        nz-button 
+        nzType="text" 
+        nzSize="small" 
+        (click)="clearSearch()"
+        style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); z-index: 10; padding: 0; width: 20px; height: 20px; border: none; background: transparent;"
+      >
+        <span nz-icon nzType="close" style="font-size: 12px;"></span>
+      </button>
+    }
+  </div>
 
   <label
     class="right-checkbox-toggle"
@@ -46,6 +77,7 @@
       <tr
         (click)="onRowClick(cat)"
         [class.selected]="selected() && selected()!.id === cat.id"
+        [class.highlighted]="isRowHighlighted(cat)"
       >
         <td class="id-cell">{{ cat.id }}</td>
         <!-- <td>{{ cat.name }}</td> -->
@@ -54,8 +86,8 @@
           <span 
           class="name"
           [class.root]="($levelById().get(cat.id) ?? 0) === 0"  
-          [style.padding-left.px]="($levelById().get(cat.id) ?? 0) * 16">
-            {{ cat.name }}
+          [style.padding-left.px]="($levelById().get(cat.id) ?? 0) * 16"
+          [innerHTML]="getHighlightedName(cat.name)">
           </span>
         </td>
 

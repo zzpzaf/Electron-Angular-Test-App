@@ -15,6 +15,7 @@ import {
   Validators,
 } from '@angular/forms';
 import { CommonModule } from '@angular/common';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 
 import { Category } from '../../../shared/projectObjects/varObjects';
 import { BackEnd } from '../shared/services/back-end';
@@ -29,6 +30,7 @@ import { NzFormModule } from 'ng-zorro-antd/form';
 import { CategoryNodes } from '../shared/services/category-nodes';
 import { NzTreeSelectModule } from 'ng-zorro-antd/tree-select';
 import { NzTreeNode, NzTreeNodeOptions } from 'ng-zorro-antd/tree';
+import { NzIconModule } from 'ng-zorro-antd/icon';
 
 import { toSignal } from '@angular/core/rxjs-interop';
 import { startWith } from 'rxjs';
@@ -105,6 +107,7 @@ import { DlgService } from '../shared/services/dlg-service';
     NzModalModule,
     NzFormModule,
     NzTreeSelectModule,
+    NzIconModule,
   ],
   templateUrl: './categories.html',
   styleUrl: './categories.scss',
@@ -115,6 +118,7 @@ export class Categories {
   private categoryNodesService = inject(CategoryNodes);
   private dlgService = inject(DlgService);
   private fb = inject(FormBuilder);
+  private sanitizer = inject(DomSanitizer);
 
   /** Local categories signal populated from backendService.$categories via an effect */
   $categories = signal<Category[]>([]);
@@ -138,6 +142,17 @@ export class Categories {
   /** UI state */
   readonly selected = signal<Category | null>(null);
   readonly rootOnly = signal<boolean>(false);
+  readonly $searchText = signal<string>('');
+
+  /** Computed signal for matching rows count */
+  readonly $matchingRowsCount = computed(() => {
+    const searchTerm = this.$searchText().toLowerCase().trim();
+    if (!searchTerm) return 0;
+    
+    return this.$rowsForTable().filter(cat => 
+      cat.name.toLowerCase().includes(searchTerm)
+    ).length;
+  });
 
   readonly modalVisible = signal<boolean>(false);
   readonly isEditMode = signal<boolean>(false);
@@ -430,5 +445,35 @@ export class Categories {
     ) ?? '';
     const addOn: string = this.fullAncestorsPath ? ' (' + (parent_id !== null ? String(parent_id) : '') + ')' : ' (no ancestors)'; 
     this.fullAncestorsPath = this.fullAncestorsPath + addOn;
+  }
+
+  // Search functionality methods
+  clearSearch(): void {
+    this.$searchText.set('');
+  }
+
+  isRowHighlighted(category: Category): boolean {
+    const searchTerm = this.$searchText().toLowerCase().trim();
+    if (!searchTerm) return false;
+    return category.name.toLowerCase().includes(searchTerm);
+  }
+
+  getHighlightedName(name: string): SafeHtml {
+    const searchTerm = this.$searchText().toLowerCase().trim();
+    if (!searchTerm) {
+      return this.sanitizer.bypassSecurityTrustHtml(name);
+    }
+
+    const index = name.toLowerCase().indexOf(searchTerm);
+    if (index === -1) {
+      return this.sanitizer.bypassSecurityTrustHtml(name);
+    }
+
+    const beforeMatch = name.substring(0, index);
+    const match = name.substring(index, index + searchTerm.length);
+    const afterMatch = name.substring(index + searchTerm.length);
+
+    const highlightedHtml = `${beforeMatch}<mark class="search-highlight">${match}</mark>${afterMatch}`;
+    return this.sanitizer.bypassSecurityTrustHtml(highlightedHtml);
   }
 }
