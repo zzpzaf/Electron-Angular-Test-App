@@ -1,3 +1,5 @@
+<!-- 1st Row -  URL IINPUT LOGIN FORM -->
+
 <form
   nz-form
   nzLayout="inline"
@@ -8,7 +10,10 @@
   <!-- <nz-form-item class="login-form-spacer"></nz-form-item> -->
 
   <nz-form-item class="login-form-input">
-    <nz-form-control nzErrorTip="Please input the URL" nzExtra="Enter/type, paste or drop a List URL here, e.g. a Medium List URL">
+    <nz-form-control
+      nzErrorTip="Please input the URL"
+      nzExtra="Enter/type, paste or drop a List URL here, e.g. a Medium List URL"
+    >
       <nz-input-group>
         <input
           type="text"
@@ -32,31 +37,88 @@
     <button nz-button [nzType]="'primary'">Scrape</button>
   </nz-form-item>
 
-  <nz-form-item class="simple-select-input-row">
-    <nz-tree-select
-      #catSel="nzTreeSelect"
-      formControlName="selectCategory"
-      style="width: 100%"
-      nzPlaceHolder="Select a Category for the Article to be Scraped"
-      [nzNodes]="$categoryNodes()"
-      [nzDefaultExpandAll]="true"
-      [nzCheckable]="true"
-      [nzMultiple]="true"
-      [nzCheckStrictly]="true"
-      [nzShowSearch]="true"
-    >
-    </nz-tree-select>
-  </nz-form-item>
+  <!-- 
+  2nd row - TO BE UPDATED WITH: 
+  CATEGORY SELECT, SEARCH & MATCHES COUNTER 
+  -->
 
+  <div class="category-row-container">
+    <div class="category-node-select-container">
+      <nz-form-item>
+        <!-- Tree Select (~75% width) -->
+        <nz-tree-select
+          #catSel="nzTreeSelect"
+          formControlName="selectCategory"
+          style="width: 100%"
+          nzPlaceHolder="Select a Category for the Article to be Scraped"
+          [nzNodes]="$categoryNodes()"
+          [nzDefaultExpandAll]="true"
+          [nzCheckable]="true"
+          [nzMultiple]="true"
+          [nzCheckStrictly]="true"
+          [nzShowSearch]="true"
+        >
+        </nz-tree-select>
+      </nz-form-item>
+    </div>
+
+    <!-- The Search Input (middle element in the row) ~20% ) -->
+    <div class="category-search-container">
+      <div class="search-input-wrapper">
+        <input
+          #searchInput
+          type="text"
+          nz-input
+          placeholder="Search categories..."
+          [ngModel]="$categorySearchText()"
+          (ngModelChange)="onCategorySearchChange($event)"
+          [ngModelOptions]="{ standalone: true }"
+          class="category-search-input"
+          (focus)="onSearchInputFocus()"
+        />
+        <div class="search-suffix-icons">
+          @if ($categorySearchText()) {
+          <button
+            nz-button
+            nzType="text"
+            nzSize="small"
+            (click)="clearCategorySearch()"
+            title="Clear search"
+            class="search-action-btn clear-btn"
+          >
+            <span nz-icon nzType="close"></span>
+          </button>
+          } @else {
+          <button
+            nz-button
+            nzType="text"
+            nzSize="small"
+            (click)="openTreeSelect()"
+            title="Open category selector"
+            class="search-action-btn search-btn"
+          >
+            <span nz-icon nzType="search"></span>
+          </button>
+          }
+        </div>
+      </div>
+    </div>
+
+    <!-- Matches Counter (5% width) -->
+    <div class="category-matches-counter">
+      <div class="matches-display">
+        <span class="matches-text" [class.no-search]="!$categorySearchText()">
+          @if ($categorySearchText()) { matches:
+          <span class="matches-count">{{ $matchesCount() }}</span>
+          } @else { no search }
+        </span>
+      </div>
+    </div>
+  </div>
 </form>
 
-<!-- @if (scrappedError().length > 0) {
-<div class="error-message">
-  <p>Error: {{ scrappedError() }}</p>
-</div>
-} -->
-
 <!-- ------------------------------------------------- -->
+<!-- Separator -->
 <div class="login-form-separator"></div>
 <!-- ------------------------------------------------- -->
 
@@ -68,27 +130,33 @@
   ></textarea>
 
   <div class="button-container">
-
-    <button nz-button nzType="primary"
-      [disabled]="$scrappedDataArrayString().length === 0  && linkURL().length === 0" 
-      (click)="onClearScrappedData()">
+    <button
+      nz-button
+      nzType="primary"
+      [disabled]="
+        $scrappedDataArrayString().length === 0 && linkURL().length === 0
+      "
+      (click)="onClearScrappedData()"
+    >
       Clear
     </button>
 
-    <button nz-button nzType="primary"
-      [disabled]="$scrappedDataArrayString().length === 0" 
-      (click)="onCopyScrappedData()">
+    <button
+      nz-button
+      nzType="primary"
+      [disabled]="$scrappedDataArrayString().length === 0"
+      (click)="onCopyScrappedData()"
+    >
       Copy
     </button>
 
     <button
       nz-button
       nzType="primary"
-      [disabled]="$scrappedDataArrayString().length === 0" 
+      [disabled]="$scrappedDataArrayString().length === 0"
       (click)="onSaveScrappedData()"
     >
       Save
     </button>
   </div>
-
 </div>
