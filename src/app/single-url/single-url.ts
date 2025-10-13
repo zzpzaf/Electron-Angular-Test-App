@@ -1,6 +1,6 @@
 // single-url.ts
 
-import { afterNextRender, Component, effect, inject, signal, ViewChild } from '@angular/core';
+import { afterNextRender, Component, effect, inject, signal, ViewChild, computed, ElementRef } from '@angular/core';
 import {
   FormGroup,
   NonNullableFormBuilder,
@@ -13,6 +13,7 @@ import { NzCheckboxModule } from 'ng-zorro-antd/checkbox';
 import { NzFormModule } from 'ng-zorro-antd/form';
 import { NzInputModule } from 'ng-zorro-antd/input';
 import { NzTreeSelectComponent, NzTreeSelectModule } from 'ng-zorro-antd/tree-select';
+import { NzIconModule } from 'ng-zorro-antd/icon';
 
 import { Articlebasicscraper } from '../shared/services/articlebasicscraper';
 import {
@@ -28,7 +29,7 @@ import {
 import { DlgService } from '../shared/services/dlg-service';
 
 // import { marked } from 'marked';
-import { SafeHtml } from '@angular/platform-browser';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { BackEnd } from '../shared/services/back-end';
 import { from, Subscription } from 'rxjs';
 import { Markshow } from '../shared/services/markshow';
@@ -48,6 +49,7 @@ import { NzTreeNode, NzTreeNodeOptions } from 'ng-zorro-antd/tree';
     NzCheckboxModule,
     NzButtonModule,
     NzTreeSelectModule,
+    NzIconModule,
   ],
   templateUrl: './single-url.html',
   styleUrl: './single-url.scss',
@@ -82,21 +84,45 @@ export class SingleUrl {
   private loader = inject(LoaderService);
   private articlebasicscraper = inject(Articlebasicscraper);
   private categoryNodesService = inject(CategoryNodes);
+  private sanitizer = inject(DomSanitizer);
 
   public isNewArticle: boolean = false; // Flag to indicate if it's a new article
   private existingArticleData: PostData | null = null;
 
   public $categoryNodes = signal<NzTreeNodeOptions[]>([]);
+  
+  /** Search functionality signals */
+  public $categorySearchText = signal<string>('');
+  
+  /** Computed signal for matches count */
+  public $matchesCount = computed(() => {
+    const searchTerm = this.$categorySearchText().toLowerCase().trim();
+    if (!searchTerm) return 0;
+    
+    // Count matches in the tree nodes
+    return this.countMatches(this.categoryNodesService.$catTreeNodes(), searchTerm);
+  });
+  
+  /** Computed signal for category nodes with search-based expansion */
+  public $categoryNodesWithSearch = computed(() => {
+    const searchTerm = this.$categorySearchText().toLowerCase().trim();
+    const originalNodes = this.categoryNodesService.$catTreeNodes();
+    
+    if (!searchTerm) return originalNodes;
+    
+    // Return all nodes but with expanded state based on search matches
+    return this.setExpandedNodesForSearch(originalNodes, searchTerm);
+  });
 
   public selectedCategoryIds: number[] = [];
   // selectedCategoryKey: string | null = null;
   private categoryChangesSubscription?: Subscription;
   @ViewChild('catSel', { static: false }) catSel!: NzTreeSelectComponent;
+  @ViewChild('searchInput', { static: false }) searchInput!: ElementRef<HTMLInputElement>;
   
   constructor() {
-    effect(() => {
-      this.$categoryNodes.set(this.categoryNodesService.$catTreeNodes());
-    });
+    // Removed the effect that was causing endless loops
+    // Highlighting will be triggered manually when needed
   }
 
   ngOnInit(): void {
@@ -732,6 +758,292 @@ export class SingleUrl {
     }
   }
 
+  // Category search functionality methods
+  clearCategorySearch(): void {
+    this.$categorySearchText.set('');
+    this.clearTreeHighlights();
+  }
+
+  onCategorySearchChange(value: string): void {
+    this.$categorySearchText.set(value);
+    
+    // Open tree select when user types something
+    if (value.trim().length > 0 && this.catSel && !this.catSel.nzOpen) {
+      setTimeout(() => {
+        if (this.catSel && !this.catSel.nzOpen) {
+          this.catSel.openDropdown();
+          // The highlighting will be applied by onTreeOpenChange
+        }
+      }, 100);
+    } else if (value.trim().length > 0 && this.catSel && this.catSel.nzOpen) {
+      // Tree is already open, apply highlighting directly
+      this.highlightTreeNodes(value);
+    } else if (value.trim().length === 0) {
+      // Clear highlighting when search is empty
+      this.clearTreeHighlights();
+    }
+  }
+
+  // Handle search input focus
+  onSearchInputFocus(): void {
+    // If there's search text and dropdown is closed, open it
+    const searchText = this.$categorySearchText();
+    if (searchText && searchText.trim().length > 0 && this.catSel && !this.catSel.nzOpen) {
+      setTimeout(() => {
+        if (this.catSel && !this.catSel.nzOpen) {
+          this.catSel.openDropdown();
+        }
+      }, 100);
+    }
+  }
+
+  // Handle tree open/close events
+  onTreeOpenChange(isOpen: boolean): void {
+    console.log('Tree open state changed:', isOpen);
+    
+    if (isOpen) {
+      // Apply highlighting when tree opens - only once
+      const searchText = this.$categorySearchText();
+      if (searchText) {
+        console.log('Tree opened - applying highlighting for:', searchText);
+        setTimeout(() => this.highlightTreeNodes(searchText), 200);
+      }
+      
+      // Return focus to search input
+      setTimeout(() => {
+        if (this.searchInput) {
+          this.searchInput.nativeElement.focus();
+        }
+      }, 300);
+    } else {
+      // Clear highlights when tree closes
+      this.clearTreeHighlights();
+    }
+  }
+
+  // Method to manually open tree select 
+  openTreeSelect(): void {
+    if (this.catSel) {
+      this.catSel.openDropdown();
+    }
+  }
+
+  // Set expanded state for nodes that match search or have matching children
+  private setExpandedNodesForSearch(nodes: NzTreeNodeOptions[], searchTerm: string): NzTreeNodeOptions[] {
+    return nodes.map(node => {
+      const nodeMatches = node.title?.toString().toLowerCase().includes(searchTerm);
+      const hasMatchingChildren = node.children ? this.hasMatchingDescendants(node.children, searchTerm) : false;
+      
+      return {
+        ...node,
+        expanded: nodeMatches || hasMatchingChildren,
+        children: node.children ? this.setExpandedNodesForSearch(node.children, searchTerm) : undefined
+      };
+    });
+  }
+
+  private hasMatchingDescendants(nodes: NzTreeNodeOptions[], searchTerm: string): boolean {
+    return nodes.some(node => {
+      const nodeMatches = node.title?.toString().toLowerCase().includes(searchTerm);
+      const childrenMatch = node.children ? this.hasMatchingDescendants(node.children, searchTerm) : false;
+      return nodeMatches || childrenMatch;
+    });
+  }
+
+  // Count total matches in the tree
+  private countMatches(nodes: NzTreeNodeOptions[], searchTerm: string): number {
+    let count = 0;
+    for (const node of nodes) {
+      // Check if current node matches
+      if (node.title?.toString().toLowerCase().includes(searchTerm)) {
+        count++;
+      }
+      // Recursively count matches in children
+      if (node.children) {
+        count += this.countMatches(node.children, searchTerm);
+      }
+    }
+    return count;
+  }
+
+  // More robust highlighting that works with NG-ZORRO tree structure
+  private highlightTreeNodes(searchText: string): void {
+    if (!searchText) {
+      this.clearTreeHighlights();
+      return;
+    }
+    
+    console.log('=== HIGHLIGHTING DEBUG ===');
+    console.log('Search text:', searchText);
+    
+    // Clear existing highlights
+    this.clearTreeHighlights();
+    
+    // Wait for tree to render, then apply highlighting with multiple selectors
+    setTimeout(() => {
+      // Try multiple possible selectors for NG-ZORRO tree
+      const possibleSelectors = [
+        '.ant-tree-select-dropdown',
+        '.ant-select-dropdown',
+        '.ant-tree-dropdown', 
+        '[class*="tree-select"]',
+        '[class*="dropdown"]'
+      ];
+      
+      let treeDropdown = null;
+      for (const selector of possibleSelectors) {
+        treeDropdown = document.querySelector(selector);
+        if (treeDropdown) {
+          console.log('Found dropdown with selector:', selector);
+          break;
+        }
+      }
+      
+      if (!treeDropdown) {
+        console.log('❌ No tree dropdown found with any selector');
+        // Print all elements that might be the dropdown
+        const allDropdowns = document.querySelectorAll('[class*="dropdown"], [class*="tree"], [class*="select"]');
+        console.log('Available elements:', Array.from(allDropdowns).map(el => el.className));
+        return;
+      }
+
+      // Try multiple selectors for tree nodes
+      const nodeSelectors = [
+        '.ant-tree-title',
+        '.ant-tree-node-content-wrapper',
+        '[class*="tree-title"]',
+        '[class*="tree-node"]',
+        '[title]'
+      ];
+      
+      let treeNodes: NodeListOf<Element> | null = null;
+      for (const selector of nodeSelectors) {
+        const foundNodes = treeDropdown.querySelectorAll(selector);
+        if (foundNodes.length > 0) {
+          treeNodes = foundNodes;
+          console.log('Found', foundNodes.length, 'nodes with selector:', selector);
+          break;
+        }
+      }
+      
+      if (!treeNodes || treeNodes.length === 0) {
+        console.log('❌ No tree nodes found');
+        console.log('Dropdown HTML:', treeDropdown.innerHTML.substring(0, 500));
+        return;
+      }
+      
+      let highlightedCount = 0;
+      const searchLower = searchText.toLowerCase();
+      
+      Array.from(treeNodes).forEach((node: Element, index: number) => {
+        // Try to get text content from various possible locations
+        let text = '';
+        let titleElement: Element | null = null;
+        let wrapperElement: Element | null = null;
+        
+        if (node.classList.contains('ant-tree-title')) {
+          // Current node is the title, find its wrapper parent AND the row container
+          titleElement = node;
+          text = node.textContent?.toLowerCase() || '';
+          
+          // First find the title wrapper (nz-tree-node-title)
+          wrapperElement = node.closest('nz-tree-node-title') || 
+                          node.closest('.ant-select-tree-node-content-wrapper');
+          
+          // Then find the actual row container (nz-tree-node) for background highlighting
+          const rowElement = node.closest('nz-tree-node') || 
+                           node.closest('[class*="tree-treenode"]');
+          
+          // If we found the row element, use it for background; otherwise fall back to wrapper
+          if (rowElement) {
+            wrapperElement = rowElement;
+          }
+          
+          // If still no wrapper found, try other possible parent elements
+          if (!wrapperElement) {
+            wrapperElement = node.closest('[class*="tree-node"]') || 
+                            node.closest('[class*="content-wrapper"]') ||
+                            node.parentElement;
+          }
+        } else if (node.classList.contains('ant-tree-node-content-wrapper')) {
+          // Current node is the wrapper, find its title child
+          wrapperElement = node;
+          titleElement = node.querySelector('.ant-tree-title') || node;
+          text = titleElement.textContent?.toLowerCase() || '';
+        } else {
+          // Fallback: treat current node as title and find wrapper
+          titleElement = node;
+          text = node.textContent?.toLowerCase() || '';
+          wrapperElement = node.closest('.ant-tree-node-content-wrapper') || 
+                          node.closest('[class*="tree-node"]') || 
+                          node.parentElement;
+        }
+        
+        console.log(`Node ${index}: "${text.substring(0, 30)}..." matches: ${text.includes(searchLower)}`);
+        console.log(`  - Title element:`, titleElement?.tagName, titleElement?.className);
+        console.log(`  - Wrapper element:`, wrapperElement?.tagName, wrapperElement?.className);
+        
+        if (text.includes(searchLower) && wrapperElement) {
+          // Apply highlighting to the wrapper element (for background)
+          wrapperElement.setAttribute('data-highlighted', 'true');
+          wrapperElement.classList.add('search-highlighted');
+          
+          const wrapperHtml = wrapperElement as HTMLElement;
+          wrapperHtml.style.backgroundColor = 'rgba(255, 242, 232, 0.8)';
+          wrapperHtml.style.borderLeft = '4px solid #fa8c16';
+          wrapperHtml.style.borderRadius = '4px';
+          
+          // Apply text styling to the title element
+          if (titleElement) {
+            const titleHtml = titleElement as HTMLElement;
+            titleHtml.style.color = '#fa8c16';
+            titleHtml.style.fontWeight = '600';
+          }
+          
+          highlightedCount++;
+          console.log('✅ Highlighted node:', text.substring(0, 50));
+          console.log(`  - Applied data-highlighted to:`, wrapperElement.tagName, wrapperElement.className);
+        }
+      });
+      
+      console.log('Total highlighted:', highlightedCount, 'out of', treeNodes?.length || 0);
+      console.log('=== END HIGHLIGHTING DEBUG ===');
+      
+    }, 250); // Longer delay to ensure tree is fully rendered
+  }
+
+  private clearTreeHighlights(): void {
+    console.log('Clearing highlights...');
+    
+    // Remove style elements
+    const existingStyle = document.getElementById('tree-search-highlight-style');
+    if (existingStyle) {
+      existingStyle.remove();
+    }
+    
+    // Remove data attributes and inline styles
+    const highlightedNodes = document.querySelectorAll('[data-highlighted="true"], .search-highlighted');
+    Array.from(highlightedNodes).forEach(node => {
+      node.removeAttribute('data-highlighted');
+      node.classList.remove('search-highlighted');
+      
+      // Remove inline styles
+      const nodeHtml = node as HTMLElement;
+      nodeHtml.style.backgroundColor = '';
+      nodeHtml.style.borderLeft = '';
+      nodeHtml.style.borderRadius = '';
+      
+      const titleElement = node.querySelector('.ant-tree-title, [class*="title"]');
+      if (titleElement) {
+        const titleHtml = titleElement as HTMLElement;
+        titleHtml.style.color = '';
+        titleHtml.style.fontWeight = '';
+      }
+    });
+    
+    console.log('Cleared', highlightedNodes.length, 'highlighted nodes');
+  }
+
   // 250903
   // Set/Update the article's category(-ies)
   async setArticleCategories(articleId: number, categories: number[]) {
@@ -744,6 +1056,7 @@ export class SingleUrl {
     }
     return result;
   }
+
 }
 
 

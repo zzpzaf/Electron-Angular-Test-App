@@ -1,16 +1,9 @@
-<!-- <form
-  nz-form
-  nzLayout="inline"
-  [formGroup]="linkScrapeForm"
-  class="login-form"
-  (ngSubmit)="submitForm()"
-> -->
-<form
-  nz-form
-  nzLayout="inline"
-  [formGroup]="linkScrapeForm"
-  class="login-form"
->
+
+
+<!-- 1st Row -  URL IINPU LOGIN FORM -->
+
+<form nz-form nzLayout="inline" [formGroup]="linkScrapeForm" class="login-form">
+  
   <nz-form-item class="login-form-spacer"></nz-form-item>
 
   <nz-form-item class="login-form-input">
@@ -37,37 +30,104 @@
     </label>
   </nz-form-item>
 
-  <nz-form-item class="simple-select-input-row"
-  >
-    <nz-tree-select
-      #catSel="nzTreeSelect"
-      formControlName="selectCategory"
-      style="width: 100%"
-      nzPlaceHolder="Select a Category for the Article to be Scraped"
-      [nzNodes]="$categoryNodes()"
-      [nzDefaultExpandAll]="true"
-      [nzCheckable]="true"
-      [nzMultiple]="true"
-      [nzCheckStrictly]="true"
-      [nzShowSearch]="true"
-    >
-    </nz-tree-select>
-  </nz-form-item>
 
+
+  <!-- 2nd row - CATEGORY SELECT, SEARCH & MATCHES COUNTER -->
+
+
+  <div class="category-row-container">
+
+    <div class="category-node-select-container">
+    <nz-form-item >
+      <!-- Tree Select (75% width) -->
+      <nz-tree-select
+        #catSel="nzTreeSelect"
+        formControlName="selectCategory"
+        class="category-tree-select"
+        nzPlaceHolder="Select a Category for the Article to be Scraped"
+        [nzNodes]="$categoryNodesWithSearch()"
+        [nzDefaultExpandAll]="false"
+        [nzCheckable]="true"
+        [nzMultiple]="true"
+        [nzCheckStrictly]="true"
+        [nzShowSearch]="false"
+        [nzAllowClear]="false"
+        (nzOpenChange)="onTreeOpenChange($event)"
+      >
+      </nz-tree-select>
+    </nz-form-item>
+    </div>
+
+    <!-- The Search Input (middle element in the row) ~20% ) -->
+    <div class="category-search-container">
+      <div class="search-input-wrapper">
+        <input
+          #searchInput
+          type="text"
+          nz-input
+          placeholder="Search categories..."
+          [ngModel]="$categorySearchText()"
+          (ngModelChange)="onCategorySearchChange($event)"
+          [ngModelOptions]="{ standalone: true }"
+          class="category-search-input"
+          (focus)="onSearchInputFocus()"
+        />
+        <div class="search-suffix-icons">
+          @if ($categorySearchText()) {
+          <button
+            nz-button
+            nzType="text"
+            nzSize="small"
+            (click)="clearCategorySearch()"
+            title="Clear search"
+            class="search-action-btn clear-btn"
+          >
+            <span nz-icon nzType="close"></span>
+          </button>
+          } @else {
+          <button
+            nz-button
+            nzType="text"
+            nzSize="small"
+            (click)="openTreeSelect()"
+            title="Open category selector"
+            class="search-action-btn search-btn"
+          >
+            <span nz-icon nzType="search"></span>
+          </button>
+          }
+        </div>
+      </div>
+    </div>
+
+    <!-- Matches Counter (5% width) -->
+    <div class="category-matches-counter">
+      <div class="matches-display">
+        <span class="matches-text" [class.no-search]="!$categorySearchText()">
+          @if ($categorySearchText()) { matches:
+          <span class="matches-count">{{ $matchesCount() }}</span>
+          } @else { no search }
+        </span>
+      </div>
+    </div>
+  </div>
 
 </form>
+
+
+
+
 
 <!-- Separator -->
 <div class="login-form-separator"></div>
 
-<span class="article-status"> 
-  @if (isNewArticle && postMetaDataString().length > 0) {
-    New Article Scraped !
-  } @else if (postMetaDataString().length > 0) {
-    *** Existing Article ***
-  }
-</span>
 
+<!-- TEXTAREA & PREVIEW AREAs-->
+
+<span class="article-status">
+  @if (isNewArticle && postMetaDataString().length > 0) { New Article Scraped !
+  } @else if (postMetaDataString().length > 0) { *** Existing Article *** }
+</span>
 
 <!-- Markdown Textarea / Preview container -->
 <div class="text-area-container">

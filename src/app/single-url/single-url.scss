@@ -1,32 +1,13 @@
 
-//  Moved to global styles.scss:
-//  @use '../../styles/markdown-styles.scss';
 
+
+/* =========================
+   GLOBAL / HOST + ROW 1
+   (kept as in your message)
+   ========================= */
 
 ::ng-deep .ant-checkbox-wrapper {
   color: rgb(63, 83, 237);
-}
-
-.login-form {
-  max-width: 100%;
-  width: 100%;
-  display: flex;
-  flex-wrap: wrap;
-  // gap: 8px;
-}
-
-.login-form-input {
-  flex: 1 1 auto;
-  min-width: 200px;
-}
-
-.login-form-item,
-.login-form-button {
-  flex: 0 0 auto;
-}
-
-::ng-deep .ant-input {
-  width: 100%;
 }
 
 /* Host container – fill viewport height so flex works */
@@ -35,32 +16,281 @@
   flex-direction: column;
   background-color: #011e39;
   justify-content: flex-start;
-  align-items: center;
   padding-top: 32px;
   height: 100%; /* Fill available viewport height */
   width: 100%;
+  align-items: stretch;
 }
 
-.login-form-spacer {
-  flex: 0 0 0.1%;
+/* ============ 1st Row - URL INPUT LOGIN FORM ============ */
+
+.login-form {
+  max-width: 100%;
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
 }
 
-.login-form-separator {
-  width: calc(100% - 36px);
-  max-width: 1200px;
-  height: 2px;
-  background-color: #eee89c;
-  margin: 16px auto;
-}
+.login-form-input { flex: 1 1 auto; min-width: 200px; }
+.login-form-item,
+.login-form-button { flex: 0 0 auto; }
+
+::ng-deep .ant-input { width: 100%; }
+
+.login-form-spacer { flex: 0 0 0.1%; }
+
+
 
 ::ng-deep .ant-form-item-extra {
   color: #6ba4d9;
   font-size: x-small;
 }
 
+
+
+/* ====================================================
+   2nd Row — CATEGORY | SEARCH | MATCHES (all 32px tall)
+   ==================================================== 
+*/
+
+.category-row-container {
+  // width: calc(100% - 36px);
+  // max-width: 1200px;
+  // margin: 0 auto;
+  
+
+   /* <— single source of truth */
+  --row-h: 32px;             
+  --row-left-margin: 16px;
+  --row-right-margin: 32px;
+
+  margin: 0;               /* stop centering */
+  margin-left: var(--row-left-margin);
+  margin-right: var(--row-right-margin);
+  width: calc(100% - var(--row-left-margin) - var(--row-right-margin));
+  max-width: none;         /* let the calc control width */
+
+  display: flex;
+  gap: 12px;
+  align-items: stretch;       /* every column gets the same height */
+  box-sizing: border-box;
+
+  //  overflow: hidden;         /* or: padding-bottom: 1px; margin-bottom: -1px; */
+  margin-bottom: 8px;         /* prevent scrollbar from causing layout shift */
+}
+
+/* columns behave consistently */
+.category-row-container > * {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+/* kill default 24px bottom margin from Ant form items inside col 1 */
+.category-row-container .ant-form-item {
+  margin-bottom: 0 !important;
+}
+
+/* ============== 1) LEFT (~72%) ============== */
+.category-node-select-container { flex: 0 1 72%; }
+
+.category-node-select-container > * {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding-block: 0;
+}
+
+.category-node-select-container .category-tree-select {
+  flex: 0 0 100%;
+  height: 100%;
+  width: 100%;
+}
+
+/* ANT select (scoped to this row) */
+.category-row-container .ant-select-selector {
+  height: var(--row-h) !important;
+  min-height: var(--row-h) !important;
+  padding-block: 0 !important;
+  display: flex; align-items: center;
+}
+.category-row-container .ant-select-selection-item,
+.category-row-container .ant-select-selection-placeholder {
+  line-height: var(--row-h) !important;
+}
+
+/* ============== 2) MIDDLE (~20%) ============== */
+.category-search-container {
+  flex: 0 1 20%;
+  min-width: 220px;
+  position: relative;
+}
+
+.category-search-container > input,
+.category-search-container > .search-input {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding-block: 0;
+  line-height: var(--row-h);
+  padding-right: 36px;        /* space for icon if used */
+}
+
+
+
+
+/* Search input wrapper to contain input + icons */
+.category-search-container .search-input-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.category-search-container .search-input-wrapper input {
+  width: 100%;
+  height: 100%;
+  padding-right: 32px; /* Make room for the icon */
+  border: 1px solid #d9d9d9;
+  border-radius: 2px;
+  box-sizing: border-box;
+}
+
+/* Search suffix icons container - positioned inside the input */
+.category-search-container .search-suffix-icons {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  z-index: 2001; /* Higher than search input z-index */
+  background: transparent;
+  pointer-events: auto; /* Ensure icons are clickable */
+}
+
+/* Search action buttons - styled to look integrated */
+.category-search-container .search-action-btn {
+  border: none;
+  background: transparent;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 2px;
+  min-width: 20px;
+  height: 20px;
+  font-size: 12px;
+}
+
+.category-search-container .search-action-btn:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.category-search-container .search-action-btn.clear-btn {
+  color: #ff4d4f;
+}
+
+.category-search-container .search-action-btn.search-btn {
+  color: #1890ff;
+}
+
+
+
+
+/* ANT input (scoped) */
+.category-row-container .ant-input-affix-wrapper,
+.category-row-container .ant-input {
+  height: var(--row-h) !important;
+  min-height: var(--row-h) !important;
+  padding-block: 0 !important;
+  line-height: var(--row-h) !important;
+  box-sizing: border-box;
+}
+
+/* optional icon inside the search box */
+.category-search-container .search-icon {
+  position: absolute;
+  right: 10px; top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+
+
+
+
+/* ============== 3) RIGHT (content-sized) ============== */
+.category-matches-counter {
+  margin-left: auto;          /* push to far right */
+  flex: 0 0 auto;
+  display: flex;
+  align-items: stretch;
+  white-space: nowrap;
+}
+
+.category-matches-counter .matches-display {
+  background: #fff;
+  border: 1px solid #d9d9d9;
+  border-radius: 2px;
+  height: var(--row-h);
+  min-height: var(--row-h);
+  padding: 0 12px;            /* horizontal only */
+  display: flex;
+  align-items: center;         /* center text vertically */
+  box-sizing: border-box;
+}
+
+.category-matches-counter .matches-display .matches-text {
+  font-size: 13px;
+  color: #595959;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.category-matches-counter .matches-display .matches-count {
+  color: #fa8c16;
+  font-weight: 600;
+}
+
+.category-matches-counter .matches-display .no-search {
+    color: #bfbfbf;
+    font-style: italic;
+}
+
+.category-matches-counter .matches-display * {
+  margin-block: 0;
+  line-height: 1;
+}
+
+
+
+
+/* debug (remove after): */
+// .category-row-container > * { outline: 1px dashed rgba(255,255,255,.25); }
+
+
+
+
+
+
+
+
 /* =========================
-   TEXTAREA & PREVIEW AREA
-   ========================= */
+   TEXTAREA & PREVIEW AREAs
+   ========================= 
+*/
+
+
+.login-form-separator {
+  width: calc(100% - 16px - 32px); /* Subtract both margins from 100% */
+  height: 2px;
+  background-color: #eee89c;
+  margin-left: 16px;
+  margin-right: 32px;
+}
+
+
 .text-area-container {
   display: flex;
   flex-direction: column;
@@ -72,16 +302,6 @@
   color: #011e39;
   font-size: smaller;
   gap: 12px; /* space between areas */
-
-  // /* Textarea styling */
-  // .stretch-textarea {
-  //   flex: 1; /* Take all available height in container */
-  //   font-size: smaller;
-  //   background-color: rgb(243, 238, 219);
-  //   resize: none;
-  //   width: 100%;
-  //   margin-bottom: 16px;
-  // }
 
   .ta {
     /* let each textarea be a flex item that can grow/shrink */
@@ -112,7 +332,6 @@
   }
 }
 
-
 .article-status {
   color: #6ba4d9;
   font-size: small;
@@ -120,20 +339,118 @@
   font-weight: bold;
 }
 
+/* =========================================
+   Various rest fixings and tweaks 
+   =========================================
+*/
 
-.simple-select-input-row {
-  display: flex;
-  flex: 1 1 auto;
-  width: 100%;
-  justify-content: flex-start;
-  align-items: center;
-  // margin-bottom: 8px;
-  // gap: 8px;
-  padding-left: 16px;
+/* Prevent tree-select from interfering with search input */
+:host ::ng-deep {
+  .ant-tree-select {
+    z-index: 1 !important;
+  }
 
+  .ant-tree-select-dropdown {
+    z-index: 1050 !important; // High enough but below search input
+  }
+
+  // Ensure search input area doesn't get covered
+  .category-search-container input {
+    pointer-events: auto !important;
+  }
+
+  // Prevent tree-select from auto-focusing when dropdown opens
+  .ant-tree-select-selection-search-input {
+    pointer-events: none !important;
+  }
+
+  // Keep search input focusable
+  .category-search-input {
+    pointer-events: auto !important;
+    z-index: 2000 !important;
+  }
 }
 
+/* Tree node search highlighting - Restored working methods */
+::ng-deep {
+  // Method #7 - Working method for border, transition and text styling
+  .ant-select-dropdown nz-tree-node[data-highlighted="true"] {
+    border-left: 4px solid #fa8c16 !important;
+    border-radius: 2px !important; // Reduced border radius to match search input
+    margin: 1px 0 !important;
+    transition: all 0.2s ease !important;
 
+    .ant-tree-title {
+      color: #fa8c16 !important;
+      font-weight: 600 !important;
+    }
+  }
+
+  // Method #10 - Working method for background color (highest specificity wins)
+  .ant-select-dropdown nz-tree-node[data-highlighted="true"][style] {
+    background-color: rgba(
+      176,
+      224,
+      230,
+      0.7
+    ) !important; // Light blue-green background
+    border-left: 4px solid #fa8c16 !important;
+    border-radius: 2px !important; // Reduced border radius to match search input
+
+    &:hover {
+      background-color: rgba(
+        236,
+        229,
+        151,
+        0.9
+      ) !important; // Light yellow on hover
+    }
+  }
+
+  // Fix for content wrapper hover - ensure it also gets the hover background
+  .ant-select-dropdown
+    nz-tree-node[data-highlighted="true"]:hover
+    .ant-select-tree-node-content-wrapper {
+    background-color: rgba(
+      236,
+      229,
+      151,
+      0.9
+    ) !important; // Same light yellow for content wrapper
+  }
+
+  // Additional targeting for the title area during hover
+  .ant-select-dropdown
+    nz-tree-node[data-highlighted="true"]:hover
+    nz-tree-node-title {
+    background-color: rgba(
+      236,
+      229,
+      151,
+      0.9
+    ) !important; // Same light yellow for title area
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .category-row-container {
+    flex-direction: column;
+    gap: 8px;
+
+    .category-tree-select,
+    .category-search-container,
+    .category-matches-counter {
+      flex: 1 1 100%;
+      width: 100%;
+    }
+
+    .category-matches-counter {
+      justify-content: center; // Center the matches counter on mobile
+      padding-left: 0;
+    }
+  }
+}
 
 ::ng-deep .ant-select-dropdown.ant-select-tree-dropdown {
   // margin-bottom: 150px !important; /* adjust as needed */
