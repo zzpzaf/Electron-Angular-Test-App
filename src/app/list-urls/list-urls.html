@@ -49,14 +49,16 @@
         <nz-tree-select
           #catSel="nzTreeSelect"
           formControlName="selectCategory"
-          style="width: 100%"
+          class="category-tree-select"
           nzPlaceHolder="Select a Category for the Article to be Scraped"
-          [nzNodes]="$categoryNodes()"
-          [nzDefaultExpandAll]="true"
+          [nzNodes]="$categoryNodesWithSearch()"
+          [nzDefaultExpandAll]="false"
           [nzCheckable]="true"
           [nzMultiple]="true"
           [nzCheckStrictly]="true"
-          [nzShowSearch]="true"
+          [nzShowSearch]="false"
+          [nzAllowClear]="false"
+          (nzOpenChange)="onTreeOpenChange($event)"
         >
         </nz-tree-select>
       </nz-form-item>
