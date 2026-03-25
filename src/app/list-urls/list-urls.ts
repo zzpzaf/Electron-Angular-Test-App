@@ -34,6 +34,7 @@ import { BackEnd } from '../shared/services/back-end';
 import { firstValueFrom, Subscription } from 'rxjs';
 import { LoaderService } from '../shared/services/loader-service';
 import { NzIconModule } from 'ng-zorro-antd/icon';
+import { Articlesmultiscraper } from '../shared/services/articlesmultiscraper';    // 260325
 
 // Adjust the import path as necessary
 
@@ -56,6 +57,7 @@ export class ListUrls {
   private fb = inject(NonNullableFormBuilder);
   public linkScrapeForm!: FormGroup;
   private articlebasicscraper = inject(Articlebasicscraper);
+  private articlesmultiscraper = inject(Articlesmultiscraper);    // 260325
   // public scrappedData = "";
   public scrappedError = signal<string>('');
   public scrappedData = signal<PostData | null>(null);
@@ -465,7 +467,15 @@ export class ListUrls {
         // console.log('>===>> Scrapped Data Array: ', this.$scrappedDataArray());
 
         // Insert scraped articles into the database, process/update article images and set/insert article categories
-        this.insertScrapedArticlesArrayToDB(this.$scrappedDataArray());
+        // this.insertScrapedArticlesArrayToDB(this.$scrappedDataArray());   // 260325
+
+        // 260325 - We moved the call to insertScrapedArticlesArrayToDB() inside the onGetFileUrls() function because we want to give the user the chance to review the scraped data and select a category before inserting into the DB. So, we will call insertScrapedArticlesArrayToDB() after the user clicks the "Get File URLs" button and after we get the file content from Electron.
+        await this.articlesmultiscraper.insertScrapedArticlesArrayToDB(
+          this.$scrappedDataArray(),
+          this.selectedCategoryIds
+        );
+
+
       }
     } catch (error) {
       console.error('Error scraping article data:', error);
@@ -504,167 +514,13 @@ export class ListUrls {
     );
   }
 
-  // 250913
-  /**
-   * Inserts the scraped data array into the main database.
-   * Displays a dialog with the result of the insertion.
-   * @param dataArray - The array of PostData to insert.
-   */
-  async insertScrapedArticlesArrayToDB(dataArray: PostData[]) {
-    if (dataArray.length === 0) return;
-    console.log(
-      '>===>> ListUrls - insertScrapedArticlesArrayToDB() Started ... Inserting scraped articles to DB:',
-      dataArray.length
-    );
-    try {
-      // 1. Insert all full-scraped articles int articles table
-      const insertedCount = await this.backendService.insertArticles(dataArray);
-
-      if (insertedCount > 0) {
-        // 2. Insert images for all articles in the dataArray
-        // 250827
-        // Insert images
-        this.processMarkdownContentImages(dataArray); // Process images after insertion
-
-        // 3. Set article categories for each full-scraped article iterating through the dataArray
-        for (const article of dataArray) {
-          const urlSlug = getMediumSlugFromUrl(article.link);
-          // Process each article's content images
-          const insertedArticleId = await this.backendService
-            .getPostDataBySlug(urlSlug)
-            .then((addedArticle) => addedArticle?.id);
-
-          // 250902
-          // Set article categories
-          console.log(
-            '>===>> Setting categories for article ID:',
-            insertedArticleId,
-            ' - Categories:',
-            this.selectedCategoryIds
-          );
-          if (this.selectedCategoryIds.length > 0) {
-            // this.setArticleCategories(dataArray[0].id!, this.selectedCategoryIds);
-            this.backendService
-              .updateArticleCategories(
-                insertedArticleId!,
-                this.selectedCategoryIds
-              )
-              .then((res) => {
-                console.log(
-                  '>===>> Article categories updated successfully?',
-                  res
-                );
-              });
-          }
-        }
-
-        this.dlgService
-          .popup({
-            token: 'succ',
-            header: 'Articles Inserted!',
-            content: insertedCount + ' articles were inserted to the main DB.',
-            posAnsMsg: 'OK',
-            negAnsMsg: '',
-          })
-          .subscribe((res) => console.log('Dialog closed with:', res));
-      } else {
-        console.error('Unexpected result from DB insert:', insertedCount);
-        this.dlgService
-          .popup({
-            token: 'error',
-            header: 'Error',
-            content: 'Failed to insert article(s) to the main DB.',
-            posAnsMsg: 'OK',
-            negAnsMsg: '',
-          })
-          .subscribe((res) => console.log('Dialog closed with:', res));
-      }
-    } catch (err) {
-      console.error('Error inserting URLs to main DB:', err);
-    }
-  }
-
-  // 250913
-  // 250827
-  // Process images in the markdown content
-  // This function iterates over each article and processes its images
-  //
-  async processMarkdownContentImages(articles: PostData[]) {
-    console.log('>===>> Starting processMarkdownContentImage() ...');
-    for (const article of articles) {
-      const urlSlug = getMediumSlugFromUrl(article.link);
-      // Process each article's content images
-      const articleData = await this.backendService.getPostDataBySlug(urlSlug);
-      if (articleData && articleData.id && articleData.content) {
-        // Process images in the markdown content
-        const imageProcessingResult =
-          await this.articlebasicscraper.processImagesForArticleMarkdownContent(
-            articleData.id,
-            articleData.link,
-            articleData.content
-          );
-        if (imageProcessingResult) {
-          // Update the article content in the database if it has changed
-          for (const extracted of imageProcessingResult.extracted) {
-            // Process each extracted image
-            // extracted --> { orderIndx: number; imgUrl: string }
-            console.log('>===>> Extracted image:', JSON.stringify(extracted));
-          }
-          for (const result of imageProcessingResult.results) {
-            // Update the article content with the processed image
-            // result --> { orgImgUrl: string; orderIndx?: number } & ImageDownloadResult
-            // ImageDownloadResult --> {
-            //   - success: true/false
-            //   - aborted: true if the download was aborted (e.g., due to size limits)
-            //   - reason: explanation for failure (if any)
-            //   - imageId: ID of the inserted image (if successful)
-            //   - inserted: true if a new record was inserted
-            //   - mime_type: MIME type of the image (if available)
-            //   - byte_length: size of the image in bytes (if available)
-            //   - sha256_hex: SHA-256 hash of the image (if available)
-            //   - file_name: original file name of the image (if available)
-            // }
-            console.log(
-              '>===>> Image processing result:',
-              JSON.stringify(result)
-            );
-          }
-
-          // Update the article content in the database
-          const updatedContent =
-            await this.articlebasicscraper.rewriteMarkdownWithDbLinks(
-              articleData.content,
-              // [{ orderIndx: result.orderIndx!, imgUrl: result.orgImgUrl, imageId: result.imageId }]
-              imageProcessingResult.results
-            );
-          if (updatedContent && updatedContent !== articleData.content) {
-            // Only update if content has changed
-            const updateResult =
-              await this.backendService.updateArticleContentById(
-                articleData.id,
-                updatedContent
-              );
-            if (updateResult) {
-              console.log(
-                `>===>> Article ID ${articleData.id} content updated with processed image links.`
-              );
-              // this.markdownString.set(updatedContent); // Update the preview with new content
-              // // console.log(
-              // //   '>===>> Article Content (Updated markdownString): ',
-              // //   this.markdownString()
-              // // );
-              // this.markdownPreview(updatedContent); // Refresh the preview
-            } else {
-              console.error(
-                `Failed to update content for Article ID ${articleData.id}.`
-              );
-            }
-          }
-        }
-      }
-    }
-  }
-
+  // 260325
+  // Both functions insertScrapedArticlesArrayToDB() and processMarkdownContentImages() that are related 
+  // to the processing of multiple articles, were moved to the Articlesmultiscraper service. 
+  // So, their logic relies in 1 shared place and can be used also from other components.
+  // async insertScrapedArticlesArrayToDB(dataArray: PostData[]) { . . .
+  // async processMarkdownContentImages(articles: PostData[]) { . . .
+  
 
 
 

@@ -8,6 +8,7 @@ import { StyleDrct } from '../shared/style-drct';
 import { extractAllNonImageUrls } from '../../../shared/utils/shared-utils';
 import { DlgService } from '../shared/services/dlg-service';
 import { Articlebasicscraper } from '../shared/services/articlebasicscraper';
+import { Articlesmultiscraper } from '../shared/services/articlesmultiscraper';
 import { PostData } from '../../../shared/projectObjects/varObjects';
 
 @Component({
@@ -42,6 +43,7 @@ export class FileUrls {
   };
   private dlgService = inject(DlgService);
   private scrapper = inject(Articlebasicscraper);
+  private articlesmultiscraper = inject(Articlesmultiscraper);
 
   // private fileDropService = inject(FikeDrop);
   // filePath = this.fileDropService.$filePath;
@@ -69,9 +71,19 @@ export class FileUrls {
             JSON.stringify(this.scrappedDataArray(), null, 2)
           );
         }
+
+        // 260325
+        // Insert scraped articles into the database via shared service.
+        await this.articlesmultiscraper.insertScrapedArticlesArrayToDB(
+          this.scrappedDataArray()
+          // No category selection in this component; pass [] to skip category assignment.
+        );
+
       } else {
         error = response.error;
       }
+
+
     } catch (err) {
       error = err;
     } finally {
@@ -197,4 +209,17 @@ export class FileUrls {
       console.error('Error saving scrapped data:', error);
     }
   }
+
+
+
+
+
+
+
+
+
+
+
+
+  
 }
