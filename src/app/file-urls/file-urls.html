@@ -50,6 +50,86 @@
     class="stretch-textarea1"
   ></textarea>
 
+
+  
+  <!-- Category selection row -->
+  <form [formGroup]="categorySelectForm">
+    <div class="category-row-container">
+      <div class="category-node-select-container">
+        <nz-form-item>
+          <nz-tree-select
+            #catSel="nzTreeSelect"
+            formControlName="selectCategory"
+            class="category-tree-select"
+            nzPlaceHolder="Select Categories for the Scraped Articles"
+            [nzNodes]="$categoryNodesWithSearch()"
+            [nzDefaultExpandAll]="false"
+            [nzCheckable]="true"
+            [nzMultiple]="true"
+            [nzCheckStrictly]="true"
+            [nzShowSearch]="false"
+            [nzAllowClear]="false"
+            nzVirtualHeight="320px"
+            nzDropdownClassName="file-urls-category-dropdown"
+            (nzOpenChange)="onTreeOpenChange($event)"
+          >
+          </nz-tree-select>
+        </nz-form-item>
+      </div>
+
+
+      <div class="category-search-container">
+        <div class="search-input-wrapper">
+          <input
+            #searchInput
+            type="text"
+            nz-input
+            placeholder="Search categories..."
+            [ngModel]="$categorySearchText()"
+            (ngModelChange)="onCategorySearchChange($event)"
+            [ngModelOptions]="{ standalone: true }"
+            class="category-search-input"
+            (focus)="onSearchInputFocus()"
+          />
+          <div class="search-suffix-icons">
+            @if ($categorySearchText()) {
+            <button
+              nz-button
+              nzType="text"
+              nzSize="small"
+              (click)="clearCategorySearch()"
+              title="Clear search"
+              class="search-action-btn clear-btn"
+            >
+              <span nz-icon nzType="close"></span>
+            </button>
+            } @else {
+            <button
+              nz-button
+              nzType="text"
+              nzSize="small"
+              (click)="openTreeSelect()"
+              title="Open category selector"
+              class="search-action-btn search-btn"
+            >
+              <span nz-icon nzType="search"></span>
+            </button>
+            }
+          </div>
+        </div>
+      </div>
+      <div class="category-matches-counter">
+        <div class="matches-display">
+          <span class="matches-text" [class.no-search]="!$categorySearchText()">
+            @if ($categorySearchText()) { matches:
+              <span class="matches-count">{{ $matchesCount() }}</span>
+            } @else { no search }
+          </span>
+        </div>
+      </div>
+    </div>
+  </form>
+
   <div class="scrape-button-row">
     <button
       nz-button

@@ -7,16 +7,74 @@ html, body {
 }
 
 /*
- * Fix: nz-tree-select dropdown scroll when opened inside a modal.
- * The dropdown renders via CDK overlay at <body> level, so ::ng-deep from
- * a component host cannot reach it — global styles are required.
+ * Tree-select dropdown sizing/highlighting (global because CDK overlay is at <body>).
+ * Keep enough height to reach deep category trees while still fitting viewport.
  */
 .ant-tree-select-dropdown .ant-select-tree-list {
-  max-height: 260px;
+  max-height: min(70vh, 640px);
   overflow-y: auto !important;
 }
+
 .ant-tree-select-dropdown .ant-select-tree-list-holder {
+  max-height: min(70vh, 640px);
   overflow-y: auto !important;
+}
+
+.ant-select-dropdown.ant-select-tree-dropdown.file-urls-category-dropdown {
+  max-height: 360px !important;
+}
+
+.ant-select-dropdown.ant-select-tree-dropdown.file-urls-category-dropdown .ant-select-tree-list,
+.ant-select-dropdown.ant-select-tree-dropdown.file-urls-category-dropdown .ant-select-tree-list-holder {
+  max-height: 320px !important;
+  overflow-y: auto !important;
+}
+
+.ant-select-dropdown.ant-select-tree-dropdown.file-urls-category-dropdown .cdk-virtual-scroll-viewport {
+  height: 320px !important;
+  max-height: 320px !important;
+}
+
+/* Enforce match highlight colors consistently across components. */
+.ant-tree-select-dropdown .search-highlighted {
+  background-color: rgba(176, 224, 230, 0.7) !important;
+  border-left: 4px solid #fa8c16 !important;
+  border-radius: 2px;
+}
+
+.ant-tree-select-dropdown .search-highlighted:hover {
+  background-color: rgba(236, 229, 151, 0.9) !important;
+}
+
+.ant-select-dropdown.ant-select-tree-dropdown.file-urls-category-dropdown nz-tree-node[data-highlighted="true"] {
+  border-left: 4px solid #fa8c16 !important;
+  border-radius: 2px !important;
+  margin: 1px 0 !important;
+  transition: all 0.2s ease !important;
+}
+
+.ant-select-dropdown.ant-select-tree-dropdown.file-urls-category-dropdown nz-tree-node[data-highlighted="true"] .ant-tree-title {
+  color: #fa8c16 !important;
+  font-weight: 600 !important;
+}
+
+.ant-select-dropdown.ant-select-tree-dropdown.file-urls-category-dropdown nz-tree-node[data-highlighted="true"][style] {
+  background-color: rgba(176, 224, 230, 0.7) !important;
+}
+
+.ant-select-dropdown.ant-select-tree-dropdown.file-urls-category-dropdown nz-tree-node[data-highlighted="true"][style]:hover {
+  background-color: rgba(236, 229, 151, 0.9) !important;
+}
+
+.ant-select-dropdown.ant-select-tree-dropdown.file-urls-category-dropdown nz-tree-node[data-highlighted="true"]:hover .ant-select-tree-node-content-wrapper,
+.ant-select-dropdown.ant-select-tree-dropdown.file-urls-category-dropdown nz-tree-node[data-highlighted="true"]:hover nz-tree-node-title {
+  background-color: rgba(236, 229, 151, 0.9) !important;
+}
+
+.ant-tree-select-dropdown .search-highlighted .ant-tree-title,
+.ant-tree-select-dropdown .ant-tree-title.search-highlighted {
+  color: #fa8c16 !important;
+  font-weight: 600 !important;
 }
 
 app-root, nz-layout {

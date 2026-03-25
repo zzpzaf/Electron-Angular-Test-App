@@ -1,5 +1,5 @@
-import { Component, effect, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { Component, computed, effect, ElementRef, inject, signal, ViewChild } from '@angular/core';
+import { FormsModule, FormGroup, NonNullableFormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzCheckboxModule } from 'ng-zorro-antd/checkbox';
 import { NzFormModule } from 'ng-zorro-antd/form';
@@ -10,15 +10,26 @@ import { DlgService } from '../shared/services/dlg-service';
 import { Articlebasicscraper } from '../shared/services/articlebasicscraper';
 import { Articlesmultiscraper } from '../shared/services/articlesmultiscraper';
 import { PostData } from '../../../shared/projectObjects/varObjects';
+import {
+  NzTreeSelectComponent,
+  NzTreeSelectModule,
+} from 'ng-zorro-antd/tree-select';
+import { NzTreeNodeOptions } from 'ng-zorro-antd/tree';
+import { NzIconModule } from 'ng-zorro-antd/icon';
+import { CategoryNodes } from '../shared/services/category-nodes';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'file-urls',
   imports: [
     FormsModule,
+    ReactiveFormsModule,
     NzFormModule,
     NzInputModule,
     NzCheckboxModule,
     NzButtonModule,
+    NzTreeSelectModule,
+    NzIconModule,
     StyleDrct,
   ],
   templateUrl: './file-urls.html',
@@ -44,11 +55,46 @@ export class FileUrls {
   private dlgService = inject(DlgService);
   private scrapper = inject(Articlebasicscraper);
   private articlesmultiscraper = inject(Articlesmultiscraper);
+  private fb = inject(NonNullableFormBuilder);
+  private categoryNodesService = inject(CategoryNodes);
 
   // private fileDropService = inject(FikeDrop);
   // filePath = this.fileDropService.$filePath;
 
+  public $categoryNodes = signal<NzTreeNodeOptions[]>([]);
+  public selectedCategoryIds: number[] = [];
+  private categoryChangesSubscription?: Subscription;
+  private dropdownScrollElement?: Element;
+  private treeScrollFrameId?: number;
+  public $categorySearchText = signal<string>('');
+
+  public $matchesCount = computed(() => {
+    const searchTerm = this.$categorySearchText().toLowerCase().trim();
+    if (!searchTerm) return 0;
+    return this.countMatches(this.categoryNodesService.$catTreeNodes(), searchTerm);
+  });
+
+  public $categoryNodesWithSearch = computed(() => {
+    const searchTerm = this.$categorySearchText().toLowerCase().trim();
+    const originalNodes = this.categoryNodesService.$catTreeNodes();
+    if (!searchTerm) return originalNodes;
+    return this.setExpandedNodesForSearch(originalNodes, searchTerm);
+  });
+
+  public categorySelectForm: FormGroup = this.fb.group({
+    selectCategory: this.fb.control<string[]>([]),
+  });
+
+  @ViewChild('catSel', { static: false }) catSel!: NzTreeSelectComponent;
+  @ViewChild('searchInput', { static: false }) searchInput!: ElementRef<HTMLInputElement>;
+
   constructor() {
+    effect(() => {
+      this.$categoryNodes.set(this.categoryNodesService.$catTreeNodes());
+    });
+    if (this.categoryNodesService.$catTreeNodes().length === 0) {
+      this.categoryNodesService.setCategoryTreeNodesSignal();
+    }
   }
 
   async onScrape(): Promise<void> {
@@ -72,11 +118,10 @@ export class FileUrls {
           );
         }
 
-        // 260325
         // Insert scraped articles into the database via shared service.
         await this.articlesmultiscraper.insertScrapedArticlesArrayToDB(
-          this.scrappedDataArray()
-          // No category selection in this component; pass [] to skip category assignment.
+          this.scrappedDataArray(),
+          this.selectedCategoryIds
         );
 
       } else {
@@ -168,10 +213,13 @@ export class FileUrls {
   }
 
   onClearScrapedData() {
-    this.scrappedDataArray.set([]); // Clear the Scraped Data array
-    this.scrappedDataArrayString.set(''); // Clear the string representation of the Scraped Data array
-    this.importedUrlsArrayString.set(''); // Clear the imported URLs
+    this.scrappedDataArray.set([]);
+    this.scrappedDataArrayString.set('');
+    this.importedUrlsArrayString.set('');
     this.fileName = '';
+    this.selectedCategoryIds = [];
+    this.categorySelectForm.reset({ selectCategory: [] });
+    this.$categorySearchText.set('');
   }
 
   onCopyScrapedData() {
@@ -208,6 +256,232 @@ export class FileUrls {
     } catch (error) {
       console.error('Error saving scrapped data:', error);
     }
+  }
+
+  ngAfterViewInit() {
+    this.categoryChangesSubscription = this.categorySelectForm.controls[
+      'selectCategory'
+    ].valueChanges.subscribe((keys: string[]) => {
+      this.selectedCategoryIds = keys
+        .map((key) => parseInt(key, 10))
+        .filter((id) => !isNaN(id));
+      console.log('>===>> FileUrls - selectedCategoryIds:', this.selectedCategoryIds);
+    });
+  }
+
+  ngOnDestroy() {
+    this.categoryChangesSubscription?.unsubscribe();
+    this.unbindDropdownScrollHighlight();
+    if (this.treeScrollFrameId) {
+      cancelAnimationFrame(this.treeScrollFrameId);
+    }
+  }
+
+  clearCategorySearch(): void {
+    this.$categorySearchText.set('');
+    this.clearTreeHighlights();
+  }
+
+  onCategorySearchChange(value: string): void {
+    this.$categorySearchText.set(value);
+    if (value.trim().length > 0 && this.catSel && !this.catSel.nzOpen) {
+      setTimeout(() => {
+        if (this.catSel && !this.catSel.nzOpen) {
+          this.catSel.openDropdown();
+        }
+      }, 100);
+    } else if (value.trim().length > 0 && this.catSel && this.catSel.nzOpen) {
+      this.highlightTreeNodes(value);
+    } else if (value.trim().length === 0) {
+      this.clearTreeHighlights();
+    }
+  }
+
+  onSearchInputFocus(): void {
+    const searchText = this.$categorySearchText();
+    if (searchText && searchText.trim().length > 0 && this.catSel && !this.catSel.nzOpen) {
+      setTimeout(() => {
+        if (this.catSel && !this.catSel.nzOpen) {
+          this.catSel.openDropdown();
+        }
+      }, 100);
+    }
+  }
+
+  onTreeOpenChange(isOpen: boolean): void {
+    if (isOpen) {
+      const searchText = this.$categorySearchText();
+      this.bindDropdownScrollHighlight();
+      if (searchText) {
+        setTimeout(() => this.highlightTreeNodes(searchText), 200);
+      }
+
+      setTimeout(() => {
+        if (this.searchInput) {
+          this.searchInput.nativeElement.focus();
+        }
+      }, 300);
+    } else {
+      this.unbindDropdownScrollHighlight();
+      this.clearTreeHighlights();
+    }
+  }
+
+  openTreeSelect(): void {
+    if (this.catSel) {
+      this.catSel.openDropdown();
+    }
+  }
+
+  private setExpandedNodesForSearch(nodes: NzTreeNodeOptions[], searchTerm: string): NzTreeNodeOptions[] {
+    return nodes.map(node => {
+      const nodeMatches = node.title?.toString().toLowerCase().includes(searchTerm);
+      const hasMatchingChildren = node.children ? this.hasMatchingDescendants(node.children, searchTerm) : false;
+      return {
+        ...node,
+        expanded: nodeMatches || hasMatchingChildren,
+        children: node.children ? this.setExpandedNodesForSearch(node.children, searchTerm) : undefined,
+      };
+    });
+  }
+
+  private hasMatchingDescendants(nodes: NzTreeNodeOptions[], searchTerm: string): boolean {
+    return nodes.some(node => {
+      const nodeMatches = node.title?.toString().toLowerCase().includes(searchTerm);
+      const childrenMatch = node.children ? this.hasMatchingDescendants(node.children, searchTerm) : false;
+      return nodeMatches || childrenMatch;
+    });
+  }
+
+  private countMatches(nodes: NzTreeNodeOptions[], searchTerm: string): number {
+    let count = 0;
+    for (const node of nodes) {
+      if (node.title?.toString().toLowerCase().includes(searchTerm)) {
+        count++;
+      }
+      if (node.children) {
+        count += this.countMatches(node.children, searchTerm);
+      }
+    }
+    return count;
+  }
+
+  private highlightTreeNodes(searchText: string): void {
+    if (!searchText) {
+      this.clearTreeHighlights();
+      return;
+    }
+
+    this.clearTreeHighlights();
+
+    setTimeout(() => {
+      const possibleSelectors = [
+        '.file-urls-category-dropdown',
+        '.ant-tree-select-dropdown',
+        '.ant-select-dropdown',
+      ];
+
+      let treeDropdown: Element | null = null;
+      for (const selector of possibleSelectors) {
+        treeDropdown = document.querySelector(selector);
+        if (treeDropdown) break;
+      }
+
+      if (!treeDropdown) return;
+
+      const titleNodes = treeDropdown.querySelectorAll('.ant-tree-title');
+      if (titleNodes.length === 0) return;
+
+      const searchLower = searchText.toLowerCase();
+
+      Array.from(titleNodes).forEach((titleElement: Element) => {
+        const text = titleElement.textContent?.trim().toLowerCase() || '';
+        const wrapperElement =
+          titleElement.closest('nz-tree-node') ||
+          titleElement.closest('[class*="tree-treenode"]') ||
+          titleElement.closest('.ant-select-tree-treenode') ||
+          titleElement.parentElement;
+
+        if (text.includes(searchLower) && wrapperElement) {
+          wrapperElement.setAttribute('data-highlighted', 'true');
+          wrapperElement.classList.add('search-highlighted');
+
+          const wrapperHtml = wrapperElement as HTMLElement;
+          wrapperHtml.style.backgroundColor = 'rgba(176, 224, 230, 0.7)';
+          wrapperHtml.style.borderLeft = '4px solid #fa8c16';
+          wrapperHtml.style.borderRadius = '2px';
+
+          const titleHtml = titleElement as HTMLElement;
+          titleHtml.style.color = '#fa8c16';
+          titleHtml.style.fontWeight = '600';
+        }
+      });
+    }, 250);
+  }
+
+  private bindDropdownScrollHighlight(): void {
+    this.unbindDropdownScrollHighlight();
+
+    setTimeout(() => {
+      const scrollElement = document.querySelector(
+        '.file-urls-category-dropdown .cdk-virtual-scroll-viewport, .file-urls-category-dropdown .ant-select-tree-list-holder'
+      );
+
+      if (!scrollElement) {
+        return;
+      }
+
+      this.dropdownScrollElement = scrollElement;
+      this.dropdownScrollElement.addEventListener('scroll', this.handleDropdownScroll, {
+        passive: true,
+      });
+    }, 250);
+  }
+
+  private unbindDropdownScrollHighlight(): void {
+    if (this.dropdownScrollElement) {
+      this.dropdownScrollElement.removeEventListener('scroll', this.handleDropdownScroll);
+      this.dropdownScrollElement = undefined;
+    }
+  }
+
+  private handleDropdownScroll = (): void => {
+    if (this.treeScrollFrameId) {
+      cancelAnimationFrame(this.treeScrollFrameId);
+    }
+
+    this.treeScrollFrameId = requestAnimationFrame(() => {
+      this.treeScrollFrameId = undefined;
+      const searchText = this.$categorySearchText().trim();
+      if (!searchText) {
+        this.clearTreeHighlights();
+        return;
+      }
+      this.highlightTreeNodes(searchText);
+    });
+  };
+
+  private clearTreeHighlights(): void {
+    const highlightedNodes = document.querySelectorAll(
+      '[data-highlighted="true"], .search-highlighted'
+    );
+
+    Array.from(highlightedNodes).forEach((node) => {
+      node.removeAttribute('data-highlighted');
+      node.classList.remove('search-highlighted');
+
+      const nodeHtml = node as HTMLElement;
+      nodeHtml.style.backgroundColor = '';
+      nodeHtml.style.borderLeft = '';
+      nodeHtml.style.borderRadius = '';
+
+      const titleElement = node.querySelector('.ant-tree-title, [class*="title"]');
+      if (titleElement) {
+        const titleHtml = titleElement as HTMLElement;
+        titleHtml.style.color = '';
+        titleHtml.style.fontWeight = '';
+      }
+    });
   }
 
 

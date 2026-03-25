@@ -69,6 +69,7 @@
 
 .stretch-textarea2 {
   flex: 3; // takes 3 parts (3× the height of .stretch-textarea1)
+  max-height: 300px;
   background-color: rgb(169, 222, 243);
   width: 100%;
   resize: none;
@@ -110,3 +111,192 @@
     //   text-align: center;
     //   color: white;
     // }
+
+// ============================================================
+// Category row styles (mirrored from list-urls.scss)
+// ============================================================
+
+.category-row-container {
+  --row-h: 32px;
+  --row-left-margin: 0px;
+  --row-right-margin: 0px;
+  --matches-col-w: 112px;
+  --search-col-w: 240px;
+
+  margin: 0;
+  margin-left: var(--row-left-margin);
+  margin-right: var(--row-right-margin);
+  width: calc(100% - var(--row-left-margin) - var(--row-right-margin));
+  max-width: none;
+
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  box-sizing: border-box;
+  margin-bottom: 8px;
+}
+
+.category-row-container > * {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.category-row-container .ant-form-item {
+  margin-bottom: 0 !important;
+}
+
+.category-node-select-container {
+  flex: 0 0 calc(100% - var(--search-col-w) - var(--matches-col-w) - 24px);
+}
+
+.category-node-select-container > * {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding-block: 0;
+}
+
+.category-node-select-container .category-tree-select {
+  flex: 0 0 100%;
+  height: 100%;
+  width: 100%;
+}
+
+.category-row-container .ant-select-selector {
+  height: var(--row-h) !important;
+  min-height: var(--row-h) !important;
+  padding-block: 0 !important;
+  display: flex;
+  align-items: center;
+}
+
+.category-row-container .ant-select-selection-item,
+.category-row-container .ant-select-selection-placeholder {
+  line-height: var(--row-h) !important;
+}
+
+.category-search-container {
+  flex: 0 0 var(--search-col-w);
+  width: var(--search-col-w);
+  min-width: var(--search-col-w);
+  position: relative;
+}
+
+.category-search-container > input,
+.category-search-container > .search-input {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding-block: 0;
+  line-height: var(--row-h);
+  padding-right: 36px;
+}
+
+.category-search-container .search-input-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.category-search-container .search-input-wrapper input {
+  width: 100%;
+  height: 100%;
+  padding-right: 32px;
+  border: 1px solid #d9d9d9;
+  border-radius: 2px;
+  box-sizing: border-box;
+}
+
+.category-search-container .search-suffix-icons {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  z-index: 2001;
+  background: transparent;
+  pointer-events: auto;
+}
+
+.category-search-container .search-action-btn {
+  border: none;
+  background: transparent;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 2px;
+  min-width: 20px;
+  height: 20px;
+  font-size: 12px;
+}
+
+.category-search-container .search-action-btn:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.category-search-container .search-action-btn.clear-btn {
+  color: #ff4d4f;
+}
+
+.category-search-container .search-action-btn.search-btn {
+  color: #1890ff;
+}
+
+.category-row-container .ant-input-affix-wrapper,
+.category-row-container .ant-input {
+  height: var(--row-h) !important;
+  min-height: var(--row-h) !important;
+  padding-block: 0 !important;
+  line-height: var(--row-h) !important;
+  box-sizing: border-box;
+}
+
+.category-matches-counter {
+  margin-left: 0;
+  flex: 0 0 var(--matches-col-w);
+  width: var(--matches-col-w);
+  min-width: var(--matches-col-w);
+  display: flex;
+  align-items: stretch;
+  white-space: nowrap;
+}
+
+.category-matches-counter .matches-display {
+  background: #fff;
+  border: 1px solid #d9d9d9;
+  border-radius: 2px;
+  height: var(--row-h);
+  min-height: var(--row-h);
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.category-matches-counter .matches-display .matches-text {
+  font-size: 13px;
+  color: #595959;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.category-matches-counter .matches-display .matches-count {
+  color: #fa8c16;
+  font-weight: 600;
+}
+
+.category-matches-counter .matches-display .no-search {
+  color: #bfbfbf;
+  font-style: italic;
+}
+
+.category-matches-counter .matches-display * {
+  margin-block: 0;
+  line-height: 1;
+}
