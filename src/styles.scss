@@ -6,6 +6,19 @@ html, body {
   margin: 0;
 }
 
+/*
+ * Fix: nz-tree-select dropdown scroll when opened inside a modal.
+ * The dropdown renders via CDK overlay at <body> level, so ::ng-deep from
+ * a component host cannot reach it — global styles are required.
+ */
+.ant-tree-select-dropdown .ant-select-tree-list {
+  max-height: 260px;
+  overflow-y: auto !important;
+}
+.ant-tree-select-dropdown .ant-select-tree-list-holder {
+  overflow-y: auto !important;
+}
+
 app-root, nz-layout {
   height: 100%;
 }

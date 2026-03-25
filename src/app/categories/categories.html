@@ -189,6 +189,7 @@
               [nzDefaultExpandAll]="true"
               [nzAllowClear]="true"
               [nzShowSearch]="true"
+              nzVirtualHeight="260px"
               (change)="onTreeNodeSelectChange($event)"
             ></nz-tree-select>
             <span class="full-ancestors">{{ fullAncestorsPath }} </span>
