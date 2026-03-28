@@ -2,14 +2,21 @@
 // 250906
 .table-header {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 8px;
   width: 100%;
   // padding: 8px 0;
   /* optional cosmetics */
   /* border-bottom: 1px solid #f0f0f0; */
 }
 
-.table-header > h3 {
+.table-header-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.table-header-row > h3 {
   margin: 0;
   font-weight: 600;
 }
@@ -20,6 +27,57 @@
   align-items: center;
   gap: 8px;                      /* space between buttons if you add more */
   white-space: nowrap;           /* keep button(s) on one line */
+}
+
+.table-search-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.search-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border: 1px solid #6eaeb2;
+  border-radius: 6px;
+  background: #c2edef;
+  color: #17363f;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+:host ::ng-deep .table-search-row .search-input-group {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+:host ::ng-deep .table-search-row .search-input {
+  width: 100%;
+}
+
+:host ::ng-deep .table-search-row .search-input.ant-input {
+  width: 100%;
+}
+
+.search-suffix-action {
+  cursor: pointer;
+}
+
+.search-no-results {
+  color: #7a5a00;
+  font-size: 12px;
+  font-style: italic;
+}
+
+:host ::ng-deep mark.search-hit {
+  background-color: #ffe58f;
+  color: inherit;
+  padding: 0 1px;
+  border-radius: 2px;
 }
 
 // Optional: keep the bar visible while scrolling

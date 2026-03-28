@@ -2,29 +2,72 @@
 
 <ng-template #tableHeader>
   <div class="table-header">
-    <h3>
-      Filter: {{ filter }}{{ selectedCategory }}, Nr of articles:
-      {{ $articles().length }}
-    </h3>
-    <div class="table-actions">
-      <!-- <button nz-button nzType="primary" (click)="updateArticlesTable()">
-        <span nz-icon nzType="reload" nzTheme="outline"></span>
-        Refresh
-      </button> -->
-      @if (isCategoriesCheckboxMode()) {
-        <button nz-button nzType="primary" 
-          type="button" 
-          (click)="openCategoryDrawerForMultipleArticles()">
-          <span nz-icon nzType="tags" nzTheme="outline"></span>
-          Categories
-        </button>
-      }
+    <div class="table-header-row">
+      <h3>
+        Filter: {{ filter }}{{ selectedCategory }}, Nr of articles:
+        {{ $filteredArticles().length }}
+        @if (articlesSearchTextDebounced().length > 0) {
+          / {{ $articles().length }}
+        }
+      </h3>
+      <div class="table-actions">
+        <!-- <button nz-button nzType="primary" (click)="updateArticlesTable()">
+          <span nz-icon nzType="reload" nzTheme="outline"></span>
+          Refresh
+        </button> -->
+        @if (isCategoriesCheckboxMode()) {
+          <button nz-button nzType="primary"
+            type="button"
+            (click)="openCategoryDrawerForMultipleArticles()">
+            <span nz-icon nzType="tags" nzTheme="outline"></span>
+            Categories
+          </button>
+        }
 
-      <button nz-button nzType="primary" (click)="updateArticlesTable()">
-        <span nz-icon nzType="reload" nzTheme="outline"></span>
-        Refresh
-      </button>
+        <button nz-button nzType="primary" (click)="updateArticlesTable()">
+          <span nz-icon nzType="reload" nzTheme="outline"></span>
+          Refresh
+        </button>
+      </div>
     </div>
+
+    <div class="table-search-row">
+      <div class="search-label" aria-hidden="true">
+        <span nz-icon nzType="search" nzTheme="outline"></span>
+        Search
+      </div>
+
+      <nz-input-group [nzSuffix]="searchSuffixTpl" class="search-input-group">
+        <input
+          nz-input
+          class="search-input"
+          placeholder="Search Articles . . ."
+          [ngModel]="articlesSearchText()"
+          (ngModelChange)="onSearchTextChange($event)"
+        />
+      </nz-input-group>
+
+      <ng-template #searchSuffixTpl>
+        @if (articlesSearchText().length > 0) {
+          <span
+            nz-icon
+            nzType="close-circle"
+            nzTheme="outline"
+            class="search-suffix-action"
+            title="Clear search"
+            (click)="clearArticlesSearchText()"
+          ></span>
+        } @else {
+          <span nz-icon nzType="search" nzTheme="outline"></span>
+        }
+      </ng-template>
+    </div>
+
+    @if (articlesSearchTextDebounced().length > 0 && $filteredArticles().length === 0) {
+      <div class="search-no-results">
+        No results for "{{ articlesSearchTextDebounced() }}".
+      </div>
+    }
   </div>
 </ng-template>
 
@@ -33,7 +76,7 @@
   #table
   [nzTitle]="tableHeader"
   class="col-balanced-gap"
-  [nzData]="$articles()"
+  [nzData]="$filteredArticles()"
   [nzScroll]="{ x: 'max-content' }"
   [nzPageIndex]="pageIndex"
   [(nzPageIndex)]="pageIndex"
@@ -169,9 +212,7 @@
         }
         <!-- 3 -->
         <td>
-          <a [href]="row.link" target="_blank" rel="noopener noreferrer">{{
-            row.title
-          }}</a>
+          <a [href]="row.link" target="_blank" rel="noopener noreferrer" [innerHTML]="highlightTitle(row.title)"></a>
         </td>
         <!-- 4 -->
         <td nzAlign="center">

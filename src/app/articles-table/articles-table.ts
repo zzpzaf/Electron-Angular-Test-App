@@ -1,4 +1,4 @@
-import { Component, effect, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { BackEnd } from '../shared/services/back-end';
 import { PostData } from '../../../shared/projectObjects/varObjects';
@@ -12,6 +12,7 @@ import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzRateModule } from 'ng-zorro-antd/rate';
 import { NzDrawerModule, NzDrawerService } from 'ng-zorro-antd/drawer';
 import { NzCheckboxModule } from 'ng-zorro-antd/checkbox'; // 260327
+import { NzInputModule } from 'ng-zorro-antd/input';
 import { ArticleCategoriesSelection } from '../article-categories-selection/article-categories-selection';
 
 
@@ -28,6 +29,7 @@ import { ArticleCategoriesSelection } from '../article-categories-selection/arti
     NzRateModule,
     NzDrawerModule,
     NzCheckboxModule, // 260327
+    NzInputModule,
   ],
   templateUrl: './articles-table.html',
   styleUrl: './articles-table.scss'
@@ -36,8 +38,20 @@ export class ArticlesTable {
 
   // Articles signal
   public $articles = signal<PostData[]>([]);
+  public $filteredArticles = computed(() => {
+    const rows = this.$articles();
+    const term = this.articlesSearchTextDebounced().trim().toLowerCase();
+    if (!term) return rows;
+
+    return rows.filter((row) => this.matchesSearch(row, term));
+  });
   public filter: 'unassigned' | 'all' | 'byCategory' = 'unassigned';
+  public filter2: string = '';
   public selectedCategory: string  = '';
+  public articlesSearchText = signal('');
+  public articlesSearchTextDebounced = signal('');
+
+  private searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   private readonly drawer = inject(NzDrawerService);
 
@@ -90,6 +104,13 @@ export class ArticlesTable {
 
   ngOnInit() {
     // this.getUnassignedArticles();
+  }
+
+  ngOnDestroy() {
+    if (this.searchDebounceTimer) {
+      clearTimeout(this.searchDebounceTimer);
+      this.searchDebounceTimer = null;
+    }
   }
 
   // immutable update when user changes the stars
@@ -185,6 +206,79 @@ export class ArticlesTable {
         this.$articles.set(this.backendService.$articles());
          console.log('>===>> ArticlesTable - updateArticlesTable: DEFAULT ???');
     }
+  }
+
+  // 260328 - Search UI handlers (UI phase only)
+  onSearchTextChange(value: string): void {
+    const next = value ?? '';
+    this.articlesSearchText.set(next);
+
+    if (this.searchDebounceTimer) {
+      clearTimeout(this.searchDebounceTimer);
+    }
+
+    this.searchDebounceTimer = setTimeout(() => {
+      const debounced = next.trim();
+      this.articlesSearchTextDebounced.set(debounced);
+      this.filter2 = debounced;
+    }, 150);
+  }
+
+  // 260328 - Clear search text and reset related signals and UI state
+  clearArticlesSearchText(): void {
+    if (this.searchDebounceTimer) {
+      clearTimeout(this.searchDebounceTimer);
+      this.searchDebounceTimer = null;
+    }
+    this.articlesSearchText.set('');
+    this.articlesSearchTextDebounced.set('');
+    this.filter2 = '';
+  }
+
+  // 260328 - Check if any of the relevant fields in the row match the search term (case-insensitive)
+  // For now I just left only title, but we can easily add more fields 
+  private matchesSearch(row: PostData, term: string): boolean {
+    const values: string[] = [
+      row.title,
+      // row.link,
+      // row.hostname,
+      // row.pubname,
+      // row.authorname,
+      // row.pubauthorslug,
+      // row.listname,
+      // row.date,
+      String(row.likes ?? ''),
+      String(row.comments ?? ''),
+      row.timestamp,
+    ].map((v) => (v ?? '').toString().toLowerCase());
+
+    return values.some((v) => v.includes(term));
+  }
+
+  // 260328 - Highlight search term in the title by wrapping matches with <mark> tags, while safely escaping HTML
+  private escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  private escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // 260328 - Highlight search term in the title by wrapping matches with <mark> tags, while safely escaping HTML
+  highlightTitle(title: string | null | undefined): string {
+    const rawTitle = title ?? '';
+    const safeTitle = this.escapeHtml(rawTitle);
+    const term = this.articlesSearchTextDebounced().trim();
+
+    if (!term) return safeTitle;
+
+    const regex = new RegExp(`(${this.escapeRegExp(term)})`, 'ig');
+    return safeTitle.replace(regex, '<mark class="search-hit">$1</mark>');
   }
 
 
