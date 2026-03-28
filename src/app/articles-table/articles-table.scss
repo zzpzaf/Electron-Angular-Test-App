@@ -159,6 +159,71 @@
   color: #0f2f38;
 }
 
+.delete-toggle-th {
+  text-align: center;
+}
+
+.delete-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border: 1px solid #4fa9ae;
+  border-radius: 6px;
+  background: #8ddde0;
+  color: #0f3740;
+  font: inherit;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.delete-toggle-btn:hover {
+  background: #7fd2d7;
+}
+
+.delete-toggle-btn:focus-visible {
+  outline: 2px solid #d46b08;
+  outline-offset: 1px;
+}
+
+.delete-toggle-btn[aria-pressed='true'] {
+  background: #f7c2d6;
+  border-color: #e784a6;
+  color: #5b1932;
+}
+
+:host ::ng-deep .delete-action-btn.ant-btn {
+  background: #f7c2d6;
+  border-color: #e784a6;
+  color: #5b1932;
+}
+
+:host ::ng-deep .delete-action-btn.ant-btn:hover,
+:host ::ng-deep .delete-action-btn.ant-btn:focus {
+  background: #f3acc8;
+  border-color: #de6f99;
+  color: #4a1228;
+}
+
+.delete-icon-red {
+  color: #e784a6;
+}
+
+:host ::ng-deep .delete-row-checkbox .ant-checkbox-inner {
+  border-color: #e784a6;
+}
+
+:host ::ng-deep .delete-row-checkbox.ant-checkbox-wrapper:hover .ant-checkbox-inner,
+:host ::ng-deep .delete-row-checkbox .ant-checkbox:hover .ant-checkbox-inner {
+  border-color: #e784a6;
+}
+
+:host ::ng-deep .delete-row-checkbox .ant-checkbox-checked .ant-checkbox-inner {
+  background-color: #e784a6;
+  border-color: #e784a6;
+}
+
 :host ::ng-deep .ant-table-pagination.ant-pagination {
     margin: 6px 0;
 }
@@ -202,4 +267,14 @@
 //Because you already have a hover rule on all rows, add a specific rule so checked rows keep their own tone:
 :host ::ng-deep .ant-table-tbody > tr.row-checked:hover > td {
   background-color: #ecd67d;
+}
+
+// 260328 - Add delete-checked row background style (pink opaque)
+:host ::ng-deep .ant-table-tbody > tr.row-del-checked > td {
+  background-color: #f7d3e3;
+}
+
+// Keep delete-checked row style visible even when hovered
+:host ::ng-deep .ant-table-tbody > tr.row-del-checked:hover > td {
+  background-color: #f3c0d8;
 }

@@ -1,4 +1,4 @@
-<div [ngClass]="getTokenClass()">
+<div [ngClass]="getTokenClass()" #dialogRoot tabindex="-1">
   <!-- <div class="dialog-header">
         <i nz-icon [nzType]="getIconName()" nzTheme="twotone"></i>
         <span>{{ dlgData.header }}</span>
@@ -19,6 +19,7 @@
   </div>
   <div class="dialog-actions">
     <button
+      #positiveBtn
       nz-button
       [nzType]="'primary'"
       (click)="onYesClick()"
@@ -28,6 +29,7 @@
     </button>
     <button
       *ngIf="dlgData.negAnsMsg"
+      #negativeBtn
       nz-button
       (click)="onNoClick()"
       [ngClass]="getButtonClass('negative')"

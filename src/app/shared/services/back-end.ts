@@ -236,6 +236,13 @@ export class BackEnd {
   }
 
 
+  // 260328 - Delete multiple articles by their IDs
+  async deleteArticlesByIds(article_ids: number[]): Promise<boolean> {
+    const result = await this.ipcInvoke<boolean>('sqlite:delete-articles-by-ids', article_ids);
+    return result;
+  }
+
+
   /*
   * Application wide functions
   */

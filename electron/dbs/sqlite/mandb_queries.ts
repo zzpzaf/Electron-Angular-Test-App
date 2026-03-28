@@ -437,6 +437,90 @@ export function getArticleById(id?: number): PostData[] {
   }
 }
 
+
+// 260328 - Delete Article by Id
+export function deleteArticleById(id: number): boolean {
+  if (!mainDb) {
+    console.error('>===>> No Main DB connection.');
+    return false;
+  }
+
+  try {
+
+    deleteAllArticleCategories(id); // Also delete associated categories
+    deleteArticleImages(id); // Also delete associated images 
+
+    const stmt = mainDb.prepare<{ id: number }>(`
+      DELETE FROM articles
+      WHERE id = @id
+    `);
+    const info = stmt.run({ id });
+    console.log('>= *** ==>> "deleteArticleById" -> Delete Result:', info);
+
+    return info.changes === 1; // true if exactly one row deleted
+  } catch (err) {
+    console.error('Error deleting article:', err);
+    return false;
+  }
+}
+
+
+
+/**
+ * 260328
+ * Deletes multiple articles by their IDs.
+ * @param ids Array of article IDs to delete.
+ * @returns true if all deletions were successful, false if any deletion failed.
+ */
+export function deleteArticlesByIds(ids: number[]): boolean {
+  if (!mainDb) {
+    console.error('>===>> No Main DB connection.');
+    return false;
+  }
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return true;
+  }
+
+  try {
+    const deleteManyTx = mainDb.transaction((articleIds: number[]) => {
+      for (const id of articleIds) {
+        const ok = deleteArticleById(id);
+        if (!ok) {
+          throw new Error(`Failed to delete article with id ${id}`);
+        }
+      }
+    });
+
+    deleteManyTx(ids);
+    console.log('>= *** ==>> "deleteArticlesByIds" -> Delete Result: deleted', ids.length, 'rows');
+    return true;
+  } catch (err) {
+    console.error('Error deleting articles:', err);
+    return false;
+  }
+}
+
+
+// 260328 - Delete all images associated with an article by the article's ID
+export function deleteArticleImages( article_id: number): boolean {
+  if (!mainDb) throw new Error('No Main DB connection');
+
+  const del = mainDb.prepare(`
+    DELETE FROM images
+    WHERE article_id = ?
+  `);
+  const info = del.run(article_id);
+  return info.changes > 0; // true if at least one row deleted
+}
+
+
+
+
+
+
+
+
 /**
  * 250821
  * Returns an array of all articles that have NO category assigned (no entry in the article-categories join table).

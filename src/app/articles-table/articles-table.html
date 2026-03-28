@@ -24,6 +24,15 @@
           </button>
         }
 
+        @if (isDeleteCheckboxMode()) {
+          <button nz-button nzType="primary" [nzDanger]="true" class="delete-action-btn"
+            type="button"
+            (click)="onDeleteMultipleArticles()">
+            <span nz-icon nzType="delete" nzTheme="outline"></span>
+            Delete
+          </button>
+        }
+
         <button nz-button nzType="primary" (click)="updateArticlesTable()">
           <span nz-icon nzType="reload" nzTheme="outline"></span>
           Refresh
@@ -100,6 +109,23 @@
       <!-- 2 -->
       <th nzAlign="center">MD</th>
       <!-- 3 -->
+      <th nzAlign="center" class="delete-toggle-th">
+        <button
+          type="button"
+          class="delete-toggle-btn"
+          [attr.aria-pressed]="isDeleteCheckboxMode()"
+          (click)="toggleDeleteColumnMode()"
+          title="Toggle delete selection mode"
+        >
+          Del
+          @if (isDeleteCheckboxMode()) {
+            <span nz-icon nzType="check-square" nzTheme="outline"></span>
+          } @else {
+            <span nz-icon nzType="delete" nzTheme="outline"></span>
+          }
+        </button>
+      </th>
+      <!-- 4 -->
       <th
         nzColumnKey="title"
         [nzSortFn]="sortByTitle"
@@ -107,9 +133,9 @@
       >
         Article Title
       </th>
-      <!-- 4 -->
-      <th nzColumnKey="image">Image</th>
       <!-- 5 -->
+      <th nzColumnKey="image">Image</th>
+      <!-- 6 -->
       <th
         nzColumnKey="date"
         [nzSortFn]="sortByDate"
@@ -117,7 +143,7 @@
       >
         Date (YYMMDD)
       </th>
-      <!-- 6 -->
+      <!-- 7 -->
       <!-- <th nzAlign="center">Categories</th> -->
       <th nzAlign="center" class="categories-toggle-th">
         <button
@@ -135,7 +161,7 @@
           }
         </button>
       </th>
-      <!-- 7 -->
+      <!-- 8 -->
       <th
         nzColumnKey="hostname"
         [nzSortFn]="sortByHostname"
@@ -143,13 +169,13 @@
       >
         Hostname
       </th>
-      <!-- 8 -->
-      <th nzColumnKey="pubname">Publication</th>
       <!-- 9 -->
-      <th nzColumnKey="authorname" [nzShowFilter]="true">Author</th>
+      <th nzColumnKey="pubname">Publication</th>
       <!-- 10 -->
-      <th nzColumnKey="pubauthorslug" [nzShowFilter]="true">Author's Slug</th>
+      <th nzColumnKey="authorname" [nzShowFilter]="true">Author</th>
       <!-- 11 -->
+      <th nzColumnKey="pubauthorslug" [nzShowFilter]="true">Author's Slug</th>
+      <!-- 12 -->
       <th
         nzColumnKey="listname"
         [nzSortFn]="sortByListname"
@@ -158,7 +184,7 @@
         Medium List name
       </th>
 
-      <!-- 12 -->
+      <!-- 13 -->
       <th
         nzColumnKey="likes"
         [nzSortFn]="sortByLikes"
@@ -166,9 +192,9 @@
       >
         Likes
       </th>
-      <!-- 13  -->
+      <!-- 14  -->
       <th nzColumnKey="comments">Comments</th>
-      <!-- 14 -->
+      <!-- 15 -->
       <!-- <th nzColumnKey="ranking">Ranking</th> -->
       <th
         nzColumnKey="ranking"
@@ -178,7 +204,7 @@
       >
         Ranking
       </th>
-      <!-- 15 -->
+      <!-- 16 -->
       <th nzColumnKey="timestamp">Time Stamp</th>
     </tr>
   </thead>
@@ -188,7 +214,10 @@
   <!-- ------------------------------------------------------- -->
   <tbody>
     @for (row of table.data; track row.id ?? row.link; let i = $index) {
-      <tr [class.row-checked]="isCategoriesCheckboxMode() && isRowChecked(row)">
+      <tr
+        [class.row-checked]="isCategoriesCheckboxMode() && isRowChecked(row)"
+        [class.row-del-checked]="isDeleteCheckboxMode() && isDeleteRowChecked(row)"
+      >
         <!-- 1 -->
         <td nzAlign="center">{{ row.id }}</td>
         <!-- 2 -->
@@ -211,10 +240,32 @@
           </td>
         }
         <!-- 3 -->
+        <td nzAlign="center">
+          @if (!isDeleteCheckboxMode()) {
+            <button
+              nz-button
+              nzType="text"
+              nzShape="circle"
+              nzSize="small"
+              aria-label="Delete article (TODO)"
+              (click)="onDeleteSingleArticle(row, $event)"
+            >
+              <span nz-icon nzType="delete" nzTheme="outline" class="delete-icon-red"></span>
+            </button>
+          } @else {
+            <label
+              nz-checkbox
+              class="delete-row-checkbox"
+              [ngModel]="isDeleteRowChecked(row)"
+              (ngModelChange)="onDeleteRowCheckChange(row, $event)"
+            ></label>
+          }
+        </td>
+        <!-- 4 -->
         <td>
           <a [href]="row.link" target="_blank" rel="noopener noreferrer" [innerHTML]="highlightTitle(row.title)"></a>
         </td>
-        <!-- 4 -->
+        <!-- 5 -->
         <td nzAlign="center">
           <img
             [src]="row.image"
@@ -223,9 +274,9 @@
             style="height: 20px; width: auto"
           />
         </td>
-        <!-- 5 -->
-        <td nzAlign="center">{{ row.date }}</td>
         <!-- 6 -->
+        <td nzAlign="center">{{ row.date }}</td>
+        <!-- 7 -->
         <!-- <td nzAlign="center">
               <button
                 nz-button
@@ -264,7 +315,7 @@
           }
         </td>
 
-        <!-- 7 -->
+        <!-- 8 -->
         <td>
           <a
             [href]="
@@ -279,9 +330,9 @@
             {{ row.hostname }}
           </a>
         </td>
-        <!-- 8 -->
-        <td>{{ row.pubname }}</td>
         <!-- 9 -->
+        <td>{{ row.pubname }}</td>
+        <!-- 10 -->
         @if (row.authorlink) {
           <td>
             <a
@@ -294,15 +345,15 @@
         } @else {
           <td>{{ row.authorname }}</td>
         }
-        <!-- 10 -->
-        <td>{{ row.pubauthorslug }}</td>
         <!-- 11 -->
-        <td>{{ row.listname }}</td>
+        <td>{{ row.pubauthorslug }}</td>
         <!-- 12 -->
-        <td nzAlign="center">{{ row.likes }}</td>
+        <td>{{ row.listname }}</td>
         <!-- 13 -->
-        <td nzAlign="center">{{ row.comments }}</td>
+        <td nzAlign="center">{{ row.likes }}</td>
         <!-- 14 -->
+        <td nzAlign="center">{{ row.comments }}</td>
+        <!-- 15 -->
         <!-- <td nzAlign="center">{{ row.ranking }}</td> -->
         <td nzAlign="center">
           <nz-rate
@@ -316,7 +367,7 @@
           </nz-rate>
         </td>
 
-        <!-- 15 -->
+        <!-- 16 -->
         <td>{{ row.timestamp }}</td>
       </tr>
     }

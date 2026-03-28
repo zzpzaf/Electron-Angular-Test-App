@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnInit, OnDestroy, ViewChild, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { NzModalRef, NzModalModule, NZ_MODAL_DATA } from 'ng-zorro-antd/modal';
 import { NzButtonModule } from 'ng-zorro-antd/button';
@@ -41,8 +41,15 @@ export interface DialogData {
   templateUrl: './dialog.html',
   styleUrl: './dialog.scss',
 })
-export class Dialog implements OnInit, OnDestroy {
+export class Dialog implements OnInit, OnDestroy, AfterViewInit {
   readonly dlgData = inject(NZ_MODAL_DATA) as DialogData;
+
+  @ViewChild('dialogRoot', { read: ElementRef })
+  private dialogRoot?: ElementRef<HTMLElement>;
+  @ViewChild('positiveBtn', { read: ElementRef })
+  private positiveBtn?: ElementRef<HTMLButtonElement>;
+  @ViewChild('negativeBtn', { read: ElementRef })
+  private negativeBtn?: ElementRef<HTMLButtonElement>;
 
   private autoCloseTimer: any;
   private modalRef = inject(NzModalRef);
@@ -69,12 +76,18 @@ export class Dialog implements OnInit, OnDestroy {
 
     // console.log('>===>> Dialog data:', JSON.stringify(d));
 
-    if (!d.delay) d.delay = 5000;
+    
     if (d.token === 'info' || d.token === 'succ' || d.token === 'warn') {
+      if (!d.delay) d.delay = 5000;
       this.autoCloseTimer = setTimeout(() => {
         this.modalRef.destroy();
       }, d.delay);
     }
+  }
+
+  ngAfterViewInit(): void {
+    // Wait for modal content to be attached/painted before moving focus.
+    setTimeout(() => this.applyInitialFocus(), 0);
   }
 
   ngOnDestroy(): void {
@@ -95,6 +108,27 @@ export class Dialog implements OnInit, OnDestroy {
     if (this.autoCloseTimer) {
       clearTimeout(this.autoCloseTimer);
       this.autoCloseTimer = null;
+    }
+  }
+
+  private applyInitialFocus(): void {
+    const focusTarget = this.dlgData.initialFocus;
+    if (!focusTarget) {
+      return;
+    }
+
+    if (focusTarget === 1 && this.positiveBtn?.nativeElement) {
+      this.positiveBtn.nativeElement.focus();
+      return;
+    }
+
+    if (focusTarget === 2 && this.negativeBtn?.nativeElement) {
+      this.negativeBtn.nativeElement.focus();
+      return;
+    }
+
+    if (focusTarget === 3 && this.dialogRoot?.nativeElement) {
+      this.dialogRoot.nativeElement.focus();
     }
   }
 

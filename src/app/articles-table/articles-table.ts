@@ -14,9 +14,15 @@ import { NzDrawerModule, NzDrawerService } from 'ng-zorro-antd/drawer';
 import { NzCheckboxModule } from 'ng-zorro-antd/checkbox'; // 260327
 import { NzInputModule } from 'ng-zorro-antd/input';
 import { ArticleCategoriesSelection } from '../article-categories-selection/article-categories-selection';
+import { DlgService } from '../shared/services/dlg-service'; // 260328
+import { firstValueFrom } from 'rxjs';
 
 
- type RowKey = number | string;
+
+
+
+
+type RowKey = number | string;
 
 
 @Component({
@@ -56,12 +62,16 @@ export class ArticlesTable {
   private categoryStatusLoadingIds = new Set<number>();
 
   private readonly drawer = inject(NzDrawerService);
-
+  private dlgService = inject(DlgService);
 
   // 260327 - isCategoriesCheckboxMode controls which UI appears in column 6.
   public isCategoriesCheckboxMode = signal(false);  
   // 260327 - selectedCategoryRows stores check/uncheck state and is perfect for future batch actions.
   private selectedCategoryRows = signal<Set<RowKey>>(new Set<RowKey>());  
+
+  // 260328 - Delete column UI mode and selected rows for future multi-delete action.
+  public isDeleteCheckboxMode = signal(false);
+  private selectedDeleteRows = signal<Set<RowKey>>(new Set<RowKey>());
 
   private backendService = inject(BackEnd);
   // Pagination state (two-way bound)
@@ -322,6 +332,95 @@ export class ArticlesTable {
       return next;
     });
   }
+
+  // 260328 - Delete column UI handlers (TODO: wire to real delete functionality later)
+  public toggleDeleteColumnMode(): void {
+    const next = !this.isDeleteCheckboxMode();
+    this.isDeleteCheckboxMode.set(next);
+
+    // Leaving checkbox mode resets staged delete selection.
+    if (!next) {
+      this.selectedDeleteRows.set(new Set<RowKey>());
+    }
+  }
+
+  // 280328 - Check if a row is currently selected for deletion based on its key
+  public isDeleteRowChecked(row: PostData): boolean {
+    return this.selectedDeleteRows().has(this.rowKey(row));
+  }
+
+  // 280328 - Handle checkbox change for delete action: add/remove row key from selectedDeleteRows set
+  public onDeleteRowCheckChange(row: PostData, checked: boolean): void {
+    const key = this.rowKey(row);
+    this.selectedDeleteRows.update((prev) => {
+      const next = new Set(prev);
+      if (checked) {
+        next.add(key);
+      } else {
+        next.delete(key);
+      }
+      return next;
+    });
+  }
+
+  // 260328 - Handler for deleting a single article (to be implemented)
+  public onDeleteSingleArticle(row: PostData, e: MouseEvent): void {
+    e.stopPropagation();
+    const selectedArticleIds: number[] = [row.id!].filter((id): id is number => typeof id === 'number');
+    console.log('>===>> TODO - delete single article:', selectedArticleIds);
+    this.warnAndAskForConfirmation(selectedArticleIds);
+
+  }
+
+  // 260328 - Handler for deleting multiple selected articles (to be implemented)
+  public onDeleteMultipleArticles(): void {
+    const selectedArticleIds: number[] = this.$articles()
+      .filter((row) => this.selectedDeleteRows().has(this.rowKey(row)))
+      .map((row) => row.id)
+      .filter((id): id is number => typeof id === 'number');
+    console.log('>===>> TODO - delete multiple articles:', selectedArticleIds);
+    this.warnAndAskForConfirmation(selectedArticleIds);
+
+  }
+
+
+  // 260328 - Show a confirmation dialog before deleting articles, and proceed with deletion if user confirms
+  public async warnAndAskForConfirmation(articleIds: number[]): Promise<void> {
+    const confirmed = await firstValueFrom(
+      this.dlgService.popup({
+        token: 'conf',
+        header: 'ATTENTION! Article(s) Deletion!',
+        content: `Attention! You are about to delete the following article(s): \n${articleIds.join(', ')}.\n Please, confirm if you want to continue!`,
+        posAnsMsg: 'No, keep them.',
+        negAnsMsg: 'Yes, delete.',
+        initialFocus: 1,
+      })
+    );
+      if (confirmed) {
+         console.log('>===>> User cancelled the delete action.');
+         return
+      }
+
+      // !confirmed means the user clicked the negative button, which in this case is the "Yes, delete" option, because we want to make the user actively confirm deletion by clicking that button, while the positive button is the "No, keep them" option which is focused by default to prevent accidental deletions. 
+      console.log('>===>> User confirmed deletion of articles:', articleIds);
+      const res = await this.backendService.deleteArticlesByIds(articleIds);
+      console.log('>===>> ArticlesTable - deleteArticlesByIds result:', res);
+      if (res) {
+        // Clear the delete selection after successful deletion
+        this.selectedDeleteRows.set(new Set<RowKey>());
+      }
+      this.updateArticlesTable();
+
+    }
+
+
+
+
+
+
+
+
+
 
   // 260327 - Example batch action that operates on selected rows  
   openCategoryDrawerForMultipleArticles(): void {

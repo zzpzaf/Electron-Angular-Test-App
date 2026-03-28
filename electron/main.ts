@@ -60,6 +60,7 @@ import {
   updateArticleCategoriesForMultipleArticles,
   updateArticleContentById,
   updateCategoryById,
+  deleteArticlesByIds,
 } from './dbs/sqlite/mandb_queries';
 import { attachContextMenu } from './context/context-menu';
 
@@ -814,7 +815,16 @@ ipcMain.handle('sqlite:get-articles-by-category-id', (event: any, category_id: n
   }
 });
 
-
+// 260328
+ipcMain.handle('sqlite:delete-articles-by-ids', (event: any, articleIds: number[]) => {
+  try {
+    const result = deleteArticlesByIds(articleIds);
+    return result;
+  } catch (err) {
+    console.error('Error deleting article categories for article IDs: ', articleIds, err);
+    return false;
+  }
+});
 
 
 

@@ -19,6 +19,7 @@ import {
   TagsTwoTone,
   ClearOutline,
   CloseCircleOutline,
+  DeleteOutline,
   ReloadOutline,
 } from '@ant-design/icons-angular/icons';
 
@@ -43,6 +44,7 @@ bootstrapApplication(App, {
       TagsOutline,
       ClearOutline,
       CloseCircleOutline,
+      DeleteOutline,
       ReloadOutline,
     ]),
   ],
