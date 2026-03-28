@@ -11,7 +11,12 @@ import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzRateModule } from 'ng-zorro-antd/rate';
 import { NzDrawerModule, NzDrawerService } from 'ng-zorro-antd/drawer';
+import { NzCheckboxModule } from 'ng-zorro-antd/checkbox'; // 260327
 import { ArticleCategoriesSelection } from '../article-categories-selection/article-categories-selection';
+
+
+ type RowKey = number | string;
+
 
 @Component({
   selector: 'articles-table',
@@ -22,6 +27,7 @@ import { ArticleCategoriesSelection } from '../article-categories-selection/arti
     NzIconModule,
     NzRateModule,
     NzDrawerModule,
+    NzCheckboxModule, // 260327
   ],
   templateUrl: './articles-table.html',
   styleUrl: './articles-table.scss'
@@ -35,7 +41,12 @@ export class ArticlesTable {
 
   private readonly drawer = inject(NzDrawerService);
 
-  
+
+  // 260327 - isCategoriesCheckboxMode controls which UI appears in column 6.
+  public isCategoriesCheckboxMode = signal(false);  
+  // 260327 - selectedCategoryRows stores check/uncheck state and is perfect for future batch actions.
+  private selectedCategoryRows = signal<Set<RowKey>>(new Set<RowKey>());  
+
   private backendService = inject(BackEnd);
   // Pagination state (two-way bound)
   pageIndex = 1;
@@ -108,7 +119,7 @@ export class ArticlesTable {
   // 250904
   // Create and open a category selection drawer and pass it the ArticleCategoriesSelection
   // component and initial keys
-  async openCategoryDrawer(row: PostData): Promise<void> {
+  async openCategoryDrawerForSingleArticle(row: PostData): Promise<void> {
     // 1) Get the article id from the row (adjust the property if needed)
 
     const articleId: number = row.id!;
@@ -116,7 +127,7 @@ export class ArticlesTable {
     // 2) Fetch initial category ids 
     // const initialKeys: number[]  = [41, 44, 97];
     const initialKeys: number[] = await this.backendService.getCategoryIdsOfAnArticle(articleId);
-    console.log('>===>> ArticlesTable - openCategoryDrawer -Initial category keys for article id', articleId, ':', initialKeys);
+    console.log('>===>> ArticlesTable - openCategoryDrawerForSingleArticle -Initial category keys for article id', articleId, ':', initialKeys);
 
     // 3) Create the drawer and pass the initial keys to the content component
     const drawerRef = this.drawer.create<
@@ -138,7 +149,7 @@ export class ArticlesTable {
       if (!selectedKeys) return; // user cancelled
       console.log('>===>> Selected category keys:', selectedKeys);
       // Persist the selected category ids for the article
-      const result = await this.backendService.updateArticleCategories(articleId, selectedKeys);
+      const result = await this.backendService.updateArticleCategoriesForSingleArticle(articleId, selectedKeys);
       console.log('>===>> ArticlesTable - Update article categories result:', result);
       this.updateArticlesTable();
     });
@@ -165,5 +176,78 @@ export class ArticlesTable {
          console.log('>===>> ArticlesTable - updateArticlesTable: DEFAULT ???');
     }
   }
+
+
+
+  // 260327 - Category checkbox mode methods
+
+  // 260327 - Generate a unique key for each row based on id or link
+  // It safely handles rows with missing id by falling back to link
+  private rowKey(row: PostData): RowKey {
+    return row.id ?? row.link;
+  }
+
+  // 260327 - Check if a row is currently selected (checked) based on its key
+  public isRowChecked(row: PostData): boolean {
+    return this.selectedCategoryRows().has(this.rowKey(row));
+  }
+
+  // 260327 - Toggle the category checkbox mode on/off
+  public toggleCategoriesColumnMode(): void {
+    this.isCategoriesCheckboxMode.update(v => !v);
+  }
+
+  // 260327 - Handle checkbox change for a row: add/remove its key from the selected set 
+  public onCategoryRowCheckChange(row: PostData, checked: boolean): void {
+    const key = this.rowKey(row);
+    this.selectedCategoryRows.update(prev => {
+    const next = new Set(prev);
+    if (checked) {
+    next.add(key);
+    } else {
+    next.delete(key);
+    }
+    return next;
+    });
+  }
+
+  // 260327 - Example batch action that operates on selected rows  
+  openCategoryDrawerForMultipleArticles(): void {
+    const selectedArticleIds: number[] = this.$articles()
+      .filter((row) => this.selectedCategoryRows().has(this.rowKey(row)))
+      .map((row) => row.id)
+      .filter((id): id is number => typeof id === 'number');
+
+    console.log('>===>> ArticlesTable - selected article ids:', selectedArticleIds);
+
+
+    // 1) Create the drawer and pass the initial keys to the content component
+    const drawerRef = this.drawer.create<
+      ArticleCategoriesSelection,
+      { checkedArticleIds: number[], initialKeys: number[], row: PostData | null },
+      number[] | undefined
+    >({
+      nzTitle: 'Select/Unselect categories for total: ' + selectedArticleIds.length + ' checked article(s)',
+      nzWidth: 520,
+      nzHeight: 200,
+      nzClosable: true,
+      nzMaskClosable: true,
+      nzContent: ArticleCategoriesSelection,
+      nzContentParams: { checkedArticleIds: selectedArticleIds, initialKeys: [], row: null }
+    });
+
+    // 2) On close, persist the final selection 
+    drawerRef.afterClose.subscribe(async (selectedKeys) => {
+      if (!selectedKeys) return; // user cancelled
+      console.log('>===>> ArticlesTable - openCategoryDrawerForMultipleArticles - Selected category keys:', selectedKeys);
+      // Persist the selected category ids for the checked articles 
+      const result = await this.backendService.updateArticleCategoriesForMultipleArticles(selectedArticleIds, selectedKeys);
+      console.log('>===>> ArticlesTable - Update multi-article categories result:', result);
+      this.updateArticlesTable();
+    });
+
+
+  }
+
 
 }

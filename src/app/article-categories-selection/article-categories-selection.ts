@@ -46,8 +46,11 @@ export class ArticleCategoriesSelection {
   readonly $expandedKeys = signal<string[]>([]);
   readonly $selectedKeys = signal<string[]>([]); // (optional) highlight behavior
 
-  @Input() initialKeys: number[] = [];  // are passed in from ArticlesTable -> openCategoryDrawer()
-  @Input() row: PostData | null = null; // optional, for context - is passed in from ArticlesTable -> openCategoryDrawer
+  @Input() initialKeys: number[] = [];  // are passed in from ArticlesTable -> openCategoryDrawerForSingleArticle()
+  @Input() row: PostData | null = null; // optional, for context - is passed in from ArticlesTable -> openCategoryDrawerForSingleArticle()
+  
+  @Input() checkedArticleIds: number[] = []; //  is the nr of checked rows that is passed in from ArticlesTable -> openCategoryDrawerForMultipleArticles() 
+  
   // $initialKeyStrings = signal<string[]>(this.initialKeys.map(String));
   $initialKeyStrings = signal<string[]>([]);
 

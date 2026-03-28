@@ -529,7 +529,7 @@ export class SingleUrl {
         console.log('>===>> Setting categories for article ID:', insertedArticleId, ' - Categories:', this.selectedCategoryIds);
         if (this.selectedCategoryIds.length > 0) {
           // this.setArticleCategories(dataArray[0].id!, this.selectedCategoryIds);
-          this.backendService.updateArticleCategories(
+          this.backendService.updateArticleCategoriesForSingleArticle(
             insertedArticleId!,
             this.selectedCategoryIds,
           ).then((res) => {
@@ -592,7 +592,7 @@ export class SingleUrl {
         console.log('>===>> Setting categories for article ID:', dataArray[0].id, ' - Categories:', this.selectedCategoryIds);
         if (this.selectedCategoryIds.length > 0) {
           // this.setArticleCategories(dataArray[0].id!, this.selectedCategoryIds);
-          this.backendService.updateArticleCategories(
+          this.backendService.updateArticleCategoriesForSingleArticle(
             updatedArticleId!,
             this.selectedCategoryIds,
           ).then((res) => {

@@ -1252,6 +1252,37 @@ export function updateArticleCategories(
 
 
 
+// 260327
+export function updateArticleCategoriesForMultipleArticles(
+  article_ids: number[],
+  category_ids: number[]
+): { success: boolean; removed: number; inserted: number } {
+  if (!mainDb) throw new Error("No Main DB connection");
+
+  try {
+    let totalRemoved = 0;
+    let totalInserted = 0;
+
+    const tx = mainDb.transaction(() => {
+      for (const article_id of article_ids) {
+        const result = updateArticleCategories(article_id, category_ids);
+        totalRemoved += result.removed;
+        totalInserted += result.inserted;
+      }
+    });
+
+    tx(); // execute transaction
+
+    return { success: true, removed: totalRemoved, inserted: totalInserted };
+  } catch (err) {
+    console.error("Error updating article_categories for multiple articles:", err);
+    return { success: false, removed: 0, inserted: 0 };
+  }
+}
+  
+
+
+
 
 
 // 250902

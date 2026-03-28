@@ -224,10 +224,17 @@ export class BackEnd {
   }
 
   // 250905
-  async updateArticleCategories(article_id: number, category_ids: number[]): Promise<boolean> {
+  async updateArticleCategoriesForSingleArticle(article_id: number, category_ids: number[]): Promise<boolean> {
     const result = await this.ipcInvoke<boolean>('sqlite:update-article-categories', article_id, category_ids);
     return result;
   }
+
+  // 260327 - Update article categories for multiple articles
+  async updateArticleCategoriesForMultipleArticles(article_ids: number[], category_ids: number[]): Promise<boolean> {
+    const result = await this.ipcInvoke<boolean>('sqlite:update-article-categories-multiple', article_ids, category_ids);
+    return result;
+  }
+
 
   /*
   * Application wide functions

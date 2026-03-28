@@ -59,7 +59,7 @@ export class Articlesmultiscraper {
             insertedArticleId !== null
           ) {
             this.backendService
-              .updateArticleCategories(insertedArticleId, selectedCategoryIds)
+              .updateArticleCategoriesForSingleArticle(insertedArticleId, selectedCategoryIds)
               .then((res) => {
                 console.log(
                   '>===>> Articlesmultiscraper - Article categories updated successfully?',

@@ -57,6 +57,7 @@ import {
   isUrlExisting,
   updateArticleById,
   updateArticleCategories,
+  updateArticleCategoriesForMultipleArticles,
   updateArticleContentById,
   updateCategoryById,
 } from './dbs/sqlite/mandb_queries';
@@ -1000,6 +1001,18 @@ ipcMain.handle('sqlite:update-article-categories', (event: any, article_id: numb
     return { success: false, removed: 0, inserted: 0 };
   }
 });
+
+// 260327
+ipcMain.handle('sqlite:update-article-categories-multiple', (event: any, article_ids: number[], category_ids: number[]) => {
+  try {
+    const result = updateArticleCategoriesForMultipleArticles(article_ids, category_ids);
+    return result;
+  } catch (err) {
+    console.error('Error updating article categories for multiple articles:', err);
+    return { success: false, removed: 0, inserted: 0 };
+  }
+});
+
 
 
 // Not-used so far ....

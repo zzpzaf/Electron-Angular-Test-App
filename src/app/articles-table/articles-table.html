@@ -1,160 +1,191 @@
 <!-- <p>articles-table works!</p> -->
 
+<ng-template #tableHeader>
+  <div class="table-header">
+    <h3>
+      Filter: {{ filter }}{{ selectedCategory }}, Nr of articles:
+      {{ $articles().length }}
+    </h3>
+    <div class="table-actions">
+      <!-- <button nz-button nzType="primary" (click)="updateArticlesTable()">
+        <span nz-icon nzType="reload" nzTheme="outline"></span>
+        Refresh
+      </button> -->
+      @if (isCategoriesCheckboxMode()) {
+        <button nz-button nzType="primary" 
+          type="button" 
+          (click)="openCategoryDrawerForMultipleArticles()">
+          <span nz-icon nzType="tags" nzTheme="outline"></span>
+          Categories
+        </button>
+      }
 
-    <ng-template #tableHeader>
-      <div class="table-header">
-        <h3>Filter: {{ filter }}{{ selectedCategory }},  Nr of articles: {{ $articles().length }}</h3>
-        <div class="table-actions">
-          <button nz-button nzType="primary" (click)="updateArticlesTable()">
-            <span nz-icon nzType="reload" nzTheme="outline"></span>
-            Refresh
-          </button>
-        </div>
-      </div>
-    </ng-template>  
-    
-    <!-- <div class="inner-content"> -->
-      <nz-table
-        #table
-        [nzTitle]="tableHeader"
-        class="col-balanced-gap"
-        [nzData]="$articles()"
-        [nzScroll]="{ x: 'max-content' }"
-        [nzPageIndex]="pageIndex"
-        [(nzPageIndex)]="pageIndex"
-        [nzPageSize]="pageSize"
-        [(nzPageSize)]="pageSize"
-        [nzShowPagination]="true"
+      <button nz-button nzType="primary" (click)="updateArticlesTable()">
+        <span nz-icon nzType="reload" nzTheme="outline"></span>
+        Refresh
+      </button>
+    </div>
+  </div>
+</ng-template>
+
+<!-- <div class="inner-content"> -->
+<nz-table
+  #table
+  [nzTitle]="tableHeader"
+  class="col-balanced-gap"
+  [nzData]="$articles()"
+  [nzScroll]="{ x: 'max-content' }"
+  [nzPageIndex]="pageIndex"
+  [(nzPageIndex)]="pageIndex"
+  [nzPageSize]="pageSize"
+  [(nzPageSize)]="pageSize"
+  [nzShowPagination]="true"
+>
+  <!-- ------------------------------------------------------- -->
+  <!--                       Table Header                      -->
+  <!-- ------------------------------------------------------- -->
+  <thead>
+    <tr>
+      <!-- 1 -->
+      <th
+        nzColumnKey="id"
+        [nzSortFn]="sortById"
+        [nzSortDirections]="['ascend', 'descend', null]"
       >
-        <!-- ------------------------------------------------------- -->
-        <!--                       Table Header                      -->
-        <!-- ------------------------------------------------------- -->
-        <thead>
-          <tr>
-            <!-- 1 -->
-            <th
-              nzColumnKey="id"
-              [nzSortFn]="sortById"
-              [nzSortDirections]="['ascend', 'descend', null]"
-            >
-              Id
-            </th>
-            <!-- 2 -->
-            <th nzAlign="center">MD</th>
-            <!-- 3 -->
-            <th
-              nzColumnKey="title"
-              [nzSortFn]="sortByTitle"
-              [nzSortDirections]="['ascend', 'descend', null]"
-            >
-              Article Title
-            </th>
-            <!-- 4 -->
-            <th nzColumnKey="image">Image</th>
-            <!-- 5 -->
-            <th
-              nzColumnKey="date"
-              [nzSortFn]="sortByDate"
-              [nzSortDirections]="['ascend', 'descend', null]"
-            >
-              Date (YYMMDD)
-            </th>
-            <!-- 6 -->
-            <th nzAlign="center">Categories</th>
-            <!-- 7 -->
-            <th
-              nzColumnKey="hostname"
-              [nzSortFn]="sortByHostname"
-              [nzSortDirections]="['ascend', 'descend', null]"
-            >
-              Hostname
-            </th>
-            <!-- 8 -->
-            <th nzColumnKey="pubname">Publication</th>
-            <!-- 9 -->
-            <th nzColumnKey="authorname" [nzShowFilter]="true">Author</th>
-            <!-- 10 -->
-            <th nzColumnKey="pubauthorslug" [nzShowFilter]="true">
-              Author's Slug
-            </th>
-            <!-- 11 -->
-            <th
-              nzColumnKey="listname"
-              [nzSortFn]="sortByListname"
-              [nzSortDirections]="['ascend', 'descend', null]"
-            >
-              Medium List name
-            </th>
+        Id
+      </th>
+      <!-- 2 -->
+      <th nzAlign="center">MD</th>
+      <!-- 3 -->
+      <th
+        nzColumnKey="title"
+        [nzSortFn]="sortByTitle"
+        [nzSortDirections]="['ascend', 'descend', null]"
+      >
+        Article Title
+      </th>
+      <!-- 4 -->
+      <th nzColumnKey="image">Image</th>
+      <!-- 5 -->
+      <th
+        nzColumnKey="date"
+        [nzSortFn]="sortByDate"
+        [nzSortDirections]="['ascend', 'descend', null]"
+      >
+        Date (YYMMDD)
+      </th>
+      <!-- 6 -->
+      <!-- <th nzAlign="center">Categories</th> -->
+      <th nzAlign="center" class="categories-toggle-th">
+        <button
+          type="button"
+          class="categories-toggle-btn"
+          [attr.aria-pressed]="isCategoriesCheckboxMode()"
+          (click)="toggleCategoriesColumnMode()"
+          title="Toggle categories selection mode"
+        >
+          Categories
+          @if (isCategoriesCheckboxMode()) {
+            <span nz-icon nzType="check-square" nzTheme="outline"></span>
+          } @else {
+            <span nz-icon nzType="tags" nzTheme="outline"></span>
+          }
+        </button>
+      </th>
+      <!-- 7 -->
+      <th
+        nzColumnKey="hostname"
+        [nzSortFn]="sortByHostname"
+        [nzSortDirections]="['ascend', 'descend', null]"
+      >
+        Hostname
+      </th>
+      <!-- 8 -->
+      <th nzColumnKey="pubname">Publication</th>
+      <!-- 9 -->
+      <th nzColumnKey="authorname" [nzShowFilter]="true">Author</th>
+      <!-- 10 -->
+      <th nzColumnKey="pubauthorslug" [nzShowFilter]="true">Author's Slug</th>
+      <!-- 11 -->
+      <th
+        nzColumnKey="listname"
+        [nzSortFn]="sortByListname"
+        [nzSortDirections]="['ascend', 'descend', null]"
+      >
+        Medium List name
+      </th>
 
-            <!-- 12 -->
-            <th
-              nzColumnKey="likes"
-              [nzSortFn]="sortByLikes"
-              [nzSortDirections]="['descend', 'ascend', null]"
-            >
-              Likes
-            </th>
-            <!-- 13  -->
-            <th nzColumnKey="comments">Comments</th>
-            <!-- 14 -->
-            <!-- <th nzColumnKey="ranking">Ranking</th> -->
-            <th
-              nzColumnKey="ranking"
-              [nzSortFn]="sortByRanking"
-              [nzSortDirections]="['descend', 'ascend', null]"
-              nzAlign="center"
-            >
-              Ranking
-            </th>
-            <!-- 15 -->
-            <th nzColumnKey="timestamp">Time Stamp</th>
-          </tr>
-        </thead>
+      <!-- 12 -->
+      <th
+        nzColumnKey="likes"
+        [nzSortFn]="sortByLikes"
+        [nzSortDirections]="['descend', 'ascend', null]"
+      >
+        Likes
+      </th>
+      <!-- 13  -->
+      <th nzColumnKey="comments">Comments</th>
+      <!-- 14 -->
+      <!-- <th nzColumnKey="ranking">Ranking</th> -->
+      <th
+        nzColumnKey="ranking"
+        [nzSortFn]="sortByRanking"
+        [nzSortDirections]="['descend', 'ascend', null]"
+        nzAlign="center"
+      >
+        Ranking
+      </th>
+      <!-- 15 -->
+      <th nzColumnKey="timestamp">Time Stamp</th>
+    </tr>
+  </thead>
 
-        <!-- ------------------------------------------------------- -->
-        <!--                      Table Rows                         -->
-        <!-- ------------------------------------------------------- -->
-        <tbody>
-          @for (row of table.data; track row.id ?? row.link; let i = $index) {
-          <tr>
-            <!-- 1 -->
-            <td nzAlign="center">{{ row.id }}</td>
-            <!-- 2 -->
-            @if (row.content && row.content.trim()!.length > 0 ) {
-              <td nzAlign="center">
-                <button
-                  nz-button
-                  nzType="text"
-                  nzShape="circle"
-                  nzSize="small"
-                  aria-label="Open markdown"
-                  (click)="onMarkdown(row, i, $event)"
-                >
-                  <span nz-icon nzType="file-markdown" nzTheme="twotone"></span>
-                </button>
-              </td>
-            } @else {
-              <td nzAlign="center"> <span nz-icon nzType="file-markdown" nzTheme="outline" ></span> </td>
-            }
-            <!-- 3 -->
-            <td>
-              <a [href]="row.link" target="_blank" rel="noopener noreferrer">{{
-                row.title
-              }}</a>
-            </td>
-            <!-- 4 -->
-            <td nzAlign="center">
-              <img
-                [src]="row.image"
-                alt=""
-                referrerpolicy="no-referrer"
-                style="height: 20px; width: auto"
-              />
-            </td>
-            <!-- 5 -->
-            <td nzAlign="center">{{ row.date }}</td>
-            <!-- 6 -->
-            <td nzAlign="center">
+  <!-- ------------------------------------------------------- -->
+  <!--                      Table Rows                         -->
+  <!-- ------------------------------------------------------- -->
+  <tbody>
+    @for (row of table.data; track row.id ?? row.link; let i = $index) {
+      <tr>
+        <!-- 1 -->
+        <td nzAlign="center">{{ row.id }}</td>
+        <!-- 2 -->
+        @if (row.content && row.content.trim()!.length > 0) {
+          <td nzAlign="center">
+            <button
+              nz-button
+              nzType="text"
+              nzShape="circle"
+              nzSize="small"
+              aria-label="Open markdown"
+              (click)="onMarkdown(row, i, $event)"
+            >
+              <span nz-icon nzType="file-markdown" nzTheme="twotone"></span>
+            </button>
+          </td>
+        } @else {
+          <td nzAlign="center">
+            <span nz-icon nzType="file-markdown" nzTheme="outline"></span>
+          </td>
+        }
+        <!-- 3 -->
+        <td>
+          <a [href]="row.link" target="_blank" rel="noopener noreferrer">{{
+            row.title
+          }}</a>
+        </td>
+        <!-- 4 -->
+        <td nzAlign="center">
+          <img
+            [src]="row.image"
+            alt=""
+            referrerpolicy="no-referrer"
+            style="height: 20px; width: auto"
+          />
+        </td>
+        <!-- 5 -->
+        <td nzAlign="center">{{ row.date }}</td>
+        <!-- 6 -->
+        <!-- <td nzAlign="center">
               <button
                 nz-button
                 nzType="text"
@@ -165,62 +196,84 @@
               >
                 <span nz-icon nzType="tags" nzTheme="twotone"></span>
               </button>
-            </td>
-            
-            <!-- 7 -->
-            <td>
-              <a
-                [href]="
-                  row.hostname.startsWith('http://') ||
-                  row.hostname.startsWith('https://')
-                    ? row.hostname
-                    : 'http://' + row.hostname
-                "
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {{ row.hostname }}
-              </a>
-            </td>
-            <!-- 8 -->
-            <td>{{ row.pubname }}</td>
-            <!-- 9 -->
-            @if (row.authorlink) {
-              <td>
-                <a [href]="row.authorlink" target="_blank" rel="noopener noreferrer">{{
-                  row.authorname
-                }}</a>
-              </td>
-            } @else {
-            <td>{{ row.authorname }}</td>
-            }
-            <!-- 10 -->
-            <td>{{ row.pubauthorslug }}</td>
-            <!-- 11 -->
-            <td>{{ row.listname }}</td>
-            <!-- 12 -->
-            <td nzAlign="center">{{ row.likes }}</td>
-            <!-- 13 -->
-            <td nzAlign="center">{{ row.comments }}</td>
-            <!-- 14 -->
-            <!-- <td nzAlign="center">{{ row.ranking }}</td> -->
-            <td nzAlign="center">
-              <nz-rate
-                class="rate-cell"
-                [ngModel]="row.ranking ?? 0"
-                (ngModelChange)="onRankChange(row, $event)"
-                [nzCount]="5"
-                [nzAllowClear]="false"
-                [nzTooltips]="nzRateToolTips"
-              >
-              </nz-rate>
-            </td>
-
-            <!-- 15 -->
-            <td>{{ row.timestamp }}</td>
-          </tr>
+            </td> -->
+        <td nzAlign="center">
+          @if (!isCategoriesCheckboxMode()) {
+            <button
+              nz-button
+              nzType="text"
+              nzShape="circle"
+              nzSize="small"
+              aria-label="Open Category selection drawer"
+              (click)="openCategoryDrawerForSingleArticle(row)"
+            >
+              <span nz-icon nzType="tags" nzTheme="twotone"></span>
+            </button>
+          } @else {
+            <label
+              nz-checkbox
+              [ngModel]="isRowChecked(row)"
+              (ngModelChange)="onCategoryRowCheckChange(row, $event)"
+            ></label>
           }
-        </tbody>
-      </nz-table>
-    <!-- </div> -->
-    
+        </td>
+
+        <!-- 7 -->
+        <td>
+          <a
+            [href]="
+              row.hostname.startsWith('http://') ||
+              row.hostname.startsWith('https://')
+                ? row.hostname
+                : 'http://' + row.hostname
+            "
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {{ row.hostname }}
+          </a>
+        </td>
+        <!-- 8 -->
+        <td>{{ row.pubname }}</td>
+        <!-- 9 -->
+        @if (row.authorlink) {
+          <td>
+            <a
+              [href]="row.authorlink"
+              target="_blank"
+              rel="noopener noreferrer"
+              >{{ row.authorname }}</a
+            >
+          </td>
+        } @else {
+          <td>{{ row.authorname }}</td>
+        }
+        <!-- 10 -->
+        <td>{{ row.pubauthorslug }}</td>
+        <!-- 11 -->
+        <td>{{ row.listname }}</td>
+        <!-- 12 -->
+        <td nzAlign="center">{{ row.likes }}</td>
+        <!-- 13 -->
+        <td nzAlign="center">{{ row.comments }}</td>
+        <!-- 14 -->
+        <!-- <td nzAlign="center">{{ row.ranking }}</td> -->
+        <td nzAlign="center">
+          <nz-rate
+            class="rate-cell"
+            [ngModel]="row.ranking ?? 0"
+            (ngModelChange)="onRankChange(row, $event)"
+            [nzCount]="5"
+            [nzAllowClear]="false"
+            [nzTooltips]="nzRateToolTips"
+          >
+          </nz-rate>
+        </td>
+
+        <!-- 15 -->
+        <td>{{ row.timestamp }}</td>
+      </tr>
+    }
+  </tbody>
+</nz-table>
+<!-- </div> -->

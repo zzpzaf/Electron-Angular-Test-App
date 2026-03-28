@@ -4,7 +4,9 @@
 
   <div class="header">
     <div class="header-left">
-      <img src="{{ row?.image }}" alt="icon" />
+      @if (row) {
+        <img src="{{ row?.image }}" alt="icon" />
+      }
     </div>
     <div class="header-right">
       <div class="title">{{ row?.title }}</div>
