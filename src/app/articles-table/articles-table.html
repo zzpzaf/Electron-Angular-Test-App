@@ -248,7 +248,12 @@
               aria-label="Open Category selection drawer"
               (click)="openCategoryDrawerForSingleArticle(row)"
             >
-              <span nz-icon nzType="tags" nzTheme="twotone"></span>
+              <span
+                nz-icon
+                nzType="tags"
+                [nzTheme]="isArticleUncategorized(row) ? 'outline' : 'twotone'"
+                [class.tag-icon-uncategorized]="isArticleUncategorized(row)"
+              ></span>
             </button>
           } @else {
             <label

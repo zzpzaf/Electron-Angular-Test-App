@@ -50,8 +50,10 @@ export class ArticlesTable {
   public selectedCategory: string  = '';
   public articlesSearchText = signal('');
   public articlesSearchTextDebounced = signal('');
+  public $articleCategoryIdsByArticleId = signal<Record<number, number[]>>({});
 
   private searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private categoryStatusLoadingIds = new Set<number>();
 
   private readonly drawer = inject(NzDrawerService);
 
@@ -98,6 +100,9 @@ export class ArticlesTable {
       if (this.backendService.$selectedCategory()) {
         this.selectedCategory = ': ' + this.backendService.$selectedCategory()!.name;
       }
+
+      // Prefetch category status for currently visible rows (used by categories tag icon styling).
+      this.prefetchCategoryStatusForVisibleRows(this.$filteredArticles());
       console.log('>===>> ArticlesTable - Articles signal updated, count=', this.$articles().length);
     });
   }
@@ -172,6 +177,9 @@ export class ArticlesTable {
       // Persist the selected category ids for the article
       const result = await this.backendService.updateArticleCategoriesForSingleArticle(articleId, selectedKeys);
       console.log('>===>> ArticlesTable - openCategoryDrawerForSingleArticle 4 - Update article categories result:', result);
+      if (result) {
+        this.setArticleCategoryIdsCache(articleId, selectedKeys);
+      }
       // 260328 - clear the selected checkbox -if it has been checked- after the action is done:
       if (this.selectedCategoryRows().has(this.rowKey(row))) {
         console.log('>===>> ArticlesTable - openCategoryDrawerForSingleArticle 4 - Clearing selected checkbox for article id:', articleId);
@@ -347,6 +355,11 @@ export class ArticlesTable {
       // Persist the selected category ids for the checked articles 
       const result = await this.backendService.updateArticleCategoriesForMultipleArticles(selectedArticleIds, selectedKeys);
       console.log('>===>> ArticlesTable - Update multi-article categories result:', result);
+      if (result) {
+        for (const articleId of selectedArticleIds) {
+          this.setArticleCategoryIdsCache(articleId, selectedKeys);
+        }
+      }
       // 260328 - clear the selected checkboxes after the batch action is done:
       this.selectedCategoryRows.set(new Set<RowKey>());
       
@@ -354,6 +367,64 @@ export class ArticlesTable {
     });
 
 
+  }
+
+  private setArticleCategoryIdsCache(articleId: number, categoryIds: number[]): void {
+    this.$articleCategoryIdsByArticleId.update((prev) => ({
+      ...prev,
+      [articleId]: [...categoryIds],
+    }));
+  }
+
+  private prefetchCategoryStatusForVisibleRows(rows: PostData[]): void {
+    // All rows are uncategorized in this mode, so no per-row fetch is required.
+    if (this.filter === 'unassigned') {
+      return;
+    }
+
+    const cached = this.$articleCategoryIdsByArticleId();
+
+    for (const row of rows) {
+      if (typeof row.id !== 'number') {
+        continue;
+      }
+
+      const articleId = row.id;
+      if (cached[articleId] !== undefined || this.categoryStatusLoadingIds.has(articleId)) {
+        continue;
+      }
+
+      this.categoryStatusLoadingIds.add(articleId);
+
+      this.backendService
+        .getCategoryIdsOfAnArticle(articleId)
+        .then((categoryIds) => {
+          this.setArticleCategoryIdsCache(articleId, categoryIds ?? []);
+        })
+        .catch((err) => {
+          console.error('>===>> ArticlesTable - prefetchCategoryStatusForVisibleRows error:', articleId, err);
+        })
+        .finally(() => {
+          this.categoryStatusLoadingIds.delete(articleId);
+        });
+    }
+  }
+
+  isArticleUncategorized(row: PostData): boolean {
+    if (this.filter === 'unassigned') {
+      return true;
+    }
+
+    if (typeof row.id !== 'number') {
+      return false;
+    }
+
+    const categoryIds = this.$articleCategoryIdsByArticleId()[row.id];
+    if (categoryIds === undefined) {
+      return false;
+    }
+
+    return categoryIds.length === 0;
   }
 
 
