@@ -147,11 +147,21 @@ export class ArticlesTable {
     // 4) On close, persist the final selection 
     drawerRef.afterClose.subscribe(async (selectedKeys) => {
       if (!selectedKeys) return; // user cancelled
-      console.log('>===>> Selected category keys:', selectedKeys);
+      console.log('>===>> ArticlesTable - openCategoryDrawerForSingleArticle 4 - Selected category keys:', selectedKeys);
       // Persist the selected category ids for the article
       const result = await this.backendService.updateArticleCategoriesForSingleArticle(articleId, selectedKeys);
-      console.log('>===>> ArticlesTable - Update article categories result:', result);
+      console.log('>===>> ArticlesTable - openCategoryDrawerForSingleArticle 4 - Update article categories result:', result);
+      // 260328 - clear the selected checkbox -if it has been checked- after the action is done:
+      if (this.selectedCategoryRows().has(this.rowKey(row))) {
+        console.log('>===>> ArticlesTable - openCategoryDrawerForSingleArticle 4 - Clearing selected checkbox for article id:', articleId);
+        this.selectedCategoryRows.update(prev => {
+          const next = new Set(prev);
+          next.delete(this.rowKey(row));
+          return next;
+        });
+      }
       this.updateArticlesTable();
+
     });
   }
 
@@ -201,13 +211,13 @@ export class ArticlesTable {
   public onCategoryRowCheckChange(row: PostData, checked: boolean): void {
     const key = this.rowKey(row);
     this.selectedCategoryRows.update(prev => {
-    const next = new Set(prev);
-    if (checked) {
-    next.add(key);
-    } else {
-    next.delete(key);
-    }
-    return next;
+      const next = new Set(prev);
+      if (checked) {
+      next.add(key);
+      } else {
+      next.delete(key);
+      }
+      return next;
     });
   }
 
@@ -243,6 +253,9 @@ export class ArticlesTable {
       // Persist the selected category ids for the checked articles 
       const result = await this.backendService.updateArticleCategoriesForMultipleArticles(selectedArticleIds, selectedKeys);
       console.log('>===>> ArticlesTable - Update multi-article categories result:', result);
+      // 260328 - clear the selected checkboxes after the batch action is done:
+      this.selectedCategoryRows.set(new Set<RowKey>());
+      
       this.updateArticlesTable();
     });
 

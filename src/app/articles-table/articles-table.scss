@@ -131,4 +131,13 @@
   padding-left: 20px;   /* the actual inter-column gap */
 }
 
+// 260328 - Add checked-row background style (darker than hover)
+:host ::ng-deep .ant-table-tbody > tr.row-checked > td {
+  background-color: #f2de8f; /* slightly darker than hover #fff4bf */
+}
 
+// 260328 - Keep checked-row style visible even when hovered
+//Because you already have a hover rule on all rows, add a specific rule so checked rows keep their own tone:
+:host ::ng-deep .ant-table-tbody > tr.row-checked:hover > td {
+  background-color: #ecd67d;
+}

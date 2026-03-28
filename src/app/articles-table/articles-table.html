@@ -145,7 +145,7 @@
   <!-- ------------------------------------------------------- -->
   <tbody>
     @for (row of table.data; track row.id ?? row.link; let i = $index) {
-      <tr>
+      <tr [class.row-checked]="isCategoriesCheckboxMode() && isRowChecked(row)">
         <!-- 1 -->
         <td nzAlign="center">{{ row.id }}</td>
         <!-- 2 -->
