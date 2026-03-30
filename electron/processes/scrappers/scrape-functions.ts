@@ -27,6 +27,8 @@ import {
   timeConst,
   metaSEL,
   cleanSEL,
+  iframeConst,
+  iframeSEL,
   listSEL,
 } from './scrape-constants';
  
@@ -38,6 +40,14 @@ puppeteer.use(StealthPlugin());
 
 // 260330 Update: Per-article context store — survives async boundaries and parallel pLimit tasks
 const _scrapeContextStorage = new AsyncLocalStorage<{ article: string }>();
+
+type IframeEmbedType = 'gist' | 'stackademic' | 'datawrapper';
+
+type IframeEmbed = {
+  src: string;
+  title: string;
+  type: IframeEmbedType;
+};
 
 // 260328 Update: Adding logging for scrape timing
 function logScrapeTiming(message: string): void {
@@ -108,6 +118,70 @@ async function connectToBrowser(): Promise<Puppeteer.Browser> {
     defaultViewport: null,
     protocolTimeout: timeConst.PROTOCOL_TIMEOUT,
   });
+}
+
+function classifyIframeSource(src: string): IframeEmbedType | null {
+  if (!src) return null;
+
+  try {
+    const u = new URL(src, 'https://medium.com');
+    const hostname = u.hostname.toLowerCase();
+    const pathname = u.pathname || '';
+    const schema = (u.searchParams.get('schema') || '').toLowerCase();
+    const urlParam = u.searchParams.get('url') || '';
+
+    if (hostname === iframeConst.GIST_HOST || pathname.endsWith('.js')) {
+      return 'gist';
+    }
+
+    if (
+      hostname === iframeConst.STACKACADEMIC_HOST &&
+      pathname.startsWith(iframeConst.STACKACADEMIC_MEDIA_PATH_PREFIX)
+    ) {
+      return 'stackademic';
+    }
+
+    if (hostname === iframeConst.DATAWRAPPER_HOST) {
+      return 'datawrapper';
+    }
+
+    if ((schema === 'datawrapper' || schema === 'dwcdn') && urlParam) {
+      const nested = new URL(urlParam, 'https://medium.com');
+      if (nested.hostname.toLowerCase() === iframeConst.DATAWRAPPER_HOST) {
+        return 'datawrapper';
+      }
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function resolveDatawrapperUrl(src: string): string {
+  if (!src) return src;
+
+  try {
+    const u = new URL(src, 'https://medium.com');
+    const hostname = u.hostname.toLowerCase();
+    const schema = (u.searchParams.get('schema') || '').toLowerCase();
+    const urlParam = u.searchParams.get('url') || '';
+
+    if (hostname === iframeConst.DATAWRAPPER_HOST) {
+      return u.toString();
+    }
+
+    if ((schema === 'dwcdn' || schema === 'datawrapper') && urlParam) {
+      const nested = new URL(urlParam, 'https://medium.com');
+      if (nested.hostname.toLowerCase() === iframeConst.DATAWRAPPER_HOST) {
+        return nested.toString();
+      }
+    }
+  } catch {
+    return src;
+  }
+
+  return src;
 }
 
 
@@ -442,15 +516,23 @@ async function scrapeMediumMarkdownContent(
   // console.log('>= *** ==>> scrapeMediumMarkdownContent() - before getCleanedPageContent(), page: ', page);
 
   try {
-    // Get cleaned HTML + captured gist iframe sources
-    const { html: cleanedHtml, iframeSrcs } = await measureScrapeStep(
+    // Get cleaned HTML + captured supported iframe sources
+    const { html: cleanedHtml, iframeEmbeds } = await measureScrapeStep(
       'getCleanedPageContent',
       () => getCleanedPageContent(page),
       `url=${pageUrl}`
     );
 
+    const gistEmbeds = iframeEmbeds.filter((embed) => embed.type === 'gist');
+    const stackademicEmbeds = iframeEmbeds.filter(
+      (embed) => embed.type === 'stackademic'
+    );
+    const datawrapperEmbeds = iframeEmbeds.filter(
+      (embed) => embed.type === 'datawrapper'
+    );
+
     logScrapeTiming(
-      `Cleaned HTML size=${cleanedHtml.length} chars, gist iframes=${iframeSrcs.length} | url=${pageUrl}`
+      `Cleaned HTML size=${cleanedHtml.length} chars, gist=${gistEmbeds.length}, stackademic=${stackademicEmbeds.length}, datawrapper=${datawrapperEmbeds.length} | url=${pageUrl}`
     );
 
     // console.log('>= *** ==>> scrapeMediumMarkdownContent() - after getCleanedPageContent() 🔍 Cleaned HTML: ', cleanedHtml);
@@ -458,10 +540,26 @@ async function scrapeMediumMarkdownContent(
     // Process gists using existing browser connection
     const htmlWithGists = await measureScrapeStep(
       'processGists',
-      () => processGists(browser, cleanedHtml, iframeSrcs),
+      () => processGists(browser, cleanedHtml, gistEmbeds),
       `url=${pageUrl}`
     );
 
+    const htmlWithStackademic = await measureScrapeStep(
+      'processStackacademic',
+      () => processStackacademic(browser, htmlWithGists, stackademicEmbeds),
+      `url=${pageUrl}`
+    );
+
+    const htmlWithEmbeds = await measureScrapeStep(
+      'processDatawrapper',
+      () => processDatawrapper(browser, htmlWithStackademic, datawrapperEmbeds),
+      `url=${pageUrl}`
+    );
+
+
+
+
+    
     const turndownService = new TurndownService({
       codeBlockStyle: 'fenced',
       headingStyle: 'atx',
@@ -478,7 +576,7 @@ async function scrapeMediumMarkdownContent(
     // Real convertion from HTML to Markdown
     return await measureScrapeStep(
       'turndown',
-      () => turndownService.turndown(htmlWithGists),
+      () => turndownService.turndown(htmlWithEmbeds),
       `url=${pageUrl}`
     );
   } catch (error) {
@@ -519,43 +617,78 @@ async function scrapeMediumMarkdownContent(
 
 export async function getCleanedPageContent(
   page: import('puppeteer').Page
-): Promise<{ html: string; iframeSrcs: string[] }> {
+): Promise<{ html: string; iframeEmbeds: IframeEmbed[] }> {
   await autoScrollArticlePage(page);
 
   const pageUrl = page.url();
 
   try {
-    await page.waitForSelector('figure iframe', {
+    await page.waitForSelector(cleanSEL.articleIframes, {
       timeout: timeConst.AFTER_AUTOSCROLL_GIST_IFRAME_SELECTOR_DELAY, // 1000 ms
     });
   } catch {
-    // console.warn('>= *** ==>> ⚠️ No gist iframes found within timeout');
+    // No supported iframe found within timeout
   }
 
-  const iframeSources: string[] = await measureScrapeStep(
-    'collectGistIframeSources',
+  const iframeEmbeds: IframeEmbed[] = await measureScrapeStep(
+    'collectSupportedIframeSources',
     () =>
-      page.evaluate(() => {
-        return Array.from(document.querySelectorAll('figure iframe'))
-          .map((iframe) => iframe.getAttribute('src') || '')
-          .filter(Boolean);
-      }),
+      page.evaluate((SEL) => {
+        const candidates = Array.from(
+          document.querySelectorAll(`${SEL.articleIframes}, [data-src*="datawrapper.dwcdn.net"]`)
+        );
+
+        return candidates
+          .map((el) => {
+            const src =
+              el.getAttribute('src') ||
+              el.getAttribute('data-src') ||
+              el.getAttribute('data-iframe-src') ||
+              '';
+            const title =
+              el.getAttribute('title')?.trim() ||
+              el.getAttribute('data-title')?.trim() ||
+              '';
+
+            return { src, title };
+          })
+          .filter((item) => Boolean(item.src));
+      }, cleanSEL)
+      .then((entries) =>
+        entries
+          .map((entry) => {
+            const type = classifyIframeSource(entry.src);
+            if (!type) return null;
+
+            return {
+              src: entry.src,
+              title: entry.title,
+              type,
+            } as IframeEmbed;
+          })
+          .filter((item): item is IframeEmbed => item !== null)
+      ),
     `url=${pageUrl}`
   );
 
-  if (iframeSources.length > 0) {
-    logFunctionHeader('collectGistIframeSources');
-    iframeSources.forEach((src, i) => {
-      logScrapeLinkStart('collectGistIframeSources', i + 1, src, iframeSources.length);
+  if (iframeEmbeds.length > 0) {
+    logFunctionHeader('collectSupportedIframeSources');
+    iframeEmbeds.forEach((embed, i) => {
+      logScrapeLinkStart(
+        `collectSupportedIframeSources:${embed.type}`,
+        i + 1,
+        embed.src,
+        iframeEmbeds.length
+      );
     });
   }
 
-  console.log('>= *** ==>> 📌 Found gist iframe src:', iframeSources);
+  console.log('Found supported iframe sources:', iframeEmbeds);
 
   const rawHTML = await measureScrapeStep(
     'extractCleanedArticleHtml',
     () =>
-      page.evaluate((SEL) => {
+      page.evaluate((SEL, IFRAME_CONST) => {
         // --- helpers -------------------------------------------------------------
 
         const removeSpecificText = (
@@ -609,12 +742,105 @@ export async function getCleanedPageContent(
           }
         };
 
-        // ⬇️ NEW: transform YouTube iframes into simple links, remove all others
+        const injectDatawrapperPlaceholdersFromSerializedScripts = (
+          root: HTMLElement
+        ) => {
+          const scripts = Array.from(root.querySelectorAll('script'));
+          const seen = new Set<string>();
+
+          for (const scriptEl of scripts) {
+            const scriptText = scriptEl.textContent || '';
+            if (!/datawrapper\.dwcdn\.net/i.test(scriptText)) {
+              continue;
+            }
+
+            const matches = scriptText.match(
+              /https:\\u002F\\u002Fdatawrapper\.dwcdn\.net\\u002F[A-Za-z0-9_-]+\\u002F\d+\\u002F/gi
+            );
+
+            if (!matches || matches.length === 0) {
+              continue;
+            }
+
+            for (const encodedUrl of matches) {
+              const decodedUrl = encodedUrl
+                .replace(/\\u002F/g, '/')
+                .replace(/^https:\/\//i, 'https://')
+                .trim();
+
+              if (!decodedUrl || seen.has(decodedUrl)) {
+                continue;
+              }
+
+              seen.add(decodedUrl);
+
+              const placeholder = document.createElement('div');
+              placeholder.className = 'iframe-embed-placeholder';
+              placeholder.setAttribute('data-embed-type', 'datawrapper');
+              placeholder.setAttribute('data-iframe-src', decodedUrl);
+              scriptEl.parentNode?.insertBefore(placeholder, scriptEl);
+            }
+          }
+        };
+
+        // Transform YouTube iframes into links and preserve known provider iframes as placeholders.
         const transformYouTubeIframes = (root: HTMLElement) => {
+          const extractEmbedSrc = (el: Element): string => {
+            return (
+              el.getAttribute('src') ||
+              el.getAttribute('data-src') ||
+              el.getAttribute('data-iframe-src') ||
+              ''
+            );
+          };
+
+          const classifyIframeInDom = (src: string): IframeEmbedType | null => {
+            if (!src) return null;
+
+            try {
+              const u = new URL(src, location.href);
+              const hostname = u.hostname.toLowerCase();
+              const pathname = u.pathname || '';
+              const schema = (u.searchParams.get('schema') || '').toLowerCase();
+              const urlParam = u.searchParams.get('url') || '';
+
+              if (
+                hostname === IFRAME_CONST.GIST_HOST ||
+                pathname.endsWith('.js')
+              ) {
+                return 'gist';
+              }
+
+              if (
+                hostname === IFRAME_CONST.STACKACADEMIC_HOST &&
+                pathname.startsWith(IFRAME_CONST.STACKACADEMIC_MEDIA_PATH_PREFIX)
+              ) {
+                return 'stackademic';
+              }
+
+              if (hostname === IFRAME_CONST.DATAWRAPPER_HOST) {
+                return 'datawrapper';
+              }
+
+              if ((schema === 'datawrapper' || schema === 'dwcdn') && urlParam) {
+                const nested = new URL(urlParam, location.href);
+                if (
+                  nested.hostname.toLowerCase() === IFRAME_CONST.DATAWRAPPER_HOST
+                ) {
+                  return 'datawrapper';
+                }
+              }
+            } catch {
+              return null;
+            }
+
+            return null;
+          };
+
           const iframes = Array.from(root.querySelectorAll(SEL.iframes));
 
           for (const iframe of iframes) {
-            const src = iframe.getAttribute('src') || '';
+            const src = extractEmbedSrc(iframe);
             let youtubeUrl: string | null = null;
 
             try {
@@ -647,8 +873,45 @@ export async function getCleanedPageContent(
               wrapper.appendChild(a);
               iframe.replaceWith(wrapper);
             } else {
-              iframe.remove();
+              const embedType = classifyIframeInDom(src);
+
+              if (embedType) {
+                const placeholder = document.createElement('div');
+                placeholder.className = 'iframe-embed-placeholder';
+                placeholder.setAttribute('data-embed-type', embedType);
+                placeholder.setAttribute('data-iframe-src', src);
+                const title = iframe.getAttribute('title')?.trim();
+                if (title) {
+                  placeholder.setAttribute('data-iframe-title', title);
+                }
+                iframe.replaceWith(placeholder);
+              } else {
+                iframe.remove();
+              }
             }
+          }
+
+          // Some Datawrapper embeds are lazy-loaded with data-src on non-iframe wrappers.
+          const datawrapperNodes = Array.from(
+            root.querySelectorAll('[data-src*="datawrapper.dwcdn.net"]')
+          );
+
+          for (const node of datawrapperNodes) {
+            if (node.classList.contains('iframe-embed-placeholder')) continue;
+
+            const src = extractEmbedSrc(node);
+            const embedType = classifyIframeInDom(src);
+            if (embedType !== 'datawrapper') continue;
+
+            const placeholder = document.createElement('div');
+            placeholder.className = 'iframe-embed-placeholder';
+            placeholder.setAttribute('data-embed-type', 'datawrapper');
+            placeholder.setAttribute('data-iframe-src', src);
+            const title = node.getAttribute('title')?.trim();
+            if (title) {
+              placeholder.setAttribute('data-iframe-title', title);
+            }
+            node.replaceWith(placeholder);
           }
         };
 
@@ -670,6 +933,10 @@ export async function getCleanedPageContent(
 
         // --- clean & transform ---------------------------------------------------
 
+        // Extract Datawrapper embed URLs from serialized Medium state scripts
+        // before script tags are removed by cleanTags.
+        injectDatawrapperPlaceholdersFromSerializedScripts(container);
+
         container.querySelectorAll(SEL.cleanTags).forEach((el) => el.remove());
 
         removeSpecificText(container, [
@@ -683,13 +950,13 @@ export async function getCleanedPageContent(
         transformYouTubeIframes(container);
 
         return container.innerHTML;
-      }, cleanSEL),
+      }, cleanSEL, iframeConst),
     `url=${pageUrl}`
   );
 
   logScrapeTiming(`Extracted cleaned HTML length=${rawHTML.length} | url=${pageUrl}`);
 
-  return { html: rawHTML, iframeSrcs: iframeSources };
+  return { html: rawHTML, iframeEmbeds };
 }
 
 
@@ -715,27 +982,32 @@ export async function getCleanedPageContent(
 export async function processGists(
   browser: Puppeteer.Browser,
   html: string,
-  iframeSrcs: string[]
+  gistEmbeds: IframeEmbed[]
 ): Promise<string> {
   logFunctionHeader('processGists');
-  console.log('🔍 Processing gists...');
-  console.log('📌 Captured iframe sources:', iframeSrcs);
+  console.log('Processing gists...');
+  console.log('Captured gist iframe sources:', gistEmbeds);
 
   const dom = new JSDOM(html);
   const document = dom.window.document;
 
-  // --- 1️⃣ Process .gist-meta blocks ---
+  // Process .gist-meta blocks
   const gistBlocks = document.querySelectorAll('.gist-meta');
   if (gistBlocks.length > 0) {
-    console.log(`📌 Found ${gistBlocks.length} gist-meta blocks`);
+    console.log(`Found ${gistBlocks.length} gist-meta blocks`);
     let gistIndex = 0;
     for (const gistMeta of gistBlocks) {
       gistIndex += 1;
-      const links = gistMeta.querySelectorAll('a');
-      if (links.length >= 2) {
-        const rawCodeUrl = links[0].getAttribute('href') || '';
-        const gistPermalink = links[1].getAttribute('href') || '';
+      const rawCodeUrl =
+        gistMeta
+          .querySelector(iframeSEL.gistMetaRawLink)
+          ?.getAttribute('href') || '';
+      const gistPermalink =
+        gistMeta
+          .querySelector(iframeSEL.gistMetaPermalink)
+          ?.getAttribute('href') || '';
 
+      if (rawCodeUrl) {
         logIterationHeader(
           'processGists:gist-meta',
           gistIndex,
@@ -743,52 +1015,44 @@ export async function processGists(
           rawCodeUrl || gistPermalink || 'no-link'
         );
 
-        if (rawCodeUrl) {
-          try {
-            const response = await fetch(rawCodeUrl);
-            const codeText = await response.text();
+        try {
+          const response = await fetch(rawCodeUrl);
+          const codeText = await response.text();
 
-            // Create code block
-            const pre = document.createElement('pre');
-            const code = document.createElement('code');
-            code.textContent = codeText;
-            pre.appendChild(code);
+          // Create code block
+          const pre = document.createElement('pre');
+          const code = document.createElement('code');
+          code.textContent = codeText;
+          pre.appendChild(code);
 
-            // Create gist link
-            const linkPara = document.createElement('p');
-            linkPara.textContent = `Gist Link: ${gistPermalink}`;
+          // Create gist link
+          const linkPara = document.createElement('p');
+          linkPara.textContent = `Gist Link: ${gistPermalink}`;
 
-            // Replace gist-meta with code + link
-            gistMeta.previousElementSibling?.remove();
-            gistMeta.replaceWith(pre, linkPara);
-          } catch (err) {
-            console.warn('⚠️ Failed to fetch gist code:', rawCodeUrl, err);
-          }
+          // Replace gist-meta with code + link
+          gistMeta.previousElementSibling?.remove();
+          gistMeta.replaceWith(pre, linkPara);
+        } catch (err) {
+          console.warn('Failed to fetch gist code:', rawCodeUrl, err);
         }
       }
     }
   }
 
-  // --- 2️⃣ Process iframe-based gists ---
-  if (iframeSrcs.length > 0) {
-    console.log(
-      `📌 Processing ${iframeSrcs.length} iframe-based gist embeds...`
-    );
+  // Process iframe-based gists using placeholders created in getCleanedPageContent().
+  if (gistEmbeds.length > 0) {
+    console.log(`Processing ${gistEmbeds.length} iframe-based gist embeds...`);
 
-    const figures = Array.from(document.querySelectorAll('figure iframe')).map(
-      (iframe) => iframe.closest('figure')
-    );
-
-    for (let i = 0; i < iframeSrcs.length; i++) {
-      const iframeUrl = iframeSrcs[i];
+    for (let i = 0; i < gistEmbeds.length; i++) {
+      const iframeUrl = gistEmbeds[i].src;
       if (!iframeUrl) continue;
 
-      logScrapeLinkStart('processGists:iframe', i + 1, iframeUrl, iframeSrcs.length);
+      logScrapeLinkStart('processGists:iframe', i + 1, iframeUrl, gistEmbeds.length);
 
       try {
         const gistData = await extractCodeFromIframe(browser, iframeUrl);
         if (!gistData?.code) {
-          console.warn(`⚠️ Could not extract code from ${iframeUrl}`);
+          console.warn(`Could not extract code from ${iframeUrl}`);
           continue;
         }
 
@@ -809,21 +1073,418 @@ export async function processGists(
           linkPara.textContent = `[ Gist Link: ${gistLink} ]`;
         }
 
-        // Replace figure with both elements
-        if (figures[i]) {
+        const placeholder = Array.from(
+          document.querySelectorAll('.iframe-embed-placeholder[data-embed-type="gist"]')
+        ).find((el) => el.getAttribute('data-iframe-src') === iframeUrl);
+        if (placeholder) {
           if (linkPara) {
-            figures[i]?.replaceWith(pre, linkPara);
+            placeholder.replaceWith(pre, linkPara);
           } else {
-            figures[i]?.replaceWith(pre);
+            placeholder.replaceWith(pre);
           }
+        } else {
+          console.warn(`No gist placeholder found for iframe source: ${iframeUrl}`);
         }
       } catch (err) {
-        console.warn(`⚠️ Failed to process iframe gist: ${iframeUrl}`, err);
+        console.warn(`Failed to process iframe gist: ${iframeUrl}`, err);
       }
     }
   }
 
   return document.body.innerHTML;
+}
+
+export async function processStackacademic(
+  browser: Puppeteer.Browser,
+  html: string,
+  stackademicEmbeds: IframeEmbed[]
+): Promise<string> {
+  logFunctionHeader('processStackacademic');
+  console.log('Processing Stackademic media embeds:', stackademicEmbeds.length);
+
+  if (stackademicEmbeds.length === 0) {
+    return html;
+  }
+
+  const dom = new JSDOM(html);
+  const document = dom.window.document;
+
+  for (let i = 0; i < stackademicEmbeds.length; i++) {
+    const embed = stackademicEmbeds[i];
+    logScrapeLinkStart(
+      'processStackacademic:iframe',
+      i + 1,
+      embed.src,
+      stackademicEmbeds.length
+    );
+
+    try {
+      const extracted = await extractStackacademicContentFromIframe(
+        browser,
+        embed.src
+      );
+
+      const placeholder = Array.from(
+        document.querySelectorAll('.iframe-embed-placeholder[data-embed-type="stackademic"]')
+      ).find((el) => el.getAttribute('data-iframe-src') === embed.src);
+
+      if (!placeholder) {
+        console.warn(`No Stackademic placeholder found for iframe source: ${embed.src}`);
+        continue;
+      }
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'stackademic-media-content';
+
+      if (embed.title) {
+        const h3 = document.createElement('h3');
+        h3.textContent = embed.title;
+        wrapper.appendChild(h3);
+      }
+
+      if (extracted.rawMarkdown) {
+        const pre = document.createElement('pre');
+        const code = document.createElement('code');
+        code.textContent = extracted.rawMarkdown;
+        pre.appendChild(code);
+        wrapper.appendChild(pre);
+      } else if (extracted.html) {
+        const bodyContainer = document.createElement('div');
+        bodyContainer.innerHTML = extracted.html;
+        wrapper.appendChild(bodyContainer);
+      } else if (extracted.text) {
+        const pre = document.createElement('pre');
+        const code = document.createElement('code');
+        code.textContent = extracted.text;
+        pre.appendChild(code);
+        wrapper.appendChild(pre);
+      }
+
+      const sourceLink = document.createElement('p');
+      sourceLink.textContent = `[ Stackademic Media Source: ${embed.src} ]`;
+      wrapper.appendChild(sourceLink);
+
+      placeholder.replaceWith(wrapper);
+    } catch (err) {
+      console.warn(`Failed to process Stackademic iframe: ${embed.src}`, err);
+    }
+  }
+
+  return document.body.innerHTML;
+}
+
+export async function processDatawrapper(
+  browser: Puppeteer.Browser,
+  html: string,
+  datawrapperEmbeds: IframeEmbed[]
+): Promise<string> {
+  logFunctionHeader('processDatawrapper');
+
+  console.log('Processing Datawrapper embeds from placeholders and collected sources...');
+
+  const dom = new JSDOM(html);
+  const document = dom.window.document;
+
+  const placeholderEmbeds: IframeEmbed[] = Array.from(
+    document.querySelectorAll('.iframe-embed-placeholder[data-embed-type="datawrapper"]')
+  )
+    .map((el) => ({
+      src: el.getAttribute('data-iframe-src') || '',
+      title: el.getAttribute('data-iframe-title') || '',
+      type: 'datawrapper' as const,
+    }))
+    .filter((embed) => Boolean(embed.src));
+
+  const dataSrcEmbeds: IframeEmbed[] = Array.from(
+    document.querySelectorAll('[data-src*="datawrapper.dwcdn.net"]')
+  )
+    .map((el) => ({
+      src: el.getAttribute('data-src') || '',
+      title: el.getAttribute('title') || '',
+      type: 'datawrapper' as const,
+    }))
+    .filter((embed) => Boolean(embed.src));
+
+  const linkEmbeds: IframeEmbed[] = Array.from(
+    document.querySelectorAll('a[href*="datawrapper.dwcdn.net"]')
+  )
+    .map((el) => ({
+      src: el.getAttribute('href') || '',
+      title: (el.textContent || '').trim(),
+      type: 'datawrapper' as const,
+    }))
+    .filter((embed) => Boolean(embed.src));
+
+  const allEmbeds = [
+    ...datawrapperEmbeds,
+    ...placeholderEmbeds,
+    ...dataSrcEmbeds,
+    ...linkEmbeds,
+  ]
+    .map((embed) => ({
+      ...embed,
+      src: resolveDatawrapperUrl(embed.src),
+    }))
+    .filter(
+    (embed, index, arr) =>
+      arr.findIndex((candidate) => candidate.src === embed.src) === index
+  );
+
+  console.log(`Datawrapper embeds to process: ${allEmbeds.length}`);
+
+  if (allEmbeds.length === 0) {
+    return html;
+  }
+
+  for (let i = 0; i < allEmbeds.length; i++) {
+    const embed = allEmbeds[i];
+    logScrapeLinkStart(
+      'processDatawrapper:iframe',
+      i + 1,
+      embed.src,
+      allEmbeds.length
+    );
+
+    try {
+      const sourceUrl = resolveDatawrapperUrl(embed.src);
+
+      let info: { title: string; description: string; dataPreview: string } = {
+        title: '',
+        description: '',
+        dataPreview: '',
+      };
+      try {
+        info = await extractDatawrapperInfoFromIframe(browser, sourceUrl);
+      } catch (err) {
+        console.warn(`Failed extracting Datawrapper info, using fallback link only: ${sourceUrl}`, err);
+      }
+      const targetNode =
+        Array.from(
+          document.querySelectorAll('.iframe-embed-placeholder[data-embed-type="datawrapper"]')
+        ).find((el) => resolveDatawrapperUrl(el.getAttribute('data-iframe-src') || '') === sourceUrl) ||
+        Array.from(document.querySelectorAll('[data-src*="datawrapper.dwcdn.net"]')).find(
+          (el) => resolveDatawrapperUrl(el.getAttribute('data-src') || '') === sourceUrl
+        ) ||
+        Array.from(document.querySelectorAll('a[href*="datawrapper.dwcdn.net"]')).find(
+          (el) => resolveDatawrapperUrl(el.getAttribute('href') || '') === sourceUrl
+        );
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'datawrapper-embed';
+
+      const title = embed.title || info.title || 'Datawrapper chart';
+      const pTitle = document.createElement('p');
+      pTitle.textContent = `Datawrapper: ${title}`;
+      wrapper.appendChild(pTitle);
+
+      if (info.description) {
+        const pDesc = document.createElement('p');
+        pDesc.textContent = info.description;
+        wrapper.appendChild(pDesc);
+      }
+
+      if (info.dataPreview) {
+        const pData = document.createElement('p');
+        pData.textContent = 'Data preview:';
+        wrapper.appendChild(pData);
+
+        const pre = document.createElement('pre');
+        const code = document.createElement('code');
+        code.textContent = info.dataPreview;
+        pre.appendChild(code);
+        wrapper.appendChild(pre);
+      }
+
+      const pLink = document.createElement('p');
+      pLink.textContent = `[ Open interactive chart: ${sourceUrl} ]`;
+      wrapper.appendChild(pLink);
+
+      if (targetNode) {
+        targetNode.replaceWith(wrapper);
+      } else {
+        // Keep the embed content instead of dropping it when Medium markup has no stable anchor node.
+        document.body.appendChild(wrapper);
+      }
+    } catch (err) {
+      console.warn(`Failed to process Datawrapper iframe: ${embed.src}`, err);
+    }
+  }
+
+  return document.body.innerHTML;
+}
+
+export async function extractStackacademicContentFromIframe(
+  browser: Puppeteer.Browser,
+  iframeUrl: string
+): Promise<{ html: string; text: string; rawMarkdown: string }> {
+  const page = await browser.newPage();
+
+  try {
+    logScrapeTiming(`START extractStackacademicContentFromIframe | iframe=${iframeUrl}`);
+
+    await page.goto(iframeUrl, {
+      waitUntil: 'networkidle2',
+      timeout: timeConst.STACKACADEMIC_MEDIA_PAGE_LOADING_DELAY,
+    });
+
+    const extracted = await page.evaluate((SEL) => {
+      const root =
+        document.querySelector(SEL.contentRootCandidates) || document.body;
+      const cloned = root.cloneNode(true) as HTMLElement;
+
+      cloned
+        .querySelectorAll('script, style, noscript, iframe')
+        .forEach((el) => el.remove());
+
+      const html = cloned.innerHTML.trim();
+      const text = (cloned.textContent || '').replace(/\s+\n/g, '\n').trim();
+
+      let viewRawUrl = '';
+      const allAnchors = Array.from(document.querySelectorAll('a'));
+      for (const a of allAnchors) {
+        const label = (a.textContent || '').trim().toLowerCase();
+        if (label.includes('view raw')) {
+          const href = a.getAttribute('href') || '';
+          if (href) {
+            try {
+              viewRawUrl = new URL(href, location.href).toString();
+            } catch {
+              viewRawUrl = href;
+            }
+            break;
+          }
+        }
+      }
+
+      return { html, text, viewRawUrl };
+    }, iframeSEL);
+
+    const rawMarkdown = extracted.viewRawUrl
+      ? await fetchStackacademicRawMarkdown(extracted.viewRawUrl)
+      : '';
+
+    return {
+      html: extracted.html,
+      text: extracted.text,
+      rawMarkdown,
+    };
+  } catch (err) {
+    console.warn(`Failed to extract Stackademic iframe content: ${iframeUrl}`, err);
+    return { html: '', text: '', rawMarkdown: '' };
+  } finally {
+    logScrapeTiming(`END extractStackacademicContentFromIframe | iframe=${iframeUrl}`);
+    await page.close();
+  }
+}
+
+async function fetchStackacademicRawMarkdown(viewRawUrl: string): Promise<string> {
+  try {
+    const firstRes = await fetch(viewRawUrl);
+    const firstText = await firstRes.text();
+    const contentType = firstRes.headers.get('content-type') || '';
+
+    const looksLikeHtml =
+      /text\/html/i.test(contentType) ||
+      /<html|<body|<head/i.test(firstText);
+
+    if (!looksLikeHtml) {
+      return firstText.trim();
+    }
+
+    const dom = new JSDOM(firstText);
+    const rawLink = dom.window.document.querySelector<HTMLAnchorElement>(
+      iframeSEL.gistMetaRawLink
+    );
+
+    if (!rawLink?.href) {
+      return '';
+    }
+
+    const rawRes = await fetch(rawLink.href);
+    const rawText = await rawRes.text();
+    return rawText.trim();
+  } catch (err) {
+    console.warn(`Failed to fetch Stackademic raw markdown from ${viewRawUrl}`, err);
+    return '';
+  }
+}
+
+export async function extractDatawrapperInfoFromIframe(
+  browser: Puppeteer.Browser,
+  iframeUrl: string
+): Promise<{ title: string; description: string; dataPreview: string }> {
+  const page = await browser.newPage();
+
+  try {
+    logScrapeTiming(`START extractDatawrapperInfoFromIframe | iframe=${iframeUrl}`);
+
+    await page.goto(iframeUrl, {
+      waitUntil: 'domcontentloaded',
+      timeout: timeConst.DATAWRAPPER_PAGE_LOADING_DELAY,
+    });
+
+    const meta = await page.evaluate((SEL) => {
+      const titleMeta = document.querySelector(SEL.datawrapperTitleMeta);
+      const descriptionMeta = document.querySelector(
+        SEL.datawrapperDescriptionMeta
+      );
+
+      return {
+        title:
+          titleMeta?.getAttribute('content')?.trim() ||
+          document.title?.trim() ||
+          '',
+        description:
+          descriptionMeta?.getAttribute('content')?.trim() ||
+          '',
+      };
+    }, iframeSEL);
+
+    const dataPreview = await fetchDatawrapperDatasetPreview(iframeUrl);
+
+    return {
+      title: meta.title,
+      description: meta.description,
+      dataPreview,
+    };
+  } catch (err) {
+    console.warn(`Failed to extract Datawrapper info from iframe: ${iframeUrl}`, err);
+    return { title: '', description: '', dataPreview: '' };
+  } finally {
+    logScrapeTiming(`END extractDatawrapperInfoFromIframe | iframe=${iframeUrl}`);
+    await page.close();
+  }
+}
+
+function stripHtmlTags(value: string): string {
+  return value.replace(/<[^>]+>/g, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&').trim();
+}
+
+async function fetchDatawrapperDatasetPreview(iframeUrl: string): Promise<string> {
+  try {
+    const normalized = iframeUrl.endsWith('/') ? iframeUrl : `${iframeUrl}/`;
+    const datasetUrl = `${normalized}dataset.csv`;
+    const response = await fetch(datasetUrl);
+    if (!response.ok) {
+      return '';
+    }
+
+    const csvText = await response.text();
+    if (!csvText.trim()) {
+      return '';
+    }
+
+    const lines = csvText
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(0, 6)
+      .map(stripHtmlTags);
+
+    return lines.join('\n');
+  } catch {
+    return '';
+  }
 }
 
 // ------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -849,19 +1510,19 @@ export async function extractCodeFromIframe(
     });
 
     // Find the raw code link
-    const { rawCodeUrl, gistPermalink } = await page.evaluate(() => {
+    const { rawCodeUrl, gistPermalink } = await page.evaluate((SEL) => {
       const rawLink = document.querySelector<HTMLAnchorElement>(
-        '.gist-meta a[href*="/raw"]'
+        SEL.gistMetaRawLink
       );
       const permalinkLink = document.querySelector<HTMLAnchorElement>(
-        '.gist-meta a[href^="https://gist.github.com"]'
+        SEL.gistMetaPermalink
       );
 
       return {
         rawCodeUrl: rawLink?.href || null,
         gistPermalink: permalinkLink?.href || null,
       };
-    });
+    }, iframeSEL);
 
     if (!rawCodeUrl) {
       console.warn(`⚠️ No raw code link found inside iframe: ${iframeUrl}`);

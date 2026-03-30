@@ -80,6 +80,10 @@ export const timeConst = {
   GIST_IFRAME_SELECTOR_DELAY: 5000,                  // 5 sec to wait for gist iframe
   GIST_PAGE_LOADING_DELAY: 15000,                    // 15 sec for gist page load
 
+  // Other iframe source handling
+  STACKACADEMIC_MEDIA_PAGE_LOADING_DELAY: 20000,     // 20 sec for Stackademic media iframe page load
+  DATAWRAPPER_PAGE_LOADING_DELAY: 15000,             // 15 sec for Datawrapper iframe page load
+
   // Tab handling
   OPEN_NEW_TAB_DELAY: 500,               // Delay before opening a new tab
   TAB_INITIAL_PAGE_LOADING_DELAY: 15000, // 15 sec for tab initial load
@@ -142,7 +146,27 @@ export const cleanSEL = {
   speechifyIgnoreDivs: 'div[class^="speechify-ignore"]',
   headings: 'h1',
   iframes: 'iframe',
+  articleIframes: 'figure iframe',
   cleanTags: 'script, style, noscript',
+} as const;
+
+
+// Iframe source constants and selectors
+// Used in functions: getCleanedPageContent(), processGists(), processStackacademic(), processDatawrapper()
+export const iframeConst = {
+  GIST_HOST: 'gist.github.com',
+  STACKACADEMIC_HOST: 'blog.stackademic.com',
+  STACKACADEMIC_MEDIA_PATH_PREFIX: '/media/',
+  DATAWRAPPER_HOST: 'datawrapper.dwcdn.net',
+} as const;
+
+export const iframeSEL = {
+  gistMetaRawLink: '.gist-meta a[href*="/raw"]',
+  gistMetaPermalink: '.gist-meta a[href^="https://gist.github.com"]',
+  contentRootCandidates: 'main, article, .markdown-body, .postArticle-content, body',
+  datawrapperTitleMeta: 'meta[property="og:title"], meta[name="twitter:title"]',
+  datawrapperDescriptionMeta:
+    'meta[property="og:description"], meta[name="description"], meta[name="twitter:description"]',
 } as const;
 
 
