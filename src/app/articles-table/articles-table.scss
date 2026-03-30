@@ -159,6 +159,29 @@
   color: #0f2f38;
 }
 
+.categories-select-all-icon {
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 1px 2px;
+  color: #000;
+  background: #f2de8f;
+}
+
+.categories-select-all-icon:hover {
+  color: #000;
+  background: #ecd67d;
+}
+
+.categories-select-all-icon:focus-visible {
+  outline: 2px solid #1677ff;
+  outline-offset: 1px;
+}
+
+.categories-select-all-icon.is-all-selected {
+  color: #000;
+  background: #e4cb65;
+}
+
 .delete-toggle-th {
   text-align: center;
 }

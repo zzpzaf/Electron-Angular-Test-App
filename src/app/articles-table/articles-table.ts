@@ -319,6 +319,53 @@ export class ArticlesTable {
     this.isCategoriesCheckboxMode.update(v => !v);
   }
 
+  // 260330 - True when all currently filtered rows are selected in categories checkbox mode.
+  public areAllFilteredRowsCategoryChecked(): boolean {
+    const filteredRows = this.$filteredArticles();
+    if (filteredRows.length === 0) {
+      return false;
+    }
+
+    const selected = this.selectedCategoryRows();
+    return filteredRows.every((row) => selected.has(this.rowKey(row)));
+  }
+
+  // 260330 - Toggle select/unselect all currently filtered rows for categories checkbox mode.
+  public toggleAllFilteredCategoryRows(event: Event): void {
+    event.stopPropagation();
+
+    if (event instanceof KeyboardEvent) {
+      event.preventDefault();
+    }
+
+    if (!this.isCategoriesCheckboxMode()) {
+      return;
+    }
+
+    const filteredRows = this.$filteredArticles();
+    if (filteredRows.length === 0) {
+      return;
+    }
+
+    const keys = filteredRows.map((row) => this.rowKey(row));
+    this.selectedCategoryRows.update((prev) => {
+      const next = new Set(prev);
+      const allSelected = keys.every((key) => next.has(key));
+
+      if (allSelected) {
+        for (const key of keys) {
+          next.delete(key);
+        }
+      } else {
+        for (const key of keys) {
+          next.add(key);
+        }
+      }
+
+      return next;
+    });
+  }
+
   // 260327 - Handle checkbox change for a row: add/remove its key from the selected set 
   public onCategoryRowCheckChange(row: PostData, checked: boolean): void {
     const key = this.rowKey(row);

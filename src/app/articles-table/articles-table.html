@@ -155,7 +155,21 @@
         >
           Categories
           @if (isCategoriesCheckboxMode()) {
-            <span nz-icon nzType="check-square" nzTheme="outline"></span>
+            <span
+              nz-icon
+              nzType="check-square"
+              nzTheme="outline"
+              class="categories-select-all-icon"
+              [class.is-all-selected]="areAllFilteredRowsCategoryChecked()"
+              role="button"
+              tabindex="0"
+              [attr.aria-label]="areAllFilteredRowsCategoryChecked() ? 'Unselect all filtered category checkboxes' : 'Select all filtered category checkboxes'"
+              [attr.aria-pressed]="areAllFilteredRowsCategoryChecked()"
+              title="Select/Unselect all filtered rows"
+              (click)="toggleAllFilteredCategoryRows($event)"
+              (keydown.enter)="toggleAllFilteredCategoryRows($event)"
+              (keydown.space)="toggleAllFilteredCategoryRows($event)"
+            ></span>
           } @else {
             <span nz-icon nzType="tags" nzTheme="outline"></span>
           }
