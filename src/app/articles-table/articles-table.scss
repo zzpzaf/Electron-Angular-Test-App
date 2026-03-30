@@ -84,6 +84,19 @@
   color: #000 !important;
 }
 
+// 260330 - Re-scrape button shown in empty MD cells when MD filter is in "Empty" mode.
+.rescrape-btn {
+  cursor: pointer;
+}
+
+.rescrape-icon {
+  color: #000;
+}
+
+:host ::ng-deep .rescrape-btn.ant-btn-text:hover {
+  background: #ffe58f;
+}
+
 // Optional: keep the bar visible while scrolling
 .table-header {
   position: sticky;
@@ -127,6 +140,59 @@
 
 .categories-toggle-th {
   text-align: center;
+}
+
+.md-filter-th {
+  text-align: center;
+}
+
+.md-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border: 1px solid #6eaeb2;
+  border-radius: 6px;
+  background: #c2edef;
+  color: #17363f;
+  font: inherit;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.md-filter-btn:hover {
+  background: #b3e7ea;
+}
+
+.md-filter-btn:focus-visible {
+  outline: 2px solid #1677ff;
+  outline-offset: 1px;
+}
+
+.md-filter-state {
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 0 6px;
+  background: rgba(15, 47, 56, 0.12);
+}
+
+.md-filter-btn[data-md-filter='all'] {
+  background: #c2edef;
+  border-color: #6eaeb2;
+}
+
+.md-filter-btn[data-md-filter='withMarkdown'] {
+  background: #d9f7be;
+  border-color: #7cb35e;
+  color: #1f4a1b;
+}
+
+.md-filter-btn[data-md-filter='withoutMarkdown'] {
+  background: #ffe58f;
+  border-color: #d7aa3a;
+  color: #5e4300;
 }
 
 .categories-toggle-btn {

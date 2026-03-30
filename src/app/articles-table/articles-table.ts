@@ -15,6 +15,9 @@ import { NzCheckboxModule } from 'ng-zorro-antd/checkbox'; // 260327
 import { NzInputModule } from 'ng-zorro-antd/input';
 import { ArticleCategoriesSelection } from '../article-categories-selection/article-categories-selection';
 import { DlgService } from '../shared/services/dlg-service'; // 260328
+import { Articlebasicscraper } from '../shared/services/articlebasicscraper'; // 260330
+import { LoaderService } from '../shared/services/loader-service'; // 260330
+import { getMediumSlugFromUrl } from '../../../shared/utils/shared-utils'; // 260330
 import { firstValueFrom } from 'rxjs';
 
 
@@ -23,6 +26,7 @@ import { firstValueFrom } from 'rxjs';
 
 
 type RowKey = number | string;
+type MdFilterMode = 'all' | 'withMarkdown' | 'withoutMarkdown';
 
 
 @Component({
@@ -46,10 +50,18 @@ export class ArticlesTable {
   public $articles = signal<PostData[]>([]);
   public $filteredArticles = computed(() => {
     const rows = this.$articles();
+    const mdMode = this.mdFilterMode();
     const term = this.articlesSearchTextDebounced().trim().toLowerCase();
-    if (!term) return rows;
+    const mdFilteredRows = rows.filter((row) => {
+      const hasMd = this.hasMarkdownContent(row);
+      if (mdMode === 'withMarkdown') return hasMd;
+      if (mdMode === 'withoutMarkdown') return !hasMd;
+      return true;
+    });
 
-    return rows.filter((row) => this.matchesSearch(row, term));
+    if (!term) return mdFilteredRows;
+
+    return mdFilteredRows.filter((row) => this.matchesSearch(row, term));
   });
   public filter: 'unassigned' | 'all' | 'byCategory' = 'unassigned';
   public filter2: string = '';
@@ -57,12 +69,15 @@ export class ArticlesTable {
   public articlesSearchText = signal('');
   public articlesSearchTextDebounced = signal('');
   public $articleCategoryIdsByArticleId = signal<Record<number, number[]>>({});
+  public mdFilterMode = signal<MdFilterMode>('all');
 
   private searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private categoryStatusLoadingIds = new Set<number>();
 
   private readonly drawer = inject(NzDrawerService);
   private dlgService = inject(DlgService);
+  private articlebasicscraper = inject(Articlebasicscraper); // 260330
+  private loaderService = inject(LoaderService); // 260330
 
   // 260327 - isCategoriesCheckboxMode controls which UI appears in column 6.
   public isCategoriesCheckboxMode = signal(false);  
@@ -97,7 +112,8 @@ export class ArticlesTable {
   sortByLikes: NzTableSortFn<PostData> = (a, b) => a.likes - b.likes;
   sortByRanking: NzTableSortFn<PostData> = (a, b) =>
     (a.ranking ?? 0) - (b.ranking ?? 0);
-  
+  sortByTimestamp: NzTableSortFn<PostData> = (a, b) => a.timestamp.localeCompare(b.timestamp);
+
 
   constructor() {
     // Obtain articles from backend service corresponding articles signal
@@ -297,6 +313,138 @@ export class ArticlesTable {
 
     const regex = new RegExp(`(${this.escapeRegExp(term)})`, 'ig');
     return safeTitle.replace(regex, '<mark class="search-hit">$1</mark>');
+  }
+
+  // 260330 - MD column header 3-state filter toggle: all -> with markdown -> without markdown.
+  public toggleMdFilterMode(): void {
+    const current = this.mdFilterMode();
+    if (current === 'all') {
+      this.mdFilterMode.set('withMarkdown');
+      return;
+    }
+    if (current === 'withMarkdown') {
+      this.mdFilterMode.set('withoutMarkdown');
+      return;
+    }
+    this.mdFilterMode.set('all');
+  }
+
+  public getMdFilterLabel(): string {
+    const mode = this.mdFilterMode();
+    if (mode === 'withMarkdown') return 'Has';
+    if (mode === 'withoutMarkdown') return 'Empty';
+    return 'All';
+  }
+
+  public getMdFilterTitle(): string {
+    const mode = this.mdFilterMode();
+    if (mode === 'withMarkdown') {
+      return 'MD filter: only articles containing markdown content. Click to switch to empty content only.';
+    }
+    if (mode === 'withoutMarkdown') {
+      return 'MD filter: only articles with empty content. Click to switch to all articles.';
+    }
+    return 'MD filter: all articles. Click to switch to only articles containing markdown content.';
+  }
+
+  private hasMarkdownContent(row: PostData): boolean {
+    return typeof row.content === 'string' && row.content.trim().length > 0;
+  }
+
+  public hasMarkdownForRow(row: PostData): boolean {
+    return this.hasMarkdownContent(row);
+  }
+
+  // 260330 - True when the MD column filter is in "withoutMarkdown" (Empty) mode.
+  public isEmptyMdMode(): boolean {
+    return this.mdFilterMode() === 'withoutMarkdown';
+  }
+
+  // 260330 - Re-scrape an article that has empty content and persist the result.
+  // This is a long-running operation that involves multiple steps and user feedback, 
+  // so we use the loader service to show a loading indicator and block interactions during the process.
+  // Steps: 
+  // 1) Scrape fresh content from the article URL, 
+  // ) Persist the updated article row, 
+  // 3) Process and store images found in the new markdown content, 
+  // 4) Refresh the table so the MD icon reflects the new content state.  
+  public async rescrapeArticle(row: PostData, e: MouseEvent): Promise<void> {
+    e.stopPropagation();
+
+    const url = row.link;
+    if (!url) {
+      console.warn('>===>> rescrapeArticle: row has no link, skipping.');
+      return;
+    }
+
+    console.log('>===>> rescrapeArticle: re-scraping article id', row.id, 'url:', url);
+
+    await this.loaderService.withLoader(async () => {
+      // 1. Scrape fresh content from the URL.
+      const response = await this.articlebasicscraper.scrapeTabsList([url]);
+      if (!response.success || !Array.isArray(response.data) || response.data.length === 0) {
+        console.error('>===>> rescrapeArticle: scrape failed for url:', url, response.error);
+        this.dlgService.popup({
+          token: 'error',
+          header: 'Re-scrape Failed',
+          content: `Could not scrape content for article id ${row.id}.\n${response.error ?? ''}`,
+          posAnsMsg: 'OK',
+          negAnsMsg: '',
+        }).subscribe();
+        return;
+      }
+
+      const scraped: PostData = response.data[0];
+      scraped.id = row.id; // preserve existing DB id
+
+      // 2. Persist the updated article row.
+      const updateOk = await this.backendService.updateArticleById(scraped);
+      if (!updateOk) {
+        console.error('>===>> rescrapeArticle: updateArticleById failed for id:', row.id);
+        this.dlgService.popup({
+          token: 'error',
+          header: 'Save Failed',
+          content: `Re-scraped content could not be saved for article id ${row.id}.`,
+          posAnsMsg: 'OK',
+          negAnsMsg: '',
+        }).subscribe();
+        return;
+      }
+
+      // 3. Process and store images found in the new markdown content.
+      if (scraped.content && scraped.content.trim().length > 0) {
+        const urlSlug = getMediumSlugFromUrl(url);
+        const savedArticle = await this.backendService.getPostDataBySlug(urlSlug);
+        if (savedArticle?.id && savedArticle.content) {
+          const imgResult = await this.articlebasicscraper.processImagesForArticleMarkdownContent(
+            savedArticle.id,
+            savedArticle.link,
+            savedArticle.content
+          );
+          if (imgResult) {
+            const updatedContent = await this.articlebasicscraper.rewriteMarkdownWithDbLinks(
+              savedArticle.content,
+              imgResult.results
+            );
+            if (updatedContent && updatedContent !== savedArticle.content) {
+              await this.backendService.updateArticleContentById(savedArticle.id, updatedContent);
+            }
+          }
+        }
+      }
+
+      console.log('>===>> rescrapeArticle: completed for article id', row.id);
+      this.dlgService.popup({
+        token: 'succ',
+        header: 'Re-scrape Complete',
+        content: `Article id ${row.id} has been re-scraped and saved.`,
+        posAnsMsg: 'OK',
+        negAnsMsg: '',
+      }).subscribe();
+
+      // 4. Refresh the table so the MD icon reflects the new content state.
+      this.updateArticlesTable();
+    }, 'Re-scraping article …');
   }
 
 

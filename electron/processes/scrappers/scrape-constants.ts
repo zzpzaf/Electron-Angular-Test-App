@@ -122,8 +122,14 @@ export const metaSEL = {
   title: 'h1[data-testid="storyTitle"]',
   leadImage: 'figure img',
   author: 'a[data-testid="authorName"]',
-  dateOuter: 'div.speechify-ignore:is(.bi,.bh).m',  // matches: <div class="speechify-ignore bi m"> and <div class="speechify-ignore bh m">
-  dateInner: 'div.ac:is(.af,.ag)',                  // matches: <div class="ac af"> and <div class="ac ag">
+  // dateOuter matches both legacy and new variants:
+  // <div class="speechify-ignore bi m">, <div class="speechify-ignore bh m">, <div class="speechify-ignore bd e">
+  // dateInner matches both legacy and new variants:
+  // <div class="ac af">, <div class="ac ag">, <div class="v y">
+  dateOuter: 'div.speechify-ignore:is(.bi,.bh).m, div.speechify-ignore.bd.e',
+  dateInner: 'div.ac:is(.af,.ag), div.v.y',
+  
+  
   likesButton: '.pw-multi-vote-count button',
   commentsCount: 'button[aria-label="responses"] .pw-responses-count',
 } as const;

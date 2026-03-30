@@ -107,7 +107,18 @@
         Id
       </th>
       <!-- 2 -->
-      <th nzAlign="center">MD</th>
+      <th nzAlign="center" class="md-filter-th">
+        <button
+          type="button"
+          class="md-filter-btn"
+          [attr.data-md-filter]="mdFilterMode()"
+          (click)="toggleMdFilterMode()"
+          [title]="getMdFilterTitle()"
+        >
+          MD
+          <span class="md-filter-state">{{ getMdFilterLabel() }}</span>
+        </button>
+      </th>
       <!-- 3 -->
       <th nzAlign="center" class="delete-toggle-th">
         <button
@@ -219,7 +230,10 @@
         Ranking
       </th>
       <!-- 16 -->
-      <th nzColumnKey="timestamp">Time Stamp</th>
+      <th nzColumnKey="timestamp"
+      [nzSortFn]="sortByTimestamp"
+      [nzSortDirections]="['descend', 'ascend', null]"
+      >Time Stamp</th>
     </tr>
   </thead>
 
@@ -235,7 +249,7 @@
         <!-- 1 -->
         <td nzAlign="center">{{ row.id }}</td>
         <!-- 2 -->
-        @if (row.content && row.content.trim()!.length > 0) {
+        @if (hasMarkdownForRow(row)) {
           <td nzAlign="center">
             <button
               nz-button
@@ -250,7 +264,22 @@
           </td>
         } @else {
           <td nzAlign="center">
-            <span nz-icon nzType="file-markdown" nzTheme="outline"></span>
+            @if (isEmptyMdMode()) {
+              <button
+                nz-button
+                nzType="text"
+                nzShape="circle"
+                nzSize="small"
+                aria-label="Re-scrape article to get markdown content"
+                title="Click to re-scrape this article"
+                class="rescrape-btn"
+                (click)="rescrapeArticle(row, $event)"
+              >
+                <span nz-icon nzType="file-markdown" nzTheme="outline" class="rescrape-icon"></span>
+              </button>
+            } @else {
+              <span nz-icon nzType="file-markdown" nzTheme="outline"></span>
+            }
           </td>
         }
         <!-- 3 -->
