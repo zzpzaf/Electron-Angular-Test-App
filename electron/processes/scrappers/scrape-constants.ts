@@ -64,6 +64,11 @@ export const timeConst = {
   RETRY_COUNT: 3,               // Number of retry attempts for clicks
   MAX_ATTEMPTS_WITHOUT_NEW: 5,  // Max attempts to scroll with no new articles
 
+  // 260328 - Browser connection / monitoring
+  PROTOCOL_TIMEOUT: 600000,     // 10 min for long-running page.evaluate()/CDP calls
+  MARKDOWN_SCRAPE_CONCURRENCY: 3, // Parallel article tabs when scraping full markdown
+  ENABLE_SCRAPE_TIMING_LOGS: true, // Emit step durations for long-page monitoring
+
   // Page/article loading
   MAX_ARTICLES_NUMBER: 250,     
   INITIAL_PAGE_LOADING_DELAY: 15000,     // 15 sec for page load (htmlToMarkdown)
@@ -81,7 +86,9 @@ export const timeConst = {
 
   // Auto-scroll
   SCROLL_DELAY: 1500,                    // Delay between scrolls in scrapeList()
-  DEFAULT_AUTOSCROLL_DELAY: 100          // Default delay for autoScrollArticlePage()
+  DEFAULT_AUTOSCROLL_DELAY: 100,         // Default delay for autoScrollArticlePage()
+  AUTOSCROLL_MAX_DURATION_MS: 240000,    // Hard stop for article autoscroll loop
+  AUTOSCROLL_MAX_STAGNANT_STEPS: 12      // Stop after N steps without page-growth/progress
 } as const;
 
 

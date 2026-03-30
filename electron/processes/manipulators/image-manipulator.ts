@@ -188,7 +188,9 @@ export async function downloadAndStoreImagesStreamedForArticle(
 
   const out: Array<{ orgImgUrl: string; orderIndx?: number } & ImageDownloadResult> = [];
 
+  console.log('='.repeat(90));
   console.log('>= *** ==>> downloadAndStoreImagesStreamedForArticle - Calling downloadAndStoreImageStreamed() for article_id:', article_id);
+  console.log('='.repeat(90));
   // Sequential (simpler & polite to servers)
   for (const url of orgImgUrls) {
     const res = await downloadAndStoreImageStreamed({
@@ -294,7 +296,10 @@ export async function processMarkdownImagesForArticle(
    ProcessMarkdownResult
    > {
 
+  console.log('='.repeat(90));
   console.log('>= *** ==>> processMarkdownImagesForArticle - Calling extractFromMarkdownArrayImageUrls()' );
+  console.log('='.repeat(90));
+  
   // 1) Extract image URLs from markdown, in reading order
   const extracted = extractFromMarkdownArrayImageUrls(markContent);
 

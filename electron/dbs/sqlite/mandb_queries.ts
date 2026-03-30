@@ -180,6 +180,10 @@ export function insertArticlesFromJson(posts: PostData[]): number {
   }
 
   console.log('>===>> Inserting articles from JSON array:', posts.length);
+  const divider = '='.repeat(90);
+  console.log(divider);
+  console.log('[insertArticlesFromJson]');
+  console.log(divider);
 
   const insertSQL = `
     INSERT INTO articles (
@@ -219,7 +223,16 @@ export function insertArticlesFromJson(posts: PostData[]): number {
   let insertedCount = 0;
 
   const insertMany = mainDb.transaction((articles: PostData[]) => {
+    let attemptedIndex = 0;
     for (const a of articles) {
+      attemptedIndex += 1;
+
+      const iterDivider = '-'.repeat(90);
+      console.log(iterDivider);
+      console.log(
+        `[insertArticlesFromJson] Iteration ${attemptedIndex}/${articles.length} | link=${a.link || 'N/A'}`
+      );
+      console.log(iterDivider);
 
       console.log('>===>> Inserting article:',JSON.stringify(a, null, 2));
 
@@ -254,6 +267,13 @@ export function insertArticlesFromJson(posts: PostData[]): number {
 
       if (info.changes === 1) {
         insertedCount++;
+        console.log(
+          `[insertArticlesFromJson] Inserted article #${insertedCount} (iteration ${attemptedIndex}/${articles.length})`
+        );
+      } else {
+        console.log(
+          `[insertArticlesFromJson] Skipped article at iteration ${attemptedIndex}/${articles.length}`
+        );
       }
     }
   });

@@ -17,6 +17,7 @@ import {
   mediumFriendlyCodeBlockRule,
 } from '../../helpers/turndown-rules';
 
+import { AsyncLocalStorage } from 'async_hooks';
 import { PostData } from '../../../shared/projectObjects/varObjects';
 import { formatDate } from '../../helpers/electron-utils';
 import { extractFirstPathPart } from '../../../shared/utils/shared-utils';
@@ -35,6 +36,80 @@ import {
 // Apply stealth plugin
 puppeteer.use(StealthPlugin());
 
+// 260330 Update: Per-article context store — survives async boundaries and parallel pLimit tasks
+const _scrapeContextStorage = new AsyncLocalStorage<{ article: string }>();
+
+// 260328 Update: Adding logging for scrape timing
+function logScrapeTiming(message: string): void {
+  if (timeConst.ENABLE_SCRAPE_TIMING_LOGS) {
+    console.log(`[scrape-timing] ${message}`);
+  }
+}
+
+// 260328 Update: Adding structured logging for function headers, link scraping, and iterations
+function logFunctionHeader(functionName: string): void {
+  const divider = '='.repeat(90);
+  console.log(divider);
+  console.log(`[${functionName}]`);
+  console.log(divider);
+}
+
+// 260328 Update: Logging for each scraped link in collectPostsFromUrlTabs
+function logScrapeLinkStart(
+  functionName: string,
+  index: number,
+  url: string,
+  total?: number
+): void {
+  const divider = '-'.repeat(90);
+  const seq = typeof total === 'number' ? `${index}/${total}` : `${index}`;
+  console.log(divider);
+  console.log(`[${functionName}] Scraping link ${seq}: ${url}`);
+  console.log(divider);
+}
+
+// 260328 Update: Logging for iterations in functions like processGists
+function logIterationHeader(
+  functionName: string,
+  index: number,
+  total?: number,
+  details?: string
+): void {
+  const divider = '-'.repeat(90);
+  const seq = typeof total === 'number' ? `${index}/${total}` : `${index}`;
+  console.log(divider);
+  console.log(`[${functionName}] Iteration ${seq}${details ? ` | ${details}` : ''}`);
+  console.log(divider);
+}
+
+// 260328 Update: Wrapper function to measure and log the duration of async steps in scraping functions
+async function measureScrapeStep<T>(
+  label: string,
+  action: () => T | Promise<T>,
+  details?: string
+): Promise<T> {
+  const startedAt = Date.now();
+  const ctx = _scrapeContextStorage.getStore();
+  const articleTag = ctx ? ` | article=${ctx.article}` : '';
+  const suffix = details ? ` | ${details}` : '';
+  logScrapeTiming(`START ${label}${articleTag}${suffix}`);
+
+  try {
+    return await action();
+  } finally {
+    logScrapeTiming(`END ${label} | ${Date.now() - startedAt} ms${articleTag}${suffix}`);
+  }
+}
+
+// 260328 Update: Refactored browser connection into a separate function for reuse and better error handling
+async function connectToBrowser(): Promise<Puppeteer.Browser> {
+  return puppeteer.connect({
+    browserURL: BROWSER_URLPORT,
+    defaultViewport: null,
+    protocolTimeout: timeConst.PROTOCOL_TIMEOUT,
+  });
+}
+
 
 
 
@@ -49,10 +124,7 @@ puppeteer.use(StealthPlugin());
 
 export async function scrapeArticleBasic(url: string): Promise<PostData> {
   // Connect to an already running Chrome instance with remote debugging enabled
-  const browser = await puppeteer.connect({
-    browserURL: BROWSER_URLPORT,
-    defaultViewport: null,
-  });
+  const browser = await connectToBrowser();
 
   const page = await browser.newPage();
 
@@ -96,21 +168,28 @@ export async function scrapeArticleBasic(url: string): Promise<PostData> {
 export async function collectPostsFromUrlTabs(
   urls: string[]
 ): Promise<PostData[]> {
-  const browser = await puppeteer.connect({
-    browserURL: BROWSER_URLPORT,
-    defaultViewport: null,
-  });
+  logFunctionHeader('collectPostsFromUrlTabs');
+
+  const browser = await connectToBrowser();
 
 
-  const limit = pLimit(5); // lower concurrency due to shared profile
+  const limit = pLimit(timeConst.MARKDOWN_SCRAPE_CONCURRENCY);
 
   try {
     let p = 0;
-    const pagePromises = urls.map((url) =>
-      limit(async () => {
-        let page: Puppeteer.Page | undefined;
+    const pagePromises = urls.map((url, index) =>
+      limit(() =>
+        _scrapeContextStorage.run({ article: `${index + 1}/${urls.length}` }, async () => {
+          let page: Puppeteer.Page | undefined;
 
-        try {
+          try {
+            logScrapeLinkStart(
+              'collectPostsFromUrlTabs',
+              index + 1,
+              url,
+              urls.length
+            );
+
           // Optional delay to avoid rapid tab creation
           // await new Promise((res) => setTimeout(res, 500));
           await new Promise((res) => setTimeout(res, timeConst.OPEN_NEW_TAB_DELAY));
@@ -122,10 +201,16 @@ export async function collectPostsFromUrlTabs(
             timeout: timeConst.TAB_INITIAL_PAGE_LOADING_DELAY, //15000,   /****** */
           });
 
-          // Scrape the article data by calling the scrapeMediumArticle() key-function
-          const data = await scrapeMediumArticle(page);
+          const currentPage = page;
 
-          const content = await scrapeMediumMarkdownContent(page);
+          // Scrape the article data by calling the scrapeMediumArticle() key-function
+          const data = await scrapeMediumArticle(currentPage);
+
+          const content = await measureScrapeStep(
+            'scrapeMediumMarkdownContent',
+            () => scrapeMediumMarkdownContent(currentPage),
+            `url=${url}`
+          );
           data.content = content;
 
           data.counter = p;
@@ -160,6 +245,7 @@ export async function collectPostsFromUrlTabs(
           }
         }
       })
+      )
     );
 
     // const results = await Promise.all(pagePromises);
@@ -351,17 +437,30 @@ async function scrapeMediumMarkdownContent(
   // Not recommended: relies on internal structure
   // This is not officially supported and may break with future Puppeteer versions
   const browser = page.browserContext().browser();
+  const pageUrl = page.url();
 
   // console.log('>= *** ==>> scrapeMediumMarkdownContent() - before getCleanedPageContent(), page: ', page);
 
   try {
     // Get cleaned HTML + captured gist iframe sources
-    const { html: cleanedHtml, iframeSrcs } = await getCleanedPageContent(page);
+    const { html: cleanedHtml, iframeSrcs } = await measureScrapeStep(
+      'getCleanedPageContent',
+      () => getCleanedPageContent(page),
+      `url=${pageUrl}`
+    );
+
+    logScrapeTiming(
+      `Cleaned HTML size=${cleanedHtml.length} chars, gist iframes=${iframeSrcs.length} | url=${pageUrl}`
+    );
 
     // console.log('>= *** ==>> scrapeMediumMarkdownContent() - after getCleanedPageContent() 🔍 Cleaned HTML: ', cleanedHtml);
 
     // Process gists using existing browser connection
-    const htmlWithGists = await processGists(browser, cleanedHtml, iframeSrcs);
+    const htmlWithGists = await measureScrapeStep(
+      'processGists',
+      () => processGists(browser, cleanedHtml, iframeSrcs),
+      `url=${pageUrl}`
+    );
 
     const turndownService = new TurndownService({
       codeBlockStyle: 'fenced',
@@ -377,7 +476,11 @@ async function scrapeMediumMarkdownContent(
     );
 
     // Real convertion from HTML to Markdown
-    return turndownService.turndown(htmlWithGists);
+    return await measureScrapeStep(
+      'turndown',
+      () => turndownService.turndown(htmlWithGists),
+      `url=${pageUrl}`
+    );
   } catch (error) {
     console.error('Error scraping Markdown content:', error);
     throw error;
@@ -419,6 +522,8 @@ export async function getCleanedPageContent(
 ): Promise<{ html: string; iframeSrcs: string[] }> {
   await autoScrollArticlePage(page);
 
+  const pageUrl = page.url();
+
   try {
     await page.waitForSelector('figure iframe', {
       timeout: timeConst.AFTER_AUTOSCROLL_GIST_IFRAME_SELECTOR_DELAY, // 1000 ms
@@ -427,149 +532,162 @@ export async function getCleanedPageContent(
     // console.warn('>= *** ==>> ⚠️ No gist iframes found within timeout');
   }
 
-  const iframeSources: string[] = await page.evaluate(() => {
-    return Array.from(document.querySelectorAll('figure iframe'))
-      .map((iframe) => iframe.getAttribute('src') || '')
-      .filter(Boolean);
-  });
+  const iframeSources: string[] = await measureScrapeStep(
+    'collectGistIframeSources',
+    () =>
+      page.evaluate(() => {
+        return Array.from(document.querySelectorAll('figure iframe'))
+          .map((iframe) => iframe.getAttribute('src') || '')
+          .filter(Boolean);
+      }),
+    `url=${pageUrl}`
+  );
+
+  if (iframeSources.length > 0) {
+    logFunctionHeader('collectGistIframeSources');
+    iframeSources.forEach((src, i) => {
+      logScrapeLinkStart('collectGistIframeSources', i + 1, src, iframeSources.length);
+    });
+  }
 
   console.log('>= *** ==>> 📌 Found gist iframe src:', iframeSources);
 
-  const rawHTML = await page.evaluate((SEL) => {
-    // --- helpers -------------------------------------------------------------
+  const rawHTML = await measureScrapeStep(
+    'extractCleanedArticleHtml',
+    () =>
+      page.evaluate((SEL) => {
+        // --- helpers -------------------------------------------------------------
 
-    const removeSpecificText = (root: HTMLElement, textsToRemove: string[]) => {
-      root.querySelectorAll('*').forEach((el) => {
-        el.childNodes.forEach((node) => {
-          if (node.nodeType === Node.TEXT_NODE) {
-            const text = node.textContent?.trim() || '';
-            if (textsToRemove.includes(text)) node.textContent = '';
+        const removeSpecificText = (
+          root: HTMLElement,
+          textsToRemove: string[]
+        ) => {
+          root.querySelectorAll('*').forEach((el) => {
+            el.childNodes.forEach((node) => {
+              if (node.nodeType === Node.TEXT_NODE) {
+                const text = node.textContent?.trim() || '';
+                if (textsToRemove.includes(text)) node.textContent = '';
+              }
+            });
+          });
+          textsToRemove.forEach((t) => {
+            root.querySelectorAll('*').forEach((el) => {
+              if (el.textContent?.trim() === t) el.remove();
+            });
+          });
+        };
+
+        const removeSpeechifyIgnoreDivs = (root: HTMLElement) => {
+          root
+            .querySelectorAll(SEL.speechifyIgnoreDivs)
+            .forEach((el) => el.remove());
+        };
+
+        const fixHeadings = (root: HTMLElement) => {
+          const h1s = root.querySelectorAll(SEL.headings);
+          let firstFound = false;
+          h1s.forEach((h1) => {
+            if (!firstFound) {
+              firstFound = true;
+            } else {
+              const h2 = document.createElement('h2');
+              h2.innerHTML = h1.innerHTML;
+              h1.replaceWith(h2);
+            }
+          });
+        };
+
+        const removeContentBeforeFirstHeading = (root: HTMLElement) => {
+          const firstHeading = root.querySelector(SEL.headings);
+          if (firstHeading) {
+            let prev = firstHeading.previousSibling;
+            while (prev) {
+              const toRemove = prev;
+              prev = prev.previousSibling;
+              toRemove?.parentNode?.removeChild(toRemove);
+            }
           }
-        });
-      });
-      textsToRemove.forEach((t) => {
-        root.querySelectorAll('*').forEach((el) => {
-          if (el.textContent?.trim() === t) el.remove();
-        });
-      });
-    };
+        };
 
-    const removeSpeechifyIgnoreDivs = (root: HTMLElement) => {
-      root
-        .querySelectorAll(SEL.speechifyIgnoreDivs)
-        .forEach((el) => el.remove());
-    };
+        // ⬇️ NEW: transform YouTube iframes into simple links, remove all others
+        const transformYouTubeIframes = (root: HTMLElement) => {
+          const iframes = Array.from(root.querySelectorAll(SEL.iframes));
 
-    const fixHeadings = (root: HTMLElement) => {
-      const h1s = root.querySelectorAll(SEL.headings);
-      let firstFound = false;
-      h1s.forEach((h1) => {
-        if (!firstFound) {
-          firstFound = true;
-        } else {
-          const h2 = document.createElement('h2');
-          h2.innerHTML = h1.innerHTML;
-          h1.replaceWith(h2);
-        }
-      });
-    };
+          for (const iframe of iframes) {
+            const src = iframe.getAttribute('src') || '';
+            let youtubeUrl: string | null = null;
 
-    const removeContentBeforeFirstHeading = (root: HTMLElement) => {
-      const firstHeading = root.querySelector(SEL.headings);
-      if (firstHeading) {
-        let prev = firstHeading.previousSibling;
-        while (prev) {
-          const toRemove = prev;
-          prev = prev.previousSibling;
-          toRemove?.parentNode?.removeChild(toRemove);
-        }
-      }
-    };
+            try {
+              const u = new URL(src, location.href);
+              const schema = u.searchParams.get('schema');
+              const urlParam = u.searchParams.get('url');
 
-    // ⬇️ NEW: transform YouTube iframes into simple links, remove all others
-    const transformYouTubeIframes = (root: HTMLElement) => {
-      const iframes = Array.from(root.querySelectorAll(SEL.iframes));
+              if (schema === 'youtube' && urlParam) {
+                youtubeUrl = decodeURIComponent(urlParam);
+              } else if (/youtube\.com\/embed\//i.test(src)) {
+                const id = src.match(/embed\/([^?&]+)/)?.[1];
+                if (id) youtubeUrl = `https://www.youtube.com/watch?v=${id}`;
+              }
+            } catch {
+              // ignore parse errors and treat as non-YouTube
+            }
 
-      for (const iframe of iframes) {
-        const src = iframe.getAttribute('src') || '';
-        let youtubeUrl: string | null = null;
+            if (youtubeUrl) {
+              const title = iframe.getAttribute('title')?.trim() || 'YouTube video';
 
-        try {
-          const u = new URL(src, location.href);
-          const schema = u.searchParams.get('schema');
-          const urlParam = u.searchParams.get('url'); // embedly provides the real URL here
+              const wrapper = document.createElement('div');
+              wrapper.className = 'youtube-video';
 
-          if (schema === 'youtube' && urlParam) {
-            // URLSearchParams already decodes percent-encoding; double-decoding is safe-guarded
-            youtubeUrl = decodeURIComponent(urlParam);
-          } else if (/youtube\.com\/embed\//i.test(src)) {
-            // Fallback for direct embed srcs without embedly
-            const id = src.match(/embed\/([^?&]+)/)?.[1];
-            if (id) youtubeUrl = `https://www.youtube.com/watch?v=${id}`;
+              const a = document.createElement('a');
+              a.href = youtubeUrl;
+              a.textContent = title;
+              a.target = '_blank';
+              a.rel = 'noopener';
+
+              wrapper.appendChild(a);
+              iframe.replaceWith(wrapper);
+            } else {
+              iframe.remove();
+            }
           }
-        } catch {
-          // ignore parse errors and treat as non-YouTube
-        }
+        };
 
-        if (youtubeUrl) {
-          const title =
-            iframe.getAttribute('title')?.trim() ||
-            'YouTube video';
+        // --- scope target --------------------------------------------------------
 
-          const wrapper = document.createElement('div');
-          wrapper.className = 'youtube-video';
+        const titleEl = document.querySelector(SEL.title);
+        let container: HTMLElement;
 
-          const a = document.createElement('a');
-          a.href = youtubeUrl;
-          a.textContent = title;
-          a.target = '_blank';
-          a.rel = 'noopener';
-
-          wrapper.appendChild(a);
-          iframe.replaceWith(wrapper);
+        if (!titleEl) {
+          container = document.body.cloneNode(true) as HTMLElement;
         } else {
-          // Not YouTube → drop the iframe entirely (since you consider iframes unwanted)
-          iframe.remove();
+          const articleContainer: HTMLElement | null =
+            titleEl.closest('article') ||
+            titleEl.closest('section') ||
+            titleEl.closest('main') ||
+            document.body;
+          container = articleContainer.cloneNode(true) as HTMLElement;
         }
-      }
-    };
 
-    // --- scope target --------------------------------------------------------
+        // --- clean & transform ---------------------------------------------------
 
-    const titleEl = document.querySelector(SEL.title);
-    let container: HTMLElement;
+        container.querySelectorAll(SEL.cleanTags).forEach((el) => el.remove());
 
-    if (!titleEl) {
-      container = document.body.cloneNode(true) as HTMLElement;
-    } else {
-      const articleContainer: HTMLElement | null =
-        titleEl.closest('article') ||
-        titleEl.closest('section') ||
-        titleEl.closest('main') ||
-        document.body;
-      container = articleContainer.cloneNode(true) as HTMLElement;
-    }
+        removeSpecificText(container, [
+          'Zoom image will be displayed',
+          'Press enter or click to view image in full size',
+        ]);
 
-    // --- clean & transform ---------------------------------------------------
+        removeContentBeforeFirstHeading(container);
+        removeSpeechifyIgnoreDivs(container);
+        fixHeadings(container);
+        transformYouTubeIframes(container);
 
-    container
-      .querySelectorAll(SEL.cleanTags)
-      .forEach((el) => el.remove());
+        return container.innerHTML;
+      }, cleanSEL),
+    `url=${pageUrl}`
+  );
 
-    removeSpecificText(container, [
-      'Zoom image will be displayed',
-      'Press enter or click to view image in full size',
-    ]);
-
-    removeContentBeforeFirstHeading(container);
-    removeSpeechifyIgnoreDivs(container);
-    fixHeadings(container);
-
-    // ⬅️ call the new transformer here
-    transformYouTubeIframes(container);
-
-    return container.innerHTML;
-  }, cleanSEL);
+  logScrapeTiming(`Extracted cleaned HTML length=${rawHTML.length} | url=${pageUrl}`);
 
   return { html: rawHTML, iframeSrcs: iframeSources };
 }
@@ -599,6 +717,7 @@ export async function processGists(
   html: string,
   iframeSrcs: string[]
 ): Promise<string> {
+  logFunctionHeader('processGists');
   console.log('🔍 Processing gists...');
   console.log('📌 Captured iframe sources:', iframeSrcs);
 
@@ -609,11 +728,20 @@ export async function processGists(
   const gistBlocks = document.querySelectorAll('.gist-meta');
   if (gistBlocks.length > 0) {
     console.log(`📌 Found ${gistBlocks.length} gist-meta blocks`);
+    let gistIndex = 0;
     for (const gistMeta of gistBlocks) {
+      gistIndex += 1;
       const links = gistMeta.querySelectorAll('a');
       if (links.length >= 2) {
         const rawCodeUrl = links[0].getAttribute('href') || '';
         const gistPermalink = links[1].getAttribute('href') || '';
+
+        logIterationHeader(
+          'processGists:gist-meta',
+          gistIndex,
+          gistBlocks.length,
+          rawCodeUrl || gistPermalink || 'no-link'
+        );
 
         if (rawCodeUrl) {
           try {
@@ -654,6 +782,8 @@ export async function processGists(
     for (let i = 0; i < iframeSrcs.length; i++) {
       const iframeUrl = iframeSrcs[i];
       if (!iframeUrl) continue;
+
+      logScrapeLinkStart('processGists:iframe', i + 1, iframeUrl, iframeSrcs.length);
 
       try {
         const gistData = await extractCodeFromIframe(browser, iframeUrl);
@@ -710,6 +840,8 @@ export async function extractCodeFromIframe(
   const page = await browser.newPage();
 
   try {
+    logScrapeTiming(`START extractCodeFromIframe | iframe=${iframeUrl}`);
+
     // await page.goto(iframeUrl, { waitUntil: "networkidle0", timeout: 20000 });
     await page.goto(iframeUrl, {
       waitUntil: 'networkidle0',
@@ -745,6 +877,7 @@ export async function extractCodeFromIframe(
     console.error(`❌ Failed to extract gist from iframe: ${iframeUrl}`, err);
     return null;
   } finally {
+    logScrapeTiming(`END extractCodeFromIframe | iframe=${iframeUrl}`);
     await page.close();
   }
 }
@@ -759,16 +892,16 @@ export async function extractCodeFromIframe(
 // ==========================================================================================
 
 export async function scrapeList(url: string): Promise<PostData[]> {
+  logFunctionHeader('scrapeList');
+  logScrapeLinkStart('scrapeList', 1, url);
+
   console.log(
     'scrape-functions ->  scrapeList() started .... target URL: ',
     url
   );
 
   // Connect to an already running Chrome instance with remote debugging enabled
-  const browser = await puppeteer.connect({
-    browserURL: BROWSER_URLPORT,
-    defaultViewport: null,
-  });
+  const browser = await connectToBrowser();
 
   if (browser)
     console.log(
@@ -792,6 +925,17 @@ export async function scrapeList(url: string): Promise<PostData[]> {
     );
 
     const scrapedData = await scrapeMediumList(page);
+
+    if (scrapedData.length > 0) {
+      logFunctionHeader('scrapeList:articles');
+      scrapedData.forEach((item, idx) => {
+        logScrapeLinkStart('scrapeList:article', idx + 1, item.link, scrapedData.length);
+        if (item.image) {
+          logScrapeLinkStart('scrapeList:image', idx + 1, item.image, scrapedData.length);
+        }
+      });
+    }
+
     // We update here the gathered data, since in Puppeteer, we can not use outter functions
     for (const item of scrapedData) {
       item.date = formatDate(item.date);
@@ -812,9 +956,14 @@ export async function scrapeList(url: string): Promise<PostData[]> {
 // It scrapes the basic meta-data of each Article from a Medium List
 // ==========================================================================================
 async function scrapeMediumList(page: Puppeteer.Page): Promise<PostData[]> {
+  const pageUrl = page.url();
+
+  logFunctionHeader('scrapeMediumList');
+  logScrapeLinkStart('scrapeMediumList', 1, pageUrl);
+
   console.log(
     'scrape-functions ->  scrapeMediumList() started .... for page: ',
-    page.url.toString
+    pageUrl
   );
 
   return await page.evaluate((SEL) => {
@@ -948,24 +1097,73 @@ export async function autoScrollArticlePage(
   distance = 200,
   delay = timeConst.DEFAULT_AUTOSCROLL_DELAY //100
 ): Promise<void> {
-  await page.evaluate(
-    async (scrollDistance: number, stepDelay: number) => {
-      await new Promise<void>((resolve) => {
-        let totalHeight = 0;
-        const timer = setInterval(() => {
-          const { scrollHeight } = document.body;
-          window.scrollBy(0, scrollDistance);
-          totalHeight += scrollDistance;
+  const pageUrl = page.url();
 
-          if (totalHeight >= scrollHeight) {
-            clearInterval(timer);
-            resolve();
+  await measureScrapeStep(
+    'autoScrollArticlePage',
+    async () => {
+      const startedAt = Date.now();
+      let stagnantSteps = 0;
+      let prevScrollTop = -1;
+      let prevScrollHeight = -1;
+      let iterations = 0;
+
+      while (Date.now() - startedAt < timeConst.AUTOSCROLL_MAX_DURATION_MS) {
+        iterations += 1;
+
+        const metrics = await page.evaluate(() => {
+          const scrollTop =
+            window.scrollY ||
+            document.documentElement.scrollTop ||
+            document.body.scrollTop ||
+            0;
+          const viewportHeight = window.innerHeight || 0;
+          const scrollHeight =
+            document.documentElement.scrollHeight ||
+            document.body.scrollHeight ||
+            0;
+          return { scrollTop, viewportHeight, scrollHeight };
+        });
+
+        const nearBottom =
+          metrics.scrollTop + metrics.viewportHeight >= metrics.scrollHeight - distance;
+        const noProgress =
+          metrics.scrollTop <= prevScrollTop && metrics.scrollHeight <= prevScrollHeight;
+
+        if (nearBottom) {
+          logScrapeTiming(
+            `autoScrollArticlePage reached bottom after ${iterations} iterations | url=${pageUrl}`
+          );
+          break;
+        }
+
+        if (noProgress) {
+          stagnantSteps += 1;
+          if (stagnantSteps >= timeConst.AUTOSCROLL_MAX_STAGNANT_STEPS) {
+            logScrapeTiming(
+              `autoScrollArticlePage stopping after stagnant steps=${stagnantSteps} | url=${pageUrl}`
+            );
+            break;
           }
-        }, stepDelay);
-      });
+        } else {
+          stagnantSteps = 0;
+        }
+
+        prevScrollTop = metrics.scrollTop;
+        prevScrollHeight = metrics.scrollHeight;
+
+        await page.evaluate((scrollDistance: number) => {
+          window.scrollBy(0, scrollDistance);
+        }, distance);
+
+        await sleep(delay);
+      }
+
+      if (Date.now() - startedAt >= timeConst.AUTOSCROLL_MAX_DURATION_MS) {
+        logScrapeTiming(`autoScrollArticlePage hit max duration | url=${pageUrl}`);
+      }
     },
-    distance,
-    delay
+    `url=${pageUrl}`
   );
 }
 
