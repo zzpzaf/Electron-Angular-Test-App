@@ -41,6 +41,7 @@ import { Subscription } from 'rxjs';
 export class FileUrls {
   public importedUrlsArrayString = signal<string>('');
   public precheckSummary = signal<MultiScrapePrecheckSummary | null>(null);
+  public isImportedUrlsDropActive = signal<boolean>(false);
 
   public urlsArray = signal<string[]>([]);
   public urlsArrayString = signal<string>('');
@@ -70,6 +71,7 @@ export class FileUrls {
   private categoryChangesSubscription?: Subscription;
   private dropdownScrollElement?: Element;
   private treeScrollFrameId?: number;
+  private importedUrlsPrecheckSeq = 0;
   public $categorySearchText = signal<string>('');
 
   public $matchesCount = computed(() => {
@@ -160,6 +162,51 @@ export class FileUrls {
     );
   }
 
+  onImportedUrlsTextChanged(rawText: string): void {
+    const normalized = rawText ?? '';
+    this.importedUrlsArrayString.set(normalized);
+
+    const urls = this.extractUniqueUrls(normalized);
+    this.urlsArray.set(urls);
+
+    // Keep summary consistent with current textarea input.
+    this.precheckSummary.set(null);
+  }
+
+  onImportedUrlsPaste(event: ClipboardEvent): void {
+    event.preventDefault();
+    const pastedText = event.clipboardData?.getData('text/plain') ?? '';
+    const textarea = event.target as HTMLTextAreaElement | null;
+    const mergedText = this.mergeTextAtCursor(textarea, pastedText);
+
+    this.onImportedUrlsTextChanged(mergedText);
+    void this.refreshPrecheckSummaryForTextarea();
+  }
+
+  onImportedUrlsDragOver(event: DragEvent): void {
+    event.preventDefault();
+    this.isImportedUrlsDropActive.set(true);
+  }
+
+  onImportedUrlsDragLeave(): void {
+    this.isImportedUrlsDropActive.set(false);
+  }
+
+  onImportedUrlsDrop(event: DragEvent): void {
+    event.preventDefault();
+    this.isImportedUrlsDropActive.set(false);
+
+    const droppedText = this.extractTextFromDataTransfer(event.dataTransfer);
+    if (!droppedText.trim()) {
+      return;
+    }
+
+    const textarea = event.target as HTMLTextAreaElement | null;
+    const mergedText = this.mergeTextAtCursor(textarea, droppedText);
+    this.onImportedUrlsTextChanged(mergedText);
+    void this.refreshPrecheckSummaryForTextarea();
+  }
+
   private async getFileFromElectron(): Promise<void> {
     const dlgOptions = {
       title: 'Open .txt or .json Files',
@@ -205,8 +252,7 @@ export class FileUrls {
       console.log('Data read from File: ', data);
 
       //Extract URLs
-      const urls = extractAllNonImageUrls(data);
-      const uniqueURLs = Array.from(new Set(urls));
+      const uniqueURLs = this.extractUniqueUrls(data);
       this.urlsArray.set(uniqueURLs);
 
       const precheck = await this.articlesmultiscraper.summarizeUrlsAgainstDb(
@@ -247,10 +293,68 @@ export class FileUrls {
     this.scrappedDataArrayString.set('');
     this.importedUrlsArrayString.set('');
     this.precheckSummary.set(null);
+    this.isImportedUrlsDropActive.set(false);
     this.fileName = '';
     this.selectedCategoryIds = [];
     this.categorySelectForm.reset({ selectCategory: [] });
     this.$categorySearchText.set('');
+  }
+
+  private extractUniqueUrls(rawText: string): string[] {
+    const urls = extractAllNonImageUrls(rawText ?? '');
+    return Array.from(
+      new Set(urls.map((url) => (url ?? '').trim()).filter((url) => url.length > 0))
+    );
+  }
+
+  private extractTextFromDataTransfer(dataTransfer: DataTransfer | null): string {
+    if (!dataTransfer) {
+      return '';
+    }
+
+    const uriList = dataTransfer.getData('text/uri-list') ?? '';
+    const plain = dataTransfer.getData('text/plain') ?? '';
+    const html = dataTransfer.getData('text/html') ?? '';
+
+    return [uriList, plain, html].filter((chunk) => !!chunk).join('\n');
+  }
+
+  private mergeTextAtCursor(textarea: HTMLTextAreaElement | null, incoming: string): string {
+    const current = this.importedUrlsArrayString();
+    if (!incoming.trim()) {
+      return current;
+    }
+
+    if (!textarea) {
+      return [current, incoming]
+        .map((part) => part.trim())
+        .filter((part) => part.length > 0)
+        .join('\n');
+    }
+
+    const start = textarea.selectionStart ?? current.length;
+    const end = textarea.selectionEnd ?? current.length;
+    const before = current.slice(0, start);
+    const after = current.slice(end);
+
+    return `${before}${incoming}${after}`;
+  }
+
+  private async refreshPrecheckSummaryForTextarea(): Promise<void> {
+    const urls = this.urlsArray();
+    if (urls.length === 0) {
+      this.precheckSummary.set(null);
+      return;
+    }
+
+    const requestSeq = ++this.importedUrlsPrecheckSeq;
+    const precheck = await this.articlesmultiscraper.summarizeUrlsAgainstDb(urls);
+
+    if (requestSeq !== this.importedUrlsPrecheckSeq) {
+      return;
+    }
+
+    this.precheckSummary.set(precheck);
   }
 
   onCopyScrapedData() {

@@ -47,6 +47,12 @@
   <textarea
     nz-input
     [(ngModel)]="importedUrlsArrayString"
+    (ngModelChange)="onImportedUrlsTextChanged($event)"
+    (paste)="onImportedUrlsPaste($event)"
+    (dragover)="onImportedUrlsDragOver($event)"
+    (dragleave)="onImportedUrlsDragLeave()"
+    (drop)="onImportedUrlsDrop($event)"
+    [class.imported-urls-drop-active]="isImportedUrlsDropActive()"
     class="stretch-textarea1"
   ></textarea>
 

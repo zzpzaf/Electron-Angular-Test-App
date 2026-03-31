@@ -53,6 +53,12 @@
   overflow: auto;
 }
 
+.stretch-textarea1.imported-urls-drop-active {
+  outline: 2px dashed #0f766e;
+  outline-offset: -3px;
+  background-color: #bff3ef;
+}
+
 .scrape-button-row {
   display: flex;
   justify-content: flex-end;
