@@ -50,6 +50,34 @@
     class="stretch-textarea1"
   ></textarea>
 
+  @if (precheckSummary()) {
+    <div class="precheck-summary-panel">
+      <div class="precheck-summary-title">Pre-scrape Summary</div>
+      <div class="precheck-summary-grid">
+        <div class="precheck-summary-item">
+          <span class="precheck-summary-label">Imported URLs</span>
+          <span class="precheck-summary-value">{{ precheckSummary()!.totalUrls }}</span>
+        </div>
+        <div class="precheck-summary-item">
+          <span class="precheck-summary-label">Unique URLs</span>
+          <span class="precheck-summary-value">{{ precheckSummary()!.uniqueUrls.length }}</span>
+        </div>
+        <div class="precheck-summary-item">
+          <span class="precheck-summary-label">New</span>
+          <span class="precheck-summary-value precheck-summary-value-new">{{ precheckSummary()!.newCount }}</span>
+        </div>
+        <div class="precheck-summary-item">
+          <span class="precheck-summary-label">Same Slug</span>
+          <span class="precheck-summary-value precheck-summary-value-existing">{{ precheckSummary()!.existingSlugCount }}</span>
+        </div>
+        <div class="precheck-summary-item">
+          <span class="precheck-summary-label">Duplicates In File</span>
+          <span class="precheck-summary-value">{{ precheckSummary()!.duplicateUrlCount }}</span>
+        </div>
+      </div>
+    </div>
+  }
+
 
   
   <!-- Category selection row -->

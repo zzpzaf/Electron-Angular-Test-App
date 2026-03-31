@@ -22,9 +22,6 @@ import { firstValueFrom } from 'rxjs';
 
 
 
-
-
-
 type RowKey = number | string;
 type MdFilterMode = 'all' | 'withMarkdown' | 'withoutMarkdown';
 
@@ -87,6 +84,9 @@ export class ArticlesTable {
   // 260328 - Delete column UI mode and selected rows for future multi-delete action.
   public isDeleteCheckboxMode = signal(false);
   private selectedDeleteRows = signal<Set<RowKey>>(new Set<RowKey>());
+
+  // 260331 - Focus highlight for double-clicked row (independent of other selections).
+  private focusHighlightedRowKey = signal<RowKey | null>(null);
 
   private backendService = inject(BackEnd);
   // Pagination state (two-way bound)
@@ -447,7 +447,27 @@ export class ArticlesTable {
     }, 'Re-scraping article …');
   }
 
+  // 260331 - Check if a row is currently focus-highlighted (via double-click).
+  public isFocusHighlighted(row: PostData): boolean {
+    return this.focusHighlightedRowKey() === this.rowKey(row);
+  }
 
+  // 260331 - Handle double-click on a row to toggle focus highlight.
+  // If the row is already highlighted, un-highlight it.
+  // If a different row is highlighted, switch highlight to this row.
+  public onRowDoubleClick(row: PostData, e: MouseEvent): void {
+    e.stopPropagation();
+    const key = this.rowKey(row);
+    const current = this.focusHighlightedRowKey();
+
+    if (current === key) {
+      // Same row double-clicked → un-highlight
+      this.focusHighlightedRowKey.set(null);
+    } else {
+      // Different row or no highlight → highlight this row
+      this.focusHighlightedRowKey.set(key);
+    }
+  }
 
   // 260327 - Category checkbox mode methods
 

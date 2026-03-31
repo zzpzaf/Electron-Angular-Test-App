@@ -8,7 +8,10 @@ import { StyleDrct } from '../shared/style-drct';
 import { extractAllNonImageUrls } from '../../../shared/utils/shared-utils';
 import { DlgService } from '../shared/services/dlg-service';
 import { Articlebasicscraper } from '../shared/services/articlebasicscraper';
-import { Articlesmultiscraper } from '../shared/services/articlesmultiscraper';
+import {
+  Articlesmultiscraper,
+  MultiScrapePrecheckSummary,
+} from '../shared/services/articlesmultiscraper';
 import { PostData } from '../../../shared/projectObjects/varObjects';
 import {
   NzTreeSelectComponent,
@@ -37,6 +40,7 @@ import { Subscription } from 'rxjs';
 })
 export class FileUrls {
   public importedUrlsArrayString = signal<string>('');
+  public precheckSummary = signal<MultiScrapePrecheckSummary | null>(null);
 
   public urlsArray = signal<string[]>([]);
   public urlsArrayString = signal<string>('');
@@ -118,11 +122,25 @@ export class FileUrls {
           );
         }
 
-        // Insert scraped articles into the database via shared service.
-        await this.articlesmultiscraper.insertScrapedArticlesArrayToDB(
+        const persistSummary = await this.articlesmultiscraper.persistScrapedArticlesWithDedup(
           this.scrappedDataArray(),
           this.selectedCategoryIds
         );
+
+        this.dlgService
+          .popup({
+            token: 'info',
+            header: 'File URL Scraping Completed',
+            content:
+              `Inserted new articles: ${persistSummary.insertedCount}\n` +
+              `Updated existing articles: ${persistSummary.updatedCount}\n` +
+              `Skipped unchanged/newer DB articles: ${persistSummary.skippedCount}`,
+            posAnsMsg: 'OK',
+            negAnsMsg: '',
+          })
+          .subscribe((dlgResult) => {
+            console.log('Dialog closed with:', dlgResult);
+          });
 
       } else {
         error = response.error;
@@ -191,11 +209,23 @@ export class FileUrls {
       const uniqueURLs = Array.from(new Set(urls));
       this.urlsArray.set(uniqueURLs);
 
+      const precheck = await this.articlesmultiscraper.summarizeUrlsAgainstDb(
+        uniqueURLs
+      );
+      this.precheckSummary.set(precheck);
+
       // Show message in modal dialog
-      const msg: string = this.urlsArray().length + ' URLs found in total!';
+      const msg: string =
+        `URLs found in total: ${precheck.totalUrls}\n` +
+        `Unique URLs: ${precheck.uniqueUrls.length}\n` +
+        `New articles to insert: ${precheck.newCount}\n` +
+        `Existing same-slug articles: ${precheck.existingSlugCount}` +
+        (precheck.duplicateUrlCount > 0
+          ? `\nDuplicate URLs in file: ${precheck.duplicateUrlCount}`
+          : '');
       this.dlgService
         .popup({
-          token: 'succ',
+          token: 'info',
           header: 'URLs Found!',
           content: msg,
           posAnsMsg: 'OK',
@@ -216,6 +246,7 @@ export class FileUrls {
     this.scrappedDataArray.set([]);
     this.scrappedDataArrayString.set('');
     this.importedUrlsArrayString.set('');
+    this.precheckSummary.set(null);
     this.fileName = '';
     this.selectedCategoryIds = [];
     this.categorySelectForm.reset({ selectCategory: [] });

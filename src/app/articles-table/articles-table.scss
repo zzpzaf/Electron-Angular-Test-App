@@ -367,3 +367,13 @@
 :host ::ng-deep .ant-table-tbody > tr.row-del-checked:hover > td {
   background-color: #f3c0d8;
 }
+
+// 260331 - Double-click focus highlight for row (light opal green background)
+:host ::ng-deep .ant-table-tbody > tr.row-focus-highlight > td {
+  background-color: #d9f0ed;
+}
+
+// Keep focus highlight visible even when hovered (distinct from regular hover)
+:host ::ng-deep .ant-table-tbody > tr.row-focus-highlight:hover > td {
+  background-color: #c9e9e5;
+}

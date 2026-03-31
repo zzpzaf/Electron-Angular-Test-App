@@ -34,7 +34,11 @@ import { BackEnd } from '../shared/services/back-end';
 import { firstValueFrom, Subscription } from 'rxjs';
 import { LoaderService } from '../shared/services/loader-service';
 import { NzIconModule } from 'ng-zorro-antd/icon';
-import { Articlesmultiscraper } from '../shared/services/articlesmultiscraper';    // 260325
+import {
+  Articlesmultiscraper,
+  MultiScrapePersistMode,
+  MultiScrapePrecheckSummary,
+} from '../shared/services/articlesmultiscraper';    // 260325
 
 // Adjust the import path as necessary
 
@@ -63,8 +67,7 @@ export class ListUrls {
   public scrappedData = signal<PostData | null>(null);
   public $scrappedDataArray = signal<PostData[]>([]);
   public $scrappedDataArrayString = signal<string>('');
-  // public isSaveButtonEnabled = signal<boolean>(false);
-  public isAddedChecked = signal<boolean>(true); // Default to true
+  public precheckSummary = signal<MultiScrapePrecheckSummary | null>(null);
   public linkURL = signal<string>('');
   private listurldata: listURLData = { listname: '', pubauthorslug: '' };
 
@@ -124,23 +127,15 @@ export class ListUrls {
       this.categoryNodesService.$catTreeNodes().length
     );
 
-    this.linkScrapeForm.get('add')?.valueChanges.subscribe((value) => {
-      console.log('Checkbox changed to:', value);
-      this.isAddedChecked.set(value); // Update the signal when checkbox changes
-    });
     this.linkScrapeForm.get('url')?.valueChanges.subscribe((urlValue) => {
       this.linkURL.set(urlValue);
+      this.precheckSummary.set(null);
 
       this.listurldata = { listname: '', pubauthorslug: '' };
       if (urlValue.trim().length > 0 && isValidUrl(urlValue.trim())) {
         console.log('URL changed to:', this.linkURL());
         this.listurldata = analyzeListedLink(urlValue);
         // console.log('List Name (if):', this.listurldata.listname.trim());
-      }
-      if (this.listurldata.listname.trim().length > 0) {
-        this.linkScrapeForm.get('add')?.setValue(false);
-      } else if (this.listurldata.listname.trim().length === 0) {
-        this.linkScrapeForm.get('add')?.setValue(true);
       }
     });
 
@@ -252,46 +247,47 @@ export class ListUrls {
       }
       const response = await this.articlebasicscraper.scrapeList(url);
       if (response.success) {
-        let postsArray: PostData[] = [];
-        if (!this.isAddedChecked() && response.data.length > 0)
-          postsArray = await this.removeExistingArticles(response.data);
-        if (postsArray.length === 0) {
+        const listPosts = Array.isArray(response.data)
+          ? this.dedupePostsBySlug(response.data as PostData[])
+          : [];
+
+        if (listPosts.length === 0) {
           this.dlgService
             .popup({
               token: 'warn',
-              header: 'No Articles to Add',
-              content:
-                'All articles in the List are already present in the database.',
+              header: 'No Articles Found',
+              content: 'No article URLs were found in the provided Medium list.',
               posAnsMsg: 'OK',
               negAnsMsg: '',
             })
             .subscribe((res) => console.log('Dialog closed with:', res));
           return;
-        } else if (
-          postsArray.length > 0 &&
-          postsArray.length < response.data.length
-        ) {
-          console.log(
-            '>===>> ListUrls - runScraper() - Articles remaining for scraping after removing existing:',
-            postsArray
-          );
-          this.dlgService
-            .popup({
-              token: 'warn',
-              header: 'Articles in the List for scraping',
-              content:
-                'Some articles in the List are already present in the database. Articles remaining for scraping: ' +
-                postsArray.length,
-              posAnsMsg: 'OK',
-              negAnsMsg: '',
-            })
-            .subscribe((res) => console.log('Dialog closed with:', res));
         }
-        // return;    // <------------
-        // this.$scrappedDataArray.set(response.data as PostData[]); // Store the result as PostData[]
-        // result = response.data;
-        this.$scrappedDataArray.set(postsArray as PostData[]); // Store the result as PostData[]
-        result = postsArray;
+
+        const precheck = await this.articlesmultiscraper.summarizeUrlsAgainstDb(
+          listPosts.map((post) => post.link)
+        );
+        this.precheckSummary.set(precheck);
+
+        this.dlgService
+          .popup({
+            token: 'info',
+            header: 'List Articles Summary',
+            content:
+              `List articles found: ${precheck.totalUrls}\n` +
+              `Unique URLs: ${precheck.uniqueUrls.length}\n` +
+              `New articles to insert: ${precheck.newCount}\n` +
+              `Existing same-slug articles: ${precheck.existingSlugCount}` +
+              (precheck.duplicateUrlCount > 0
+                ? `\nDuplicate URLs in list: ${precheck.duplicateUrlCount}`
+                : ''),
+            posAnsMsg: 'OK',
+            negAnsMsg: '',
+          })
+          .subscribe((res) => console.log('Dialog closed with:', res));
+
+        this.$scrappedDataArray.set(listPosts);
+        result = listPosts;
         this.$scrappedDataArrayString.set(
           JSON.stringify(this.$scrappedDataArray(), null, 2)
         ); // Beutify the JSON data;
@@ -367,7 +363,9 @@ export class ListUrls {
     this.$scrappedDataArray.set([]); // Clear the array
     this.$scrappedDataArrayString.set(''); // Clear the string representation of the array
     this.scrappedData.set(null); // Clear the scrapped data
+    this.precheckSummary.set(null);
     this.linkScrapeForm.reset(); // Reset the form
+    this.linkScrapeForm.get('add')?.setValue(true, { emitEvent: false });
   }
 
   onCopyScrappedData() {
@@ -414,26 +412,6 @@ export class ListUrls {
     }
   }
 
-  // 250914
-  // Do not mutate an array while iterating with a for...of loop and manually adjusting the index i.
-  // Instead, of mutating the array while iterating, build a new array with only the articles that do not exist in the database.
-  async removeExistingArticles(postDataArray: PostData[]): Promise<PostData[]> {
-    if (!postDataArray || postDataArray.length === 0) return [];
-    const result: PostData[] = [];
-    for (const post of postDataArray) {
-      const postSlug: string | undefined = getMediumSlugFromUrl(post.link);
-      if (postSlug && !(await this.backendService.checkSlugExists(postSlug))) {
-        result.push(post);
-      } else {
-        console.log(
-          '>===>> ListUrls - removeExistingArticles() - Article already exists, removing from array:',
-          postSlug
-        );
-      }
-    }
-    return result;
-  }
-
   // 250913
   private async fullArticleScrapeFromMetaData() {
     console.log(
@@ -470,10 +448,24 @@ export class ListUrls {
         // this.insertScrapedArticlesArrayToDB(this.$scrappedDataArray());   // 260325
 
         // 260325 - We moved the call to insertScrapedArticlesArrayToDB() inside the onGetFileUrls() function because we want to give the user the chance to review the scraped data and select a category before inserting into the DB. So, we will call insertScrapedArticlesArrayToDB() after the user clicks the "Get File URLs" button and after we get the file content from Electron.
-        await this.articlesmultiscraper.insertScrapedArticlesArrayToDB(
+        const persistSummary = await this.articlesmultiscraper.persistScrapedArticlesWithDedup(
           this.$scrappedDataArray(),
-          this.selectedCategoryIds
+          this.selectedCategoryIds,
+          this.getPersistModeFromToggle()
         );
+
+        this.dlgService
+          .popup({
+            token: 'info',
+            header: 'List Scraping Completed',
+            content:
+              `Inserted new articles: ${persistSummary.insertedCount}\n` +
+              `Updated existing articles: ${persistSummary.updatedCount}\n` +
+              `Skipped unchanged/newer DB articles: ${persistSummary.skippedCount}`,
+            posAnsMsg: 'OK',
+            negAnsMsg: '',
+          })
+          .subscribe((res) => console.log('Dialog closed with:', res));
 
 
       }
@@ -512,6 +504,29 @@ export class ListUrls {
     this.$scrappedDataArrayString.set(
       JSON.stringify(this.$scrappedDataArray(), null, 2)
     );
+  }
+
+  private dedupePostsBySlug(posts: PostData[]): PostData[] {
+    const bySlug = new Map<string, PostData>();
+
+    for (const post of posts) {
+      const slug = getMediumSlugFromUrl(post.link);
+      if (!slug) {
+        bySlug.set(`${post.link}-${bySlug.size}`, post);
+        continue;
+      }
+
+      if (!bySlug.has(slug)) {
+        bySlug.set(slug, post);
+      }
+    }
+
+    return Array.from(bySlug.values());
+  }
+
+  private getPersistModeFromToggle(): MultiScrapePersistMode {
+    const checked = !!this.linkScrapeForm.get('add')?.value;
+    return checked ? 'dbSync' : 'insertOnlyNew';
   }
 
   // 260325

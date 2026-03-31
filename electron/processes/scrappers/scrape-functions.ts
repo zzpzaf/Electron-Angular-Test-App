@@ -1561,8 +1561,24 @@ export async function scrapeList(url: string): Promise<PostData[]> {
     url
   );
 
+  const listConnectTimeoutMs = Math.max(
+    timeConst.TAB_INITIAL_PAGE_LOADING_DELAY,
+    30000
+  );
+
   // Connect to an already running Chrome instance with remote debugging enabled
-  const browser = await connectToBrowser();
+  const browser = await Promise.race([
+    connectToBrowser(),
+    new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(
+          new Error(
+            `Timed out connecting to browser at ${BROWSER_URLPORT} after ${listConnectTimeoutMs}ms`
+          )
+        );
+      }, listConnectTimeoutMs);
+    }),
+  ]);
 
   if (browser)
     console.log(
@@ -1577,7 +1593,14 @@ export async function scrapeList(url: string): Promise<PostData[]> {
       'scrape-functions ->  scrapeList() - trying to go to page: ',
       url
     );
-    await page.goto(url, { waitUntil: 'networkidle2' });
+    await page.goto(url, {
+      waitUntil: 'domcontentloaded',
+      timeout: listConnectTimeoutMs,
+    });
+
+    await page.waitForSelector(listSEL.allArticle, {
+      timeout: Math.max(timeConst.INITIAL_PAGE_LOADING_DELAY, 10000),
+    });
 
     const totalArticles = await autoScrollToEnd(
       page,

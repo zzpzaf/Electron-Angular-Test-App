@@ -28,8 +28,12 @@
   </nz-form-item>
 
   <nz-form-item>
-    <label nz-checkbox formControlName="add">
-      <span>Add</span>
+    <label
+      nz-checkbox
+      formControlName="add"
+      title="Checked: DB sync (insert new, update older, skip unchanged). Unchecked: insert only new (skip all existing slug records, no updates)."
+    >
+      <span class="sync-checkbox-label">DB sync</span>
     </label>
   </nz-form-item>
 
@@ -117,6 +121,34 @@
       </div>
     </div>
   </div>
+
+  @if (precheckSummary()) {
+    <div class="precheck-summary-panel">
+      <div class="precheck-summary-title">Pre-scrape Summary</div>
+      <div class="precheck-summary-grid">
+        <div class="precheck-summary-item">
+          <span class="precheck-summary-label">List Articles</span>
+          <span class="precheck-summary-value">{{ precheckSummary()!.totalUrls }}</span>
+        </div>
+        <div class="precheck-summary-item">
+          <span class="precheck-summary-label">Unique URLs</span>
+          <span class="precheck-summary-value">{{ precheckSummary()!.uniqueUrls.length }}</span>
+        </div>
+        <div class="precheck-summary-item">
+          <span class="precheck-summary-label">New</span>
+          <span class="precheck-summary-value precheck-summary-value-new">{{ precheckSummary()!.newCount }}</span>
+        </div>
+        <div class="precheck-summary-item">
+          <span class="precheck-summary-label">Same Slug</span>
+          <span class="precheck-summary-value precheck-summary-value-existing">{{ precheckSummary()!.existingSlugCount }}</span>
+        </div>
+        <div class="precheck-summary-item">
+          <span class="precheck-summary-label">Duplicates In List</span>
+          <span class="precheck-summary-value">{{ precheckSummary()!.duplicateUrlCount }}</span>
+        </div>
+      </div>
+    </div>
+  }
 </form>
 
 <!-- ------------------------------------------------- -->

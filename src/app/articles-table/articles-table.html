@@ -245,6 +245,8 @@
       <tr
         [class.row-checked]="isCategoriesCheckboxMode() && isRowChecked(row)"
         [class.row-del-checked]="isDeleteCheckboxMode() && isDeleteRowChecked(row)"
+        [class.row-focus-highlight]="isFocusHighlighted(row)"
+        (dblclick)="onRowDoubleClick(row, $event)"
       >
         <!-- 1 -->
         <td nzAlign="center">{{ row.id }}</td>
