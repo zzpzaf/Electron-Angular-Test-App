@@ -12,6 +12,7 @@ import {
   Articlesmultiscraper,
   MultiScrapePrecheckSummary,
 } from '../shared/services/articlesmultiscraper';
+import { ContentScrapePolicy } from '../shared/services/content-scrape-policy';
 import { PostData } from '../../../shared/projectObjects/varObjects';
 import {
   NzTreeSelectComponent,
@@ -60,6 +61,7 @@ export class FileUrls {
   private dlgService = inject(DlgService);
   private scrapper = inject(Articlebasicscraper);
   private articlesmultiscraper = inject(Articlesmultiscraper);
+  private contentScrapePolicy = inject(ContentScrapePolicy);
   private fb = inject(NonNullableFormBuilder);
   private categoryNodesService = inject(CategoryNodes);
 
@@ -113,9 +115,11 @@ export class FileUrls {
     if (!urls.length) return;
 
     try {
-      const response = await this.scrapper.scrapeTabsList(urls);
+      const scrapeOptions = this.contentScrapePolicy.buildScrapeTabsOptions(urls);
+      const response = await this.scrapper.scrapeTabsList(urls, scrapeOptions);
       if (response.success) {
-        result = response.data as PostData[]; // default
+        const scrapedPosts = (response.data as PostData[]) || [];
+        result = scrapedPosts.filter((post) => !post.excludeFromPersistence);
         this.scrappedDataArray.set(result);
 
         if (this.scrappedDataArray().length > 0) {

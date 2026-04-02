@@ -39,6 +39,7 @@ import {
   MultiScrapePersistMode,
   MultiScrapePrecheckSummary,
 } from '../shared/services/articlesmultiscraper';    // 260325
+import { ContentScrapePolicy } from '../shared/services/content-scrape-policy';
 
 // Adjust the import path as necessary
 
@@ -81,6 +82,7 @@ export class ListUrls {
  
   public selectedCategoryIds: number[] = [];
   private loader = inject(LoaderService);
+  private contentScrapePolicy = inject(ContentScrapePolicy);
 
 
     /** Search functionality signals */
@@ -423,7 +425,11 @@ export class ListUrls {
       (item) => item.link
     );
     try {
-      const response = await this.articlebasicscraper.scrapeTabsList(urlsArray);
+      const scrapeOptions = this.contentScrapePolicy.buildScrapeTabsOptions(urlsArray);
+      const response = await this.articlebasicscraper.scrapeTabsList(
+        urlsArray,
+        scrapeOptions
+      );
       if (response.success) {
         if (!response.data || response.data.length < 0) return;
         let result: PostData[] = []; // default
@@ -478,29 +484,56 @@ export class ListUrls {
   private updateScrappedDataArray(fullScrapedData: PostData[]) {
     console.log('>===>> ListUrls - updateScrappedDataArray() - Started ...');
     const currentArray = this.$scrappedDataArray();
+
+    const excludedLinks = new Set(
+      fullScrapedData
+        .filter((item) => item.excludeFromPersistence)
+        .map((item) => item.link)
+    );
+
+    const filteredCurrentArray =
+      excludedLinks.size > 0
+        ? currentArray.filter((item) => !excludedLinks.has(item.link))
+        : currentArray;
+
+    if (excludedLinks.size > 0) {
+      console.log(
+        '>===>> ListUrls - updateScrappedDataArray() - Excluding links from persistence:',
+        Array.from(excludedLinks)
+      );
+    }
+
     for (const newData of fullScrapedData) {
+      if (newData.excludeFromPersistence) {
+        continue;
+      }
+
       console.log(
         '>===>> ListUrls - updateScrappedDataArray() - FullScrapedData Article: ',
         newData.link,
         ' Slug: ',
         getMediumSlugFromUrl(newData.link)
       );
-      const match = currentArray.find(
+      const match = filteredCurrentArray.find(
         (item) =>
           getMediumSlugFromUrl(item.link) === getMediumSlugFromUrl(newData.link)
       );
-      console.log(
-        '>===>> ListUrls - updateScrappedDataArray() - Matched Article: ',
-        match!.link,
-        ' Slug: ',
-        getMediumSlugFromUrl(match!.link)
-      );
+
+      if (match) {
+        console.log(
+          '>===>> ListUrls - updateScrappedDataArray() - Matched Article: ',
+          match.link,
+          ' Slug: ',
+          getMediumSlugFromUrl(match.link)
+        );
+      }
+
       if (match && newData.content) {
         match.content = newData.content;
         match.link = newData.link;
       }
     }
-    this.$scrappedDataArray.set([...currentArray]);
+    this.$scrappedDataArray.set([...filteredCurrentArray]);
     this.$scrappedDataArrayString.set(
       JSON.stringify(this.$scrappedDataArray(), null, 2)
     );

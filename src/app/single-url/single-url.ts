@@ -36,6 +36,7 @@ import { Markshow } from '../shared/services/markshow';
 import { LoaderService } from '../shared/services/loader-service';
 import { CategoryNodes } from '../shared/services/category-nodes';
 import { NzTreeNode, NzTreeNodeOptions } from 'ng-zorro-antd/tree';
+import { ContentScrapePolicy } from '../shared/services/content-scrape-policy';
 
 
 
@@ -85,6 +86,7 @@ export class SingleUrl {
   private articlebasicscraper = inject(Articlebasicscraper);
   private categoryNodesService = inject(CategoryNodes);
   private sanitizer = inject(DomSanitizer);
+  private contentScrapePolicy = inject(ContentScrapePolicy);
 
   public isNewArticle: boolean = false; // Flag to indicate if it's a new article
   private existingArticleData: PostData | null = null;
@@ -395,13 +397,43 @@ export class SingleUrl {
     let urlsArray: string[] = [];
     if (urlValue && urlValue.trim().length > 0) urlsArray.push(urlValue.trim());
     try {
-      const response = await this.articlebasicscraper.scrapeTabsList(urlsArray);
+      const scrapeOptions = this.contentScrapePolicy.buildScrapeTabsOptions(urlsArray);
+      const response = await this.articlebasicscraper.scrapeTabsList(
+        urlsArray,
+        scrapeOptions
+      );
       if (response.success) {
         let result: PostData[] = []; // default
         if (Array.isArray(response.data) && response.data.length > 0) {
           result = response.data as PostData[];
         }
-        this.scrappedDataArray.set(result);
+
+        const excludedPosts = result.filter((post) => post.excludeFromPersistence);
+        const allowedPosts = result.filter((post) => !post.excludeFromPersistence);
+
+        if (excludedPosts.length > 0 && allowedPosts.length === 0) {
+          const reason = excludedPosts[0].exclusionReason || 'excluded-page';
+          this.scrappedDataArray.set([]);
+          this.markdownString.set('');
+          this.postMetaDataString.set('');
+          this.safeHtmlContent.set('');
+
+          this.dlgService
+            .popup({
+              token: 'warn',
+              header: 'Page Excluded',
+              content:
+                'This page was excluded from scraping and DB persistence. Reason: ' +
+                reason,
+              posAnsMsg: 'OK',
+              negAnsMsg: '',
+            })
+            .subscribe((res) => console.log('Dialog closed with:', res));
+
+          return;
+        }
+
+        this.scrappedDataArray.set(allowedPosts);
 
         console.log('>===>> Scrapped Data Array length:', this.scrappedDataArray().length);
         console.log('>===>> Scrapped Data Array[0]:', this.scrappedDataArray()[0]);

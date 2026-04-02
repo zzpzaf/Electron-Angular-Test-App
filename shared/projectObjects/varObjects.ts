@@ -21,7 +21,19 @@ export interface PostData extends listURLData{
   likes: number;
   comments: number;
   content?: string;
+  // When true, this record must not be inserted/updated in DB.
+  excludeFromPersistence?: boolean;
+  // Optional diagnostic reason for exclusion.
+  exclusionReason?: string;
   ranking?: number;     // added on 250820
+}
+
+export interface ScrapeTabsOptions {
+  // When true, scrape markdown content only for Medium-like pages.
+  // Metadata scraping still runs for all URLs.
+  restrictContentToMediumLike?: boolean;
+  // Hostname substring used for fast-path eligibility (default: "medium").
+  mediumHostnameSubstring?: string;
 }
 
 

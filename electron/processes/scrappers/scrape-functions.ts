@@ -18,7 +18,7 @@ import {
 } from '../../helpers/turndown-rules';
 
 import { AsyncLocalStorage } from 'async_hooks';
-import { PostData } from '../../../shared/projectObjects/varObjects';
+import { PostData, ScrapeTabsOptions } from '../../../shared/projectObjects/varObjects';
 import { formatDate } from '../../helpers/electron-utils';
 import { extractFirstPathPart } from '../../../shared/utils/shared-utils';
 
@@ -30,6 +30,7 @@ import {
   iframeConst,
   iframeSEL,
   listSEL,
+  mediumSEL,
 } from './scrape-constants';
  
 
@@ -184,6 +185,147 @@ function resolveDatawrapperUrl(src: string): string {
   return src;
 }
 
+function isMediumHostname(url: string, substring = 'medium'): boolean {
+  const probe = (substring || 'medium').toLowerCase().trim();
+  if (!probe) return false;
+
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return hostname.includes(probe);
+  } catch {
+    return false;
+  }
+}
+
+async function hasMediumHeaderLogo(page: Puppeteer.Page): Promise<boolean> {
+  try {
+    return await page.evaluate((SEL) => {
+      return !!document.querySelector(SEL.headerLogoAnchor);
+    }, mediumSEL);
+  } catch {
+    return false;
+  }
+}
+
+async function hasMediumPlatformSignals(page: Puppeteer.Page): Promise<boolean> {
+  try {
+    return await page.evaluate((SEL) => {
+      return !!document.querySelector(SEL.platformSignals);
+    }, mediumSEL);
+  } catch {
+    return false;
+  }
+}
+
+async function isMedium410LikePage(page: Puppeteer.Page): Promise<boolean> {
+  try {
+    return await page.evaluate((SEL) => {
+      const bodyText = (document.body?.innerText || '').replace(/\s+/g, ' ').toLowerCase();
+      const titleText = (document.title || '').toLowerCase();
+
+      const hasError410Signal =
+        /\berror\b\s*\b410\b/.test(bodyText) ||
+        /\b410\b/.test(titleText);
+
+      const ctaAnchor = document.querySelector<HTMLAnchorElement>(SEL.error410CtaAnchor);
+      const ctaText = (ctaAnchor?.textContent || '').trim().toLowerCase();
+      const hasTakeMeToMediumCta = ctaText.includes('take me to medium');
+
+      const hasKnownMedium410Text =
+        bodyText.includes('under investigation') ||
+        bodyText.includes('violation of the medium rules') ||
+        bodyText.includes('there are thousands of stories to read on medium');
+
+      return (
+        (hasError410Signal && hasTakeMeToMediumCta) ||
+        (hasError410Signal && hasKnownMedium410Text)
+      );
+    }, mediumSEL);
+  } catch {
+    return false;
+  }
+}
+
+async function isChallengeOrBlockedPage(page: Puppeteer.Page): Promise<boolean> {
+  try {
+    return await page.evaluate(() => {
+      const bodyText = (document.body?.innerText || '').replace(/\s+/g, ' ').toLowerCase();
+      const titleText = (document.title || '').toLowerCase();
+
+      const hasJustAMoment = titleText.includes('just a moment');
+      const hasJsCookiesPrompt =
+        bodyText.includes('enable javascript and cookies to continue');
+      const hasVerifyHumanPrompt = bodyText.includes('verify you are human');
+      const hasCloudflareChallengeScript = !!document.querySelector(
+        'script[src*="/cdn-cgi/challenge-platform/"]'
+      );
+
+      return (
+        hasJustAMoment ||
+        hasJsCookiesPrompt ||
+        hasVerifyHumanPrompt ||
+        hasCloudflareChallengeScript
+      );
+    });
+  } catch {
+    return false;
+  }
+}
+
+async function shouldScrapeMarkdownContent(
+  page: Puppeteer.Page,
+  url: string,
+  options?: ScrapeTabsOptions,
+  httpStatus?: number
+): Promise<{ allow: boolean; reason: string; excludeFromPersistence?: boolean }> {
+  if (!options?.restrictContentToMediumLike) {
+    return { allow: true, reason: 'content-restriction-disabled' };
+  }
+
+  if (typeof httpStatus === 'number' && httpStatus >= 400) {
+    return {
+      allow: false,
+      reason: `http-status-${httpStatus}`,
+      excludeFromPersistence: true,
+    };
+  }
+
+  if (await isChallengeOrBlockedPage(page)) {
+    return {
+      allow: false,
+      reason: 'challenge-or-blocked-page',
+      excludeFromPersistence: true,
+    };
+  }
+
+  if (await isMedium410LikePage(page)) {
+    return {
+      allow: false,
+      reason: 'medium-410-like-page',
+      excludeFromPersistence: true,
+    };
+  }
+
+  const hostnameProbe = options.mediumHostnameSubstring || 'medium';
+  if (isMediumHostname(url, hostnameProbe)) {
+    return { allow: true, reason: `hostname-contains-${hostnameProbe.toLowerCase().trim()}` };
+  }
+
+  const [hasLogo, hasPlatformSignals] = await Promise.all([
+    hasMediumHeaderLogo(page),
+    hasMediumPlatformSignals(page),
+  ]);
+
+  if (hasLogo && hasPlatformSignals) {
+    return { allow: true, reason: 'medium-logo-and-platform-signals' };
+  }
+
+  return {
+    allow: false,
+    reason: `non-medium-signals logo=${hasLogo} platform=${hasPlatformSignals}`,
+  };
+}
+
 
 
 
@@ -240,7 +382,8 @@ export async function scrapeArticleBasic(url: string): Promise<PostData> {
 // ========================================================================================================
 
 export async function collectPostsFromUrlTabs(
-  urls: string[]
+  urls: string[],
+  options?: ScrapeTabsOptions
 ): Promise<PostData[]> {
   logFunctionHeader('collectPostsFromUrlTabs');
 
@@ -270,22 +413,44 @@ export async function collectPostsFromUrlTabs(
 
           page = await browser.newPage();
           console.log(`Opening: ${url}`);
-          await page.goto(url, {
+          const navResponse = await page.goto(url, {
             waitUntil: 'domcontentloaded',
             timeout: timeConst.TAB_INITIAL_PAGE_LOADING_DELAY, //15000,   /****** */
           });
+          const navStatus = navResponse?.status();
 
           const currentPage = page;
 
           // Scrape the article data by calling the scrapeMediumArticle() key-function
           const data = await scrapeMediumArticle(currentPage);
 
-          const content = await measureScrapeStep(
-            'scrapeMediumMarkdownContent',
-            () => scrapeMediumMarkdownContent(currentPage),
+          const contentDecision = await measureScrapeStep(
+            'shouldScrapeMarkdownContent',
+            () => shouldScrapeMarkdownContent(currentPage, url, options, navStatus),
             `url=${url}`
           );
-          data.content = content;
+
+          logScrapeTiming(
+            `${contentDecision.allow ? 'ALLOW' : 'SKIP'} scrapeMediumMarkdownContent | url=${url} | reason=${contentDecision.reason}`
+          );
+
+          if (contentDecision.allow) {
+            const content = await measureScrapeStep(
+              'scrapeMediumMarkdownContent',
+              () => scrapeMediumMarkdownContent(currentPage),
+              `url=${url}`
+            );
+            data.content = content;
+          } else {
+            data.content = '';
+            if (contentDecision.excludeFromPersistence) {
+              data.excludeFromPersistence = true;
+              data.exclusionReason = contentDecision.reason;
+              logScrapeTiming(
+                `EXCLUDE post from persistence | url=${url} | reason=${contentDecision.reason}`
+              );
+            }
+          }
 
           data.counter = p;
           // console.log(` >===>> Post: ${p} ${JSON.stringify(data)} `);

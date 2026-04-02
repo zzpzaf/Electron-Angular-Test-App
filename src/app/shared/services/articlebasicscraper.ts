@@ -3,7 +3,12 @@
 
 import { Injectable } from '@angular/core';
 import { ScrapeResult } from '../../appObjects/angObjects';
-import { PostData, ProcessMarkdownResult, RewriteResultItem } from '../../../../shared/projectObjects/varObjects';
+import {
+  PostData,
+  ProcessMarkdownResult,
+  RewriteResultItem,
+  ScrapeTabsOptions,
+} from '../../../../shared/projectObjects/varObjects';
 
 const compName = 'Articlebasicscraper Service';
 
@@ -75,7 +80,8 @@ export class Articlebasicscraper {
 
   // ***
   async scrapeTabsList(
-    urls: string[]
+    urls: string[],
+    options?: ScrapeTabsOptions
   ): Promise<{ success: boolean; data?: PostData[]; error?: string }> {
     if (!window?.electronAPI?.invoke) {
       console.error('Electron API is not available.');
@@ -85,7 +91,8 @@ export class Articlebasicscraper {
       console.log('Invoking scrape-tabs with ', urls.length, 'URLs');
       const result = (await window.electronAPI.invoke(
         'scrape-tabs',
-        urls
+        urls,
+        options
       )) as ScrapeResult;
       return result;
     } catch (error: any) {

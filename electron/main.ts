@@ -23,6 +23,7 @@ import {
   CategoryNode,
   listURLData,
   PostData,
+  ScrapeTabsOptions,
   RewriteResultItem,
 } from '../shared/projectObjects/varObjects';
 import { getFileFullPathName } from './helpers/electron-utils';
@@ -552,10 +553,10 @@ ipcMain.handle(
 
 ipcMain.handle(
   'scrape-tabs',
-  async (event: IpcMainInvokeEvent, urls: string[]) => {
+  async (event: IpcMainInvokeEvent, urls: string[], options?: ScrapeTabsOptions) => {
     console.log(`Received scrape-tabs request for  ${urls.length}  URLs`);
     try {
-      const result: PostData[] = await collectPostsFromUrlTabs(urls);
+      const result: PostData[] = await collectPostsFromUrlTabs(urls, options);
       console.log('>===>> main.ts - scrape-tabs - Scraping successful');
       return { success: true, data: result };
     } catch (error: unknown) {

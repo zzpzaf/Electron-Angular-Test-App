@@ -180,5 +180,14 @@ export const listSEL = {
   authorName: 'div a[href^="/@"] p',
 } as const;
 
+// Medium identity selectors
+// Used when hostname alone does not indicate Medium hosting.
+export const mediumSEL = {
+  headerLogoAnchor: 'a[aria-label="Homepage"][data-testid="headerMediumLogo"]',
+  platformSignals:
+    'script[src*="cdn-client.medium.com"], link[href*="cdn-client.medium.com"], meta[name="twitter:app:name:iphone"][content*="Medium" i], meta[property="al:ios:app_name"][content*="Medium" i], meta[name="application-name"][content*="Medium" i]',
+  error410CtaAnchor: 'a[href^="/?source=post_page"]',
+} as const;
+
 
 // To-Do: Add Gist-related selectors

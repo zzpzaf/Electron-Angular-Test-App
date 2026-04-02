@@ -63,13 +63,24 @@ export class Articlesmultiscraper {
       return { totalScraped: 0, insertedCount: 0, updatedCount: 0, skippedCount: 0 };
     }
 
+    const eligibleDataArray = dataArray.filter((item) => !item.excludeFromPersistence);
+
+    if (eligibleDataArray.length === 0) {
+      return {
+        totalScraped: dataArray.length,
+        insertedCount: 0,
+        updatedCount: 0,
+        skippedCount: dataArray.length,
+      };
+    }
+
     const existingArticles = await this.backendService.getAllArticles();
     const existingBySlug = this.buildExistingBySlug(existingArticles);
     const insertedArticles: PostData[] = [];
     const updatedArticles: PostData[] = [];
-    let skippedCount = 0;
+    let skippedCount = dataArray.length - eligibleDataArray.length;
 
-    for (const scraped of dataArray) {
+    for (const scraped of eligibleDataArray) {
       const slug = getMediumSlugFromUrl(scraped.link);
       const existing = slug ? existingBySlug.get(slug) : undefined;
 
