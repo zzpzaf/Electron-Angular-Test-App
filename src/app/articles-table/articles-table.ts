@@ -7,6 +7,7 @@ import {
   NzTableModule,
   NzTableSortFn,
 } from 'ng-zorro-antd/table';
+import { NzResizableModule, NzResizeEvent } from 'ng-zorro-antd/resizable';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzRateModule } from 'ng-zorro-antd/rate';
@@ -24,6 +25,44 @@ import { firstValueFrom } from 'rxjs';
 
 type RowKey = number | string;
 type MdFilterMode = 'all' | 'withMarkdown' | 'withoutMarkdown';
+type ArticleColumnKey =
+  | 'id'
+  | 'md'
+  | 'delete'
+  | 'title'
+  | 'image'
+  | 'date'
+  | 'categories'
+  | 'hostname'
+  | 'publication'
+  | 'author'
+  | 'authorSlug'
+  | 'listname'
+  | 'likes'
+  | 'comments'
+  | 'ranking'
+  | 'timestamp';
+
+const ARTICLE_TABLE_COLUMN_WIDTHS_STORAGE_KEY = 'articles-table.column-widths';
+
+const DEFAULT_ARTICLE_COLUMN_WIDTHS: Record<ArticleColumnKey, number> = {
+  id: 64,
+  md: 64,
+  delete: 64,
+  title: 420,
+  image: 74,
+  date: 112,
+  categories: 128,
+  hostname: 180,
+  publication: 180,
+  author: 180,
+  authorSlug: 190,
+  listname: 200,
+  likes: 90,
+  comments: 108,
+  ranking: 140,
+  timestamp: 182,
+};
 
 
 @Component({
@@ -31,6 +70,7 @@ type MdFilterMode = 'all' | 'withMarkdown' | 'withoutMarkdown';
   imports: [
     FormsModule,
     NzTableModule,
+    NzResizableModule,
     NzButtonModule,
     NzIconModule,
     NzRateModule,
@@ -67,6 +107,15 @@ export class ArticlesTable {
   public articlesSearchTextDebounced = signal('');
   public $articleCategoryIdsByArticleId = signal<Record<number, number[]>>({});
   public mdFilterMode = signal<MdFilterMode>('all');
+  public readonly minColumnWidth = 56;
+  public readonly interColumnGapPx = 20;
+  public readonly $columnWidths = signal<Record<ArticleColumnKey, number>>(DEFAULT_ARTICLE_COLUMN_WIDTHS);
+  public readonly $tableScrollXPx = computed(() => {
+    const widths = this.$columnWidths();
+    const totalColumnWidth = Object.values(widths).reduce((sum, width) => sum + width, 0);
+    const totalGapWidth = this.interColumnGapPx * (Object.keys(widths).length - 1);
+    return `${totalColumnWidth + totalGapWidth}px`;
+  });
 
   private searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private categoryStatusLoadingIds = new Set<number>();
@@ -116,6 +165,8 @@ export class ArticlesTable {
 
 
   constructor() {
+    this.restoreColumnWidths();
+
     // Obtain articles from backend service corresponding articles signal
     effect(() => {
       if (this.backendService.$articles()) {
@@ -470,6 +521,92 @@ export class ArticlesTable {
   }
 
   // 260327 - Category checkbox mode methods
+
+  public onColumnResizeEnd(event: NzResizeEvent, key: ArticleColumnKey): void {
+    const nextWidth = Number(event.width);
+    if (!Number.isFinite(nextWidth) || nextWidth <= 0) {
+      return;
+    }
+
+    const clampedWidth = Math.max(this.columnMinWidthPx(key), Math.round(nextWidth));
+    this.$columnWidths.update((prev) => ({
+      ...prev,
+      [key]: clampedWidth,
+    }));
+    this.persistColumnWidths();
+  }
+
+  public columnMinWidthPx(key: ArticleColumnKey): number {
+    const strictHeaderMins: Partial<Record<ArticleColumnKey, number>> = {
+      md: 78,
+      delete: 76,
+      categories: 128,
+    };
+
+    return strictHeaderMins[key] ?? this.minColumnWidth;
+  }
+
+  public columnWidthPx(key: ArticleColumnKey): string {
+    return `${this.$columnWidths()[key]}px`;
+  }
+
+  private restoreColumnWidths(): void {
+    const storage = this.getLocalStorage();
+    if (!storage) {
+      return;
+    }
+
+    try {
+      const raw = storage.getItem(ARTICLE_TABLE_COLUMN_WIDTHS_STORAGE_KEY);
+      if (!raw) {
+        return;
+      }
+
+      const parsed = JSON.parse(raw) as Partial<Record<ArticleColumnKey, unknown>>;
+      const merged = { ...DEFAULT_ARTICLE_COLUMN_WIDTHS };
+
+      for (const key of Object.keys(DEFAULT_ARTICLE_COLUMN_WIDTHS) as ArticleColumnKey[]) {
+        const value = Number(parsed[key]);
+        if (!Number.isFinite(value) || value <= 0) {
+          continue;
+        }
+
+        merged[key] = Math.max(this.columnMinWidthPx(key), Math.round(value));
+      }
+
+      this.$columnWidths.set(merged);
+    } catch (error) {
+      console.warn('>===>> ArticlesTable - restoreColumnWidths failed:', error);
+    }
+  }
+
+  private persistColumnWidths(): void {
+    const storage = this.getLocalStorage();
+    if (!storage) {
+      return;
+    }
+
+    try {
+      storage.setItem(
+        ARTICLE_TABLE_COLUMN_WIDTHS_STORAGE_KEY,
+        JSON.stringify(this.$columnWidths())
+      );
+    } catch (error) {
+      console.warn('>===>> ArticlesTable - persistColumnWidths failed:', error);
+    }
+  }
+
+  private getLocalStorage(): Storage | null {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
+    try {
+      return window.localStorage;
+    } catch {
+      return null;
+    }
+  }
 
   // 260327 - Generate a unique key for each row based on id or link
   // It safely handles rows with missing id by falling back to link

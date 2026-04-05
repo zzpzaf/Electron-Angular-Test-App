@@ -110,18 +110,18 @@
 
 
 // 250821 Table settings
-/* Let columns size to content and allow horizontal growth */
+/* Keep column widths deterministic (set by nzWidth + resizing). */
 :host ::ng-deep .ant-table table {
-  table-layout: auto !important;
-  width: max-content;         /* expands to fit widest cells */
-  min-width: 100%;            /* never shrink below container */
+  table-layout: fixed !important;
+  width: auto;
+  min-width: 0;
 }
 /* No truncation or ellipsis anywhere (headers and cells) */
 :host ::ng-deep .ant-table-thead > tr > th,
 :host ::ng-deep .ant-table-tbody > tr > td {
   white-space: nowrap;
-  overflow: visible;
-  text-overflow: clip;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 :host ::ng-deep .ant-table-tbody > tr > td {
@@ -136,6 +136,33 @@
 :host ::ng-deep .ant-table-thead > tr > th {
   padding: 2px;
   background-color:#a1e3e5; 
+  position: relative;
+}
+
+:host ::ng-deep .column-resize-trigger {
+  position: absolute;
+  top: 0;
+  right: -5px;
+  width: 10px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 2;
+}
+
+:host ::ng-deep .column-resize-trigger::after {
+  content: '';
+  position: absolute;
+  top: 18%;
+  left: 4px;
+  height: 64%;
+  border-left: 1px solid #6c8b95;
+  opacity: 0.55;
+  transition: opacity 0.15s ease, border-color 0.15s ease;
+}
+
+:host ::ng-deep .column-resize-trigger:hover::after {
+  opacity: 1;
+  border-left-color: #1677ff;
 }
 
 .categories-toggle-th {
@@ -149,7 +176,12 @@
 .md-filter-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 2px 8px;
   border: 1px solid #6eaeb2;
   border-radius: 6px;
@@ -198,7 +230,12 @@
 .categories-toggle-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 2px 8px;
   border: 1px solid #6eaeb2;
   border-radius: 6px;
@@ -255,7 +292,12 @@
 .delete-toggle-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 2px 8px;
   border: 1px solid #4fa9ae;
   border-radius: 6px;
@@ -334,6 +376,21 @@
 :host ::ng-deep .rate-cell .ant-rate-star-full .ant-rate-star-second,
 :host ::ng-deep .rate-cell .ant-rate-star-half .ant-rate-star-first {
   color: #f59e0b !important;
+}
+
+:host ::ng-deep .cell-text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:host ::ng-deep .cell-text-ellipsis > a,
+:host ::ng-deep .cell-text-ellipsis > span {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Add some space (20px) between columns */

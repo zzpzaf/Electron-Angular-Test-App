@@ -86,7 +86,7 @@
   [nzTitle]="tableHeader"
   class="col-balanced-gap"
   [nzData]="$filteredArticles()"
-  [nzScroll]="{ x: 'max-content' }"
+  [nzScroll]="{ x: $tableScrollXPx() }"
   [nzPageIndex]="pageIndex"
   [(nzPageIndex)]="pageIndex"
   [nzPageSize]="pageSize"
@@ -101,13 +101,29 @@
       <!-- 1 -->
       <th
         nzColumnKey="id"
+        nz-resizable
+        nzBounds="window"
+        [nzMinWidth]="minColumnWidth"
+        [nzWidth]="columnWidthPx('id')"
         [nzSortFn]="sortById"
         [nzSortDirections]="['ascend', 'descend', null]"
+        (nzResizeEnd)="onColumnResizeEnd($event, 'id')"
       >
         Id
+        <nz-resize-handle nzDirection="right">
+          <div class="column-resize-trigger"></div>
+        </nz-resize-handle>
       </th>
       <!-- 2 -->
-      <th nzAlign="center" class="md-filter-th">
+      <th
+        nzAlign="center"
+        class="md-filter-th"
+        nz-resizable
+        nzBounds="window"
+        [nzMinWidth]="columnMinWidthPx('md')"
+        [nzWidth]="columnWidthPx('md')"
+        (nzResizeEnd)="onColumnResizeEnd($event, 'md')"
+      >
         <button
           type="button"
           class="md-filter-btn"
@@ -118,9 +134,20 @@
           MD
           <span class="md-filter-state">{{ getMdFilterLabel() }}</span>
         </button>
+        <nz-resize-handle nzDirection="right">
+          <div class="column-resize-trigger"></div>
+        </nz-resize-handle>
       </th>
       <!-- 3 -->
-      <th nzAlign="center" class="delete-toggle-th">
+      <th
+        nzAlign="center"
+        class="delete-toggle-th"
+        nz-resizable
+        nzBounds="window"
+        [nzMinWidth]="columnMinWidthPx('delete')"
+        [nzWidth]="columnWidthPx('delete')"
+        (nzResizeEnd)="onColumnResizeEnd($event, 'delete')"
+      >
         <button
           type="button"
           class="delete-toggle-btn"
@@ -135,28 +162,67 @@
             <span nz-icon nzType="delete" nzTheme="outline"></span>
           }
         </button>
+        <nz-resize-handle nzDirection="right">
+          <div class="column-resize-trigger"></div>
+        </nz-resize-handle>
       </th>
       <!-- 4 -->
       <th
         nzColumnKey="title"
+        nz-resizable
+        nzBounds="window"
+        [nzMinWidth]="minColumnWidth"
+        [nzWidth]="columnWidthPx('title')"
         [nzSortFn]="sortByTitle"
         [nzSortDirections]="['ascend', 'descend', null]"
+        (nzResizeEnd)="onColumnResizeEnd($event, 'title')"
       >
         Article Title
+        <nz-resize-handle nzDirection="right">
+          <div class="column-resize-trigger"></div>
+        </nz-resize-handle>
       </th>
       <!-- 5 -->
-      <th nzColumnKey="image">Image</th>
+      <th
+        nzColumnKey="image"
+        nz-resizable
+        nzBounds="window"
+        [nzMinWidth]="minColumnWidth"
+        [nzWidth]="columnWidthPx('image')"
+        (nzResizeEnd)="onColumnResizeEnd($event, 'image')"
+      >
+        Image
+        <nz-resize-handle nzDirection="right">
+          <div class="column-resize-trigger"></div>
+        </nz-resize-handle>
+      </th>
       <!-- 6 -->
       <th
         nzColumnKey="date"
+        nz-resizable
+        nzBounds="window"
+        [nzMinWidth]="minColumnWidth"
+        [nzWidth]="columnWidthPx('date')"
         [nzSortFn]="sortByDate"
         [nzSortDirections]="['ascend', 'descend', null]"
+        (nzResizeEnd)="onColumnResizeEnd($event, 'date')"
       >
         Date (YYMMDD)
+        <nz-resize-handle nzDirection="right">
+          <div class="column-resize-trigger"></div>
+        </nz-resize-handle>
       </th>
       <!-- 7 -->
       <!-- <th nzAlign="center">Categories</th> -->
-      <th nzAlign="center" class="categories-toggle-th">
+      <th
+        nzAlign="center"
+        class="categories-toggle-th"
+        nz-resizable
+        nzBounds="window"
+        [nzMinWidth]="columnMinWidthPx('categories')"
+        [nzWidth]="columnWidthPx('categories')"
+        (nzResizeEnd)="onColumnResizeEnd($event, 'categories')"
+      >
         <button
           type="button"
           class="categories-toggle-btn"
@@ -185,55 +251,151 @@
             <span nz-icon nzType="tags" nzTheme="outline"></span>
           }
         </button>
+        <nz-resize-handle nzDirection="right">
+          <div class="column-resize-trigger"></div>
+        </nz-resize-handle>
       </th>
       <!-- 8 -->
       <th
         nzColumnKey="hostname"
+        nz-resizable
+        nzBounds="window"
+        [nzMinWidth]="minColumnWidth"
+        [nzWidth]="columnWidthPx('hostname')"
         [nzSortFn]="sortByHostname"
         [nzSortDirections]="['ascend', 'descend', null]"
+        (nzResizeEnd)="onColumnResizeEnd($event, 'hostname')"
       >
         Hostname
+        <nz-resize-handle nzDirection="right">
+          <div class="column-resize-trigger"></div>
+        </nz-resize-handle>
       </th>
       <!-- 9 -->
-      <th nzColumnKey="pubname">Publication</th>
+      <th
+        nzColumnKey="pubname"
+        nz-resizable
+        nzBounds="window"
+        [nzMinWidth]="minColumnWidth"
+        [nzWidth]="columnWidthPx('publication')"
+        (nzResizeEnd)="onColumnResizeEnd($event, 'publication')"
+      >
+        Publication
+        <nz-resize-handle nzDirection="right">
+          <div class="column-resize-trigger"></div>
+        </nz-resize-handle>
+      </th>
       <!-- 10 -->
-      <th nzColumnKey="authorname" [nzShowFilter]="true">Author</th>
+      <th
+        nzColumnKey="authorname"
+        [nzShowFilter]="true"
+        nz-resizable
+        nzBounds="window"
+        [nzMinWidth]="minColumnWidth"
+        [nzWidth]="columnWidthPx('author')"
+        (nzResizeEnd)="onColumnResizeEnd($event, 'author')"
+      >
+        Author
+        <nz-resize-handle nzDirection="right">
+          <div class="column-resize-trigger"></div>
+        </nz-resize-handle>
+      </th>
       <!-- 11 -->
-      <th nzColumnKey="pubauthorslug" [nzShowFilter]="true">Author's Slug</th>
+      <th
+        nzColumnKey="pubauthorslug"
+        [nzShowFilter]="true"
+        nz-resizable
+        nzBounds="window"
+        [nzMinWidth]="minColumnWidth"
+        [nzWidth]="columnWidthPx('authorSlug')"
+        (nzResizeEnd)="onColumnResizeEnd($event, 'authorSlug')"
+      >
+        Author's Slug
+        <nz-resize-handle nzDirection="right">
+          <div class="column-resize-trigger"></div>
+        </nz-resize-handle>
+      </th>
       <!-- 12 -->
       <th
         nzColumnKey="listname"
+        nz-resizable
+        nzBounds="window"
+        [nzMinWidth]="minColumnWidth"
+        [nzWidth]="columnWidthPx('listname')"
         [nzSortFn]="sortByListname"
         [nzSortDirections]="['ascend', 'descend', null]"
+        (nzResizeEnd)="onColumnResizeEnd($event, 'listname')"
       >
         Medium List name
+        <nz-resize-handle nzDirection="right">
+          <div class="column-resize-trigger"></div>
+        </nz-resize-handle>
       </th>
 
       <!-- 13 -->
       <th
         nzColumnKey="likes"
+        nz-resizable
+        nzBounds="window"
+        [nzMinWidth]="minColumnWidth"
+        [nzWidth]="columnWidthPx('likes')"
         [nzSortFn]="sortByLikes"
         [nzSortDirections]="['descend', 'ascend', null]"
+        (nzResizeEnd)="onColumnResizeEnd($event, 'likes')"
       >
         Likes
+        <nz-resize-handle nzDirection="right">
+          <div class="column-resize-trigger"></div>
+        </nz-resize-handle>
       </th>
       <!-- 14  -->
-      <th nzColumnKey="comments">Comments</th>
+      <th
+        nzColumnKey="comments"
+        nz-resizable
+        nzBounds="window"
+        [nzMinWidth]="minColumnWidth"
+        [nzWidth]="columnWidthPx('comments')"
+        (nzResizeEnd)="onColumnResizeEnd($event, 'comments')"
+      >
+        Comments
+        <nz-resize-handle nzDirection="right">
+          <div class="column-resize-trigger"></div>
+        </nz-resize-handle>
+      </th>
       <!-- 15 -->
       <!-- <th nzColumnKey="ranking">Ranking</th> -->
       <th
         nzColumnKey="ranking"
+        nz-resizable
+        nzBounds="window"
+        [nzMinWidth]="minColumnWidth"
+        [nzWidth]="columnWidthPx('ranking')"
         [nzSortFn]="sortByRanking"
         [nzSortDirections]="['descend', 'ascend', null]"
         nzAlign="center"
+        (nzResizeEnd)="onColumnResizeEnd($event, 'ranking')"
       >
         Ranking
+        <nz-resize-handle nzDirection="right">
+          <div class="column-resize-trigger"></div>
+        </nz-resize-handle>
       </th>
       <!-- 16 -->
-      <th nzColumnKey="timestamp"
-      [nzSortFn]="sortByTimestamp"
-      [nzSortDirections]="['descend', 'ascend', null]"
-      >Time Stamp</th>
+      <th
+        nzColumnKey="timestamp"
+        nz-resizable
+        nzBounds="window"
+        [nzMinWidth]="minColumnWidth"
+        [nzWidth]="columnWidthPx('timestamp')"
+        [nzSortFn]="sortByTimestamp"
+        [nzSortDirections]="['descend', 'ascend', null]"
+        (nzResizeEnd)="onColumnResizeEnd($event, 'timestamp')"
+      >
+        Time Stamp
+        <nz-resize-handle nzDirection="right">
+          <div class="column-resize-trigger"></div>
+        </nz-resize-handle>
+      </th>
     </tr>
   </thead>
 
@@ -307,8 +469,8 @@
           }
         </td>
         <!-- 4 -->
-        <td>
-          <a [href]="row.link" target="_blank" rel="noopener noreferrer" [innerHTML]="highlightTitle(row.title)"></a>
+        <td class="cell-text-ellipsis">
+          <a [href]="row.link" target="_blank" rel="noopener noreferrer" [innerHTML]="highlightTitle(row.title)" [title]="row.title"></a>
         </td>
         <!-- 5 -->
         <td nzAlign="center">
@@ -361,7 +523,7 @@
         </td>
 
         <!-- 8 -->
-        <td>
+        <td class="cell-text-ellipsis">
           <a
             [href]="
               row.hostname.startsWith('http://') ||
@@ -371,29 +533,31 @@
             "
             target="_blank"
             rel="noopener noreferrer"
+            [title]="row.hostname"
           >
             {{ row.hostname }}
           </a>
         </td>
         <!-- 9 -->
-        <td>{{ row.pubname }}</td>
+        <td class="cell-text-ellipsis" [title]="row.pubname">{{ row.pubname }}</td>
         <!-- 10 -->
         @if (row.authorlink) {
-          <td>
+          <td class="cell-text-ellipsis">
             <a
               [href]="row.authorlink"
               target="_blank"
               rel="noopener noreferrer"
+              [title]="row.authorname"
               >{{ row.authorname }}</a
             >
           </td>
         } @else {
-          <td>{{ row.authorname }}</td>
+          <td class="cell-text-ellipsis" [title]="row.authorname">{{ row.authorname }}</td>
         }
         <!-- 11 -->
-        <td>{{ row.pubauthorslug }}</td>
+        <td class="cell-text-ellipsis" [title]="row.pubauthorslug">{{ row.pubauthorslug }}</td>
         <!-- 12 -->
-        <td>{{ row.listname }}</td>
+        <td class="cell-text-ellipsis" [title]="row.listname">{{ row.listname }}</td>
         <!-- 13 -->
         <td nzAlign="center">{{ row.likes }}</td>
         <!-- 14 -->
@@ -413,7 +577,7 @@
         </td>
 
         <!-- 16 -->
-        <td>{{ row.timestamp }}</td>
+        <td class="cell-text-ellipsis" [title]="row.timestamp">{{ row.timestamp }}</td>
       </tr>
     }
   </tbody>
