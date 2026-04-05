@@ -21,6 +21,7 @@ import {
 import {
   Category,
   CategoryNode,
+  DeleteCategoryResult,
   listURLData,
   PostData,
   ScrapeTabsOptions,
@@ -865,11 +866,15 @@ ipcMain.handle('sqlite:update-category-by-id', (event: any, id: number, name: st
 // 250910
 ipcMain.handle('sqlite:delete-category-by-id', (event: any, id: number) => {
   try {
-    const result = deleteCategoryById(id);
+    const result: DeleteCategoryResult = deleteCategoryById(id);
     return result;
   } catch (err) {
     console.error('Error deleting Category by id: "', id, '" ', err);
-    return false;
+    return {
+      success: false,
+      reason: 'error',
+      message: `Error deleting Category by id ${id}.`,
+    } satisfies DeleteCategoryResult;
   }
 });
 

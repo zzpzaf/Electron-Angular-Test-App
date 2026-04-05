@@ -86,6 +86,15 @@ export interface Category {
   parent_id: number
 }
 
+export interface DeleteCategoryResult {
+  success: boolean;
+  blocked?: boolean;
+  reason?: 'subtree-not-empty' | 'not-found' | 'error';
+  subcategoryCount?: number;
+  articleCount?: number;
+  message?: string;
+}
+
 export type CategoryRow = {
   id: number;
   name: string;

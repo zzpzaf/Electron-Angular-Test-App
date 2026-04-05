@@ -291,20 +291,34 @@ export class Categories {
         try {
           this.saving.set(true);
           const result = await this.backendService.deleteCategoryById(sel.id);
-          if (result) {
+          if (result.success) {
             this.dlgService.popup({
               token: 'succ',
               header: 'Category Deleted!',
-              content: 'Category with ID ' + sel.id + ' was deleted successfully.',
+              content: result.message ?? 'Category with ID ' + sel.id + ' was deleted successfully.',
               posAnsMsg: 'OK',
               negAnsMsg: '',
             });
             this.updateCategoriesSignal();
+          } else if (result.reason === 'subtree-not-empty') {
+            const subcategoryCount = result.subcategoryCount ?? 0;
+            const articleCount = result.articleCount ?? 0;
+            this.dlgService.popup({
+              token: 'info',
+              header: 'Category Cannot Be Deleted',
+              content:
+                'This category cannot be deleted because its subtree is not empty.\n\n' +
+                'Subcategories found: ' + subcategoryCount + '\n' +
+                'Article entries found: ' + articleCount + '\n\n' +
+                'Please delete any subcategories and files first, and then try deleting the category again.',
+              posAnsMsg: 'OK',
+              negAnsMsg: '',
+            });
           } else {
             this.dlgService.popup({
               token: 'error',
               header: 'Error deleting Category!',
-              content: 'Failed to delete category with ID ' + sel.id + '.',
+              content: result.message ?? 'Failed to delete category with ID ' + sel.id + '.',
               posAnsMsg: 'OK',
               negAnsMsg: '',
             });

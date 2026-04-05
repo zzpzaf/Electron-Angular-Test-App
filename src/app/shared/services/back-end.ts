@@ -1,5 +1,5 @@
 import { Injectable, signal } from '@angular/core';
-import { Category, CategoryNode, PostData } from '../../../../shared/projectObjects/varObjects';
+import { Category, CategoryNode, DeleteCategoryResult, PostData } from '../../../../shared/projectObjects/varObjects';
 
 interface DeleteFilesResult {
   deleted: string[];
@@ -142,8 +142,8 @@ export class BackEnd {
   }
 
   // 250910 - Delete Category By Id
-  async deleteCategoryById(id: number): Promise<boolean> {
-    const result = await this.ipcInvoke<boolean>('sqlite:delete-category-by-id', id);
+  async deleteCategoryById(id: number): Promise<DeleteCategoryResult> {
+    const result = await this.ipcInvoke<DeleteCategoryResult>('sqlite:delete-category-by-id', id);
     return result;
   }
 

@@ -1,6 +1,6 @@
 // electron/dbs/sqlite/maindb_queries.ts
 
-import { PostData, Category, CategoryNode, CategoryRow, ImageRow } from '../../../shared/projectObjects/varObjects';
+import { PostData, Category, CategoryNode, CategoryRow, DeleteCategoryResult, ImageRow } from '../../../shared/projectObjects/varObjects';
 import { getMainConnection } from './connections';
 
 const mainDb = getMainConnection();
@@ -866,21 +866,87 @@ export function updateCategoryById(id: number, name: string, parentId: number | 
 
 
 // 250910
-export function deleteCategoryById(id: number): boolean {
+// Update on 260405 - added subtree check to prevent deletion of categories that still have subcategories or articles assigned to them
+export function deleteCategoryById(id: number): DeleteCategoryResult {
   if (!mainDb) {
     console.error('>===>> No Main DB connection.');
-    return false;
+    return {
+      success: false,
+      reason: 'error',
+      message: 'No Main DB connection.',
+    };
   }
 
   try {
+    const existsStmt = mainDb.prepare<{ id: number }, { id: number }>(`
+      SELECT id
+      FROM categories
+      WHERE id = @id
+      LIMIT 1
+    `);
+    const existing = existsStmt.get({ id });
+
+    if (!existing) {
+      return {
+        success: false,
+        reason: 'not-found',
+        message: `Category with ID ${id} was not found.`,
+      };
+    }
+
+    const subtreeStateStmt = mainDb.prepare<{ id: number }, { subcategoryCount: number; articleCount: number }>(`
+      WITH RECURSIVE subtree AS (
+        SELECT id
+        FROM categories
+        WHERE id = @id
+        UNION ALL
+        SELECT c.id
+        FROM categories c
+        JOIN subtree s ON c.parent_id = s.id
+      )
+      SELECT
+        SUM(CASE WHEN id != @id THEN 1 ELSE 0 END) AS subcategoryCount,
+        (
+          SELECT COUNT(*)
+          FROM article_categories ac
+          WHERE ac.category_id IN (SELECT id FROM subtree)
+        ) AS articleCount
+      FROM subtree
+    `);
+    const subtreeState = subtreeStateStmt.get({ id });
+    const subcategoryCount = Number(subtreeState?.subcategoryCount ?? 0);
+    const articleCount = Number(subtreeState?.articleCount ?? 0);
+
+    if (subcategoryCount > 0 || articleCount > 0) {
+      return {
+        success: false,
+        blocked: true,
+        reason: 'subtree-not-empty',
+        subcategoryCount,
+        articleCount,
+        message:
+          'Category cannot be deleted because its subtree is not empty. Delete all subcategories and article entries first, then try again.',
+      };
+    }
+
     const stmt = mainDb.prepare<{ id: number }, { changes: number }>(`
       DELETE FROM categories WHERE id = @id
     `);
     const result = stmt.run({ id });
-    return result.changes === 1;
+    return {
+      success: result.changes === 1,
+      message:
+        result.changes === 1
+          ? `Category with ID ${id} was deleted successfully.`
+          : `Category with ID ${id} could not be deleted.`,
+    };
   } catch (err) {
     console.error('Error deleting category by id:', err);
-    return false;
+    return {
+      success: false,
+      reason: 'error',
+      message: 'Error deleting category by id.',
+    };
   }
 }
 
