@@ -112,13 +112,76 @@ async function measureScrapeStep<T>(
   }
 }
 
+type ScrapeBrowserSession = {
+  browser: Puppeteer.Browser;
+  owned: boolean;
+  mode: 'headless' | 'remote-debug';
+};
+
 // 260328 Update: Refactored browser connection into a separate function for reuse and better error handling
-async function connectToBrowser(): Promise<Puppeteer.Browser> {
-  return puppeteer.connect({
+async function connectToBrowser(): Promise<ScrapeBrowserSession> {
+  console.log(`[scraper] browser mode: ${timeConst.SCRAPE_BROWSER_MODE}`);
+  if (timeConst.SCRAPE_BROWSER_MODE === 'headless') {
+    const browser = await puppeteer.launch({
+      headless: true,
+      defaultViewport: null,
+      protocolTimeout: timeConst.PROTOCOL_TIMEOUT,
+      args: [
+        '--no-first-run',
+        '--no-default-browser-check',
+        '--disable-backgrounding-occluded-windows',
+      ],
+    });
+
+    return {
+      browser,
+      owned: true,
+      mode: 'headless',
+    };
+  }
+
+  const browser = await puppeteer.connect({
     browserURL: BROWSER_URLPORT,
     defaultViewport: null,
     protocolTimeout: timeConst.PROTOCOL_TIMEOUT,
   });
+
+  return {
+    browser,
+    owned: false,
+    mode: 'remote-debug',
+  };
+}
+
+// Create tabs in background when possible to avoid stealing OS focus from the user's current app.
+async function createScrapePage(browser: Puppeteer.Browser): Promise<Puppeteer.Page> {
+  try {
+    const browserTarget = browser.target();
+    const session = await browserTarget.createCDPSession();
+    const existingTargets = new Set(browser.targets());
+
+    await session.send(
+      'Target.createTarget' as never,
+      { url: 'about:blank', background: true } as never
+    );
+
+    const target = await browser.waitForTarget(
+      (candidate) => !existingTargets.has(candidate) && candidate.type() === 'page',
+      { timeout: 3000 }
+    );
+
+    await session.detach();
+
+    const page = await target.page();
+    if (page) {
+      return page;
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logScrapeTiming(`createScrapePage fallback to browser.newPage | reason=${msg}`);
+  }
+
+  return browser.newPage();
 }
 
 function classifyIframeSource(src: string): IframeEmbedType | null {
@@ -339,10 +402,12 @@ async function shouldScrapeMarkdownContent(
 // ========================================================================================================
 
 export async function scrapeArticleBasic(url: string): Promise<PostData> {
-  // Connect to an already running Chrome instance with remote debugging enabled
-  const browser = await connectToBrowser();
+  // Connect to the configured scraping browser mode (headless by default)
+  const session = await connectToBrowser();
+  const { browser, owned, mode } = session;
+  logScrapeTiming(`scrapeArticleBasic using browser mode=${mode}`);
 
-  const page = await browser.newPage();
+  const page = await createScrapePage(browser);
 
   try {
     await page.goto(url, { waitUntil: 'networkidle2' });
@@ -364,7 +429,9 @@ export async function scrapeArticleBasic(url: string): Promise<PostData> {
     throw error;
   } finally {
     await page.close();
-    // Do NOT close the browser — we're just connected to it
+    if (owned) {
+      await browser.close();
+    }
   }
 }
 
@@ -387,8 +454,9 @@ export async function collectPostsFromUrlTabs(
 ): Promise<PostData[]> {
   logFunctionHeader('collectPostsFromUrlTabs');
 
-  const browser = await connectToBrowser();
-
+  const session = await connectToBrowser();
+  const { browser, owned, mode } = session;
+  logScrapeTiming(`collectPostsFromUrlTabs using browser mode=${mode}`);
 
   const limit = pLimit(timeConst.MARKDOWN_SCRAPE_CONCURRENCY);
 
@@ -411,7 +479,7 @@ export async function collectPostsFromUrlTabs(
           // await new Promise((res) => setTimeout(res, 500));
           await new Promise((res) => setTimeout(res, timeConst.OPEN_NEW_TAB_DELAY));
 
-          page = await browser.newPage();
+          page = await createScrapePage(browser);
           console.log(`Opening: ${url}`);
           const navResponse = await page.goto(url, {
             waitUntil: 'domcontentloaded',
@@ -509,7 +577,9 @@ export async function collectPostsFromUrlTabs(
 
     return retPosts; // results.filter((r): r is PostData => r !== null);
   } finally {
-    // DO NOT close the browser here — you're connected to an external instance
+    if (owned) {
+      await browser.close();
+    }
   }
 }
 
@@ -1482,7 +1552,7 @@ export async function extractStackacademicContentFromIframe(
   browser: Puppeteer.Browser,
   iframeUrl: string
 ): Promise<{ html: string; text: string; rawMarkdown: string }> {
-  const page = await browser.newPage();
+  const page = await createScrapePage(browser);
 
   try {
     logScrapeTiming(`START extractStackacademicContentFromIframe | iframe=${iframeUrl}`);
@@ -1578,7 +1648,7 @@ export async function extractDatawrapperInfoFromIframe(
   browser: Puppeteer.Browser,
   iframeUrl: string
 ): Promise<{ title: string; description: string; dataPreview: string }> {
-  const page = await browser.newPage();
+  const page = await createScrapePage(browser);
 
   try {
     logScrapeTiming(`START extractDatawrapperInfoFromIframe | iframe=${iframeUrl}`);
@@ -1663,7 +1733,7 @@ export async function extractCodeFromIframe(
   browser: Puppeteer.Browser,
   iframeUrl: string
 ): Promise<{ code: string; gistPermalink?: string } | null> {
-  const page = await browser.newPage();
+  const page = await createScrapePage(browser);
 
   try {
     logScrapeTiming(`START extractCodeFromIframe | iframe=${iframeUrl}`);
@@ -1731,27 +1801,16 @@ export async function scrapeList(url: string): Promise<PostData[]> {
     30000
   );
 
-  // Connect to an already running Chrome instance with remote debugging enabled
-  const browser = await Promise.race([
-    connectToBrowser(),
-    new Promise<never>((_, reject) => {
-      setTimeout(() => {
-        reject(
-          new Error(
-            `Timed out connecting to browser at ${BROWSER_URLPORT} after ${listConnectTimeoutMs}ms`
-          )
-        );
-      }, listConnectTimeoutMs);
-    }),
-  ]);
+  // Connect to the configured scraping browser mode (headless by default)
+  const session = await connectToBrowser();
+  const { browser, owned, mode } = session;
 
-  if (browser)
-    console.log(
-      'scrape-functions ->  scrapeList() - Connected to Browser! ',
-      url
-    );
+  console.log(
+    'scrape-functions ->  scrapeList() - Connected to Browser mode: ',
+    mode
+  );
 
-  const page = await browser.newPage();
+  const page = await createScrapePage(browser);
 
   try {
     console.log(
@@ -1796,7 +1855,9 @@ export async function scrapeList(url: string): Promise<PostData[]> {
     throw error;
   } finally {
     await page.close();
-    // Do NOT close the browser — we're just connected to it
+    if (owned) {
+      await browser.close();
+    }
   }
 }
 

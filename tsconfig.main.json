@@ -21,9 +21,25 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "moduleResolution": "node",              // 👈 ensure Node-style resolution
+    "ignoreDeprecations": "5.0",
     "lib": ["ES2022", "DOM"],                // 👈 preload needs DOM types (Selection, Range, etc.)
     "types": ["node", "electron"]            // 👈 get proper Node/Electron ambient types
   },
   "include": ["electron/**/*", "shared/projectObjects/**/*", "shared/utils/**/*"]
 }
 
+// {
+//   "compilerOptions": {
+//     "target": "ES2022",
+//     "module": "Node16",
+//     "moduleResolution": "node16",
+//     "outDir": "./dist",
+//     "rootDir": ".",
+//     "strict": true,
+//     "esModuleInterop": true,
+//     "skipLibCheck": true,
+//     "lib": ["ES2022", "DOM"],
+//     "types": ["node", "electron"]
+//   },
+//   "include": ["electron/**/*", "shared/projectObjects/**/*", "shared/utils/**/*"]
+// }
