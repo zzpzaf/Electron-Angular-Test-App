@@ -68,7 +68,10 @@ export const timeConst = {
   PROTOCOL_TIMEOUT: 600000,     // 10 min for long-running page.evaluate()/CDP calls
   MARKDOWN_SCRAPE_CONCURRENCY: 3, // Parallel article tabs when scraping full markdown
   ENABLE_SCRAPE_TIMING_LOGS: true, // Emit step durations for long-page monitoring
-  SCRAPE_BROWSER_MODE: 'headless' as 'headless' | 'remote-debug', // headless avoids focus stealing
+
+  // switch manually between 'headless' and 'remote-debug'
+  // SCRAPE_BROWSER_MODE: 'headless' as 'headless' | 'remote-debug', // 'headless'
+  SCRAPE_BROWSER_MODE: 'remote-debug' as 'headless' | 'remote-debug', // 'remote-debug' (attached mode)
 
   // Page/article loading
   MAX_ARTICLES_NUMBER: 250,     

@@ -93,6 +93,88 @@ function logIterationHeader(
   console.log(divider);
 }
 
+function pickMainResponseHeaders(headers: Record<string, string>): Record<string, string> {
+  const interestingHeaderNames = [
+    'server',
+    'via',
+    'location',
+    'content-type',
+    'cache-control',
+    'x-cache',
+    'x-served-by',
+    'cf-ray',
+    'cf-cache-status',
+    'x-frame-options',
+    'retry-after',
+  ];
+
+  const picked = interestingHeaderNames.reduce<Record<string, string>>((acc, name) => {
+    const value = headers[name];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      acc[name] = value;
+    }
+    return acc;
+  }, {});
+
+  return picked;
+}
+
+async function logHttp403Diagnostics(
+  page: Puppeteer.Page,
+  requestedUrl: string,
+  navResponse?: Puppeteer.HTTPResponse | null
+): Promise<void> {
+  const finalUrl = navResponse?.url() || page.url();
+  const status = navResponse?.status();
+  const mainHeaders = pickMainResponseHeaders(navResponse?.headers() || {});
+
+  const pageSignals = await page.evaluate(() => {
+    const title = (document.title || '').replace(/\s+/g, ' ').trim();
+    const bodyText = (document.body?.innerText || '').replace(/\s+/g, ' ').trim();
+    const bodySnippet = bodyText.slice(0, 500);
+    const lowerTitle = title.toLowerCase();
+    const lowerBody = bodyText.toLowerCase();
+
+    const challengeMarkers = {
+      hasJustAMomentTitle: lowerTitle.includes('just a moment'),
+      hasEnableJsCookiesPrompt: lowerBody.includes('enable javascript and cookies to continue'),
+      hasVerifyHumanPrompt: lowerBody.includes('verify you are human'),
+      hasCloudflareMention: lowerBody.includes('cloudflare'),
+      hasCloudflareChallengeScript: !!document.querySelector(
+        'script[src*="/cdn-cgi/challenge-platform/"]'
+      ),
+      hasCaptchaInput: !!document.querySelector(
+        'input[name*="captcha" i], iframe[src*="captcha" i], div[class*="captcha" i]'
+      ),
+    };
+
+    return {
+      title,
+      bodySnippet,
+      challengeMarkers,
+    };
+  });
+
+  console.warn('------------------------------------------------------------------------------------------');
+  console.warn('[scrape-403-diagnostics] HTTP 403 detected');
+  console.warn(`[scrape-403-diagnostics] Requested URL: ${requestedUrl}`);
+  console.warn(`[scrape-403-diagnostics] Final redirected URL: ${finalUrl}`);
+  console.warn(`[scrape-403-diagnostics] Main response status: ${status ?? 'unknown'}`);
+  console.warn(
+    `[scrape-403-diagnostics] Main response headers: ${JSON.stringify(mainHeaders, null, 2)}`
+  );
+  console.warn(`[scrape-403-diagnostics] Title: ${pageSignals.title}`);
+  console.warn(`[scrape-403-diagnostics] Body snippet: ${pageSignals.bodySnippet}`);
+  console.warn(
+    `[scrape-403-diagnostics] Challenge markers: ${JSON.stringify(
+      pageSignals.challengeMarkers,
+      null,
+      2
+    )}`
+  );
+  console.warn('------------------------------------------------------------------------------------------');
+}
+
 // 260328 Update: Wrapper function to measure and log the duration of async steps in scraping functions
 async function measureScrapeStep<T>(
   label: string,
@@ -155,6 +237,11 @@ async function connectToBrowser(): Promise<ScrapeBrowserSession> {
 
 // Create tabs in background when possible to avoid stealing OS focus from the user's current app.
 async function createScrapePage(browser: Puppeteer.Browser): Promise<Puppeteer.Page> {
+  if (timeConst.SCRAPE_BROWSER_MODE === 'remote-debug') {
+    // In attached mode, creating background targets concurrently can race and return unstable pages.
+    return browser.newPage();
+  }
+
   try {
     const browserTarget = browser.target();
     const session = await browserTarget.createCDPSession();
@@ -410,7 +497,10 @@ export async function scrapeArticleBasic(url: string): Promise<PostData> {
   const page = await createScrapePage(browser);
 
   try {
-    await page.goto(url, { waitUntil: 'networkidle2' });
+    const navResponse = await page.goto(url, { waitUntil: 'networkidle2' });
+    if (navResponse?.status() === 403) {
+      await logHttp403Diagnostics(page, url, navResponse);
+    }
 
     const postData = await scrapeMediumArticle(page);
     postData.date = formatDate(postData.date);
@@ -458,7 +548,9 @@ export async function collectPostsFromUrlTabs(
   const { browser, owned, mode } = session;
   logScrapeTiming(`collectPostsFromUrlTabs using browser mode=${mode}`);
 
-  const limit = pLimit(timeConst.MARKDOWN_SCRAPE_CONCURRENCY);
+  const concurrency = mode === 'remote-debug' ? 1 : timeConst.MARKDOWN_SCRAPE_CONCURRENCY;
+  const limit = pLimit(concurrency);
+  logScrapeTiming(`collectPostsFromUrlTabs using concurrency=${concurrency}`);
 
   try {
     let p = 0;
@@ -486,6 +578,10 @@ export async function collectPostsFromUrlTabs(
             timeout: timeConst.TAB_INITIAL_PAGE_LOADING_DELAY, //15000,   /****** */
           });
           const navStatus = navResponse?.status();
+          // 260405 Update: Added diagnostics for 403 responses on individual tabs
+          if (navStatus === 403) {
+            await logHttp403Diagnostics(page, url, navResponse);
+          }
 
           const currentPage = page;
 
@@ -587,11 +683,11 @@ export async function collectPostsFromUrlTabs(
 // Key Function to scrape the basic (meta-) data of an Article, from an Article's page
 // ==========================================================================================
 async function scrapeMediumArticle(page: Puppeteer.Page): Promise<PostData> {
-  
-  
-  await page.setUserAgent(
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
-  );
+  if (timeConst.SCRAPE_BROWSER_MODE === 'headless') {
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
+    );
+  }
   
   // await new Promise((resolve) => setTimeout(resolve, 1000));
   await new Promise((resolve) => setTimeout(resolve, timeConst.ADDITIONAL_PAGE_DELAY)); // 1000 ms delay for additional page loading
