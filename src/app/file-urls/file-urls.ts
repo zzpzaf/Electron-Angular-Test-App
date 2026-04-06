@@ -180,8 +180,13 @@ export class FileUrls {
   onImportedUrlsPaste(event: ClipboardEvent): void {
     event.preventDefault();
     const pastedText = event.clipboardData?.getData('text/plain') ?? '';
+    const cleanedPastedText = this.sanitizePastedUrlsText(pastedText);
+    if (!cleanedPastedText) {
+      return;
+    }
+
     const textarea = event.target as HTMLTextAreaElement | null;
-    const mergedText = this.mergeTextAtCursor(textarea, pastedText);
+    const mergedText = this.mergeTextAtCursor(textarea, cleanedPastedText);
 
     this.onImportedUrlsTextChanged(mergedText);
     void this.refreshPrecheckSummaryForTextarea();
@@ -309,6 +314,29 @@ export class FileUrls {
     return Array.from(
       new Set(urls.map((url) => (url ?? '').trim()).filter((url) => url.length > 0))
     );
+  }
+
+  // 260406 - New URL sanitization to remove query parameters and trim whitespace, applied on paste and drop to improve DB matching and precheck accuracy
+  private sanitizePastedUrlsText(rawText: string): string {
+    const cleanedUrls = this.extractUniqueUrls(rawText)
+      .map((url) => this.removeUrlQuery(url))
+      .filter((url) => url.length > 0);
+
+    const uniqueCleanedUrls = Array.from(new Set(cleanedUrls));
+
+    return uniqueCleanedUrls.join('\n');
+  }
+
+  private removeUrlQuery(url: string): string {
+    const trimmedUrl = (url ?? '').trim();
+    if (!trimmedUrl) {
+      return '';
+    }
+
+    const queryStartIndex = trimmedUrl.indexOf('?');
+    return queryStartIndex >= 0
+      ? trimmedUrl.slice(0, queryStartIndex)
+      : trimmedUrl;
   }
 
   private extractTextFromDataTransfer(dataTransfer: DataTransfer | null): string {
