@@ -548,16 +548,26 @@ export async function collectPostsFromUrlTabs(
   const { browser, owned, mode } = session;
   logScrapeTiming(`collectPostsFromUrlTabs using browser mode=${mode}`);
 
+  const useSharedRemoteDebugPage =
+    mode === 'remote-debug' && timeConst.REMOTE_DEBUG_REUSE_SINGLE_PAGE;
+  let sharedRemoteDebugPage: Puppeteer.Page | undefined;
+
   const concurrency = mode === 'remote-debug' ? 1 : timeConst.MARKDOWN_SCRAPE_CONCURRENCY;
   const limit = pLimit(concurrency);
   logScrapeTiming(`collectPostsFromUrlTabs using concurrency=${concurrency}`);
 
   try {
+    if (useSharedRemoteDebugPage) {
+      sharedRemoteDebugPage = await createScrapePage(browser);
+      logScrapeTiming('collectPostsFromUrlTabs reusing single worker page in remote-debug mode');
+    }
+
     let p = 0;
     const pagePromises = urls.map((url, index) =>
       limit(() =>
         _scrapeContextStorage.run({ article: `${index + 1}/${urls.length}` }, async () => {
           let page: Puppeteer.Page | undefined;
+          let shouldClosePage = true;
 
           try {
             logScrapeLinkStart(
@@ -569,9 +579,17 @@ export async function collectPostsFromUrlTabs(
 
           // Optional delay to avoid rapid tab creation
           // await new Promise((res) => setTimeout(res, 500));
-          await new Promise((res) => setTimeout(res, timeConst.OPEN_NEW_TAB_DELAY));
+          if (!useSharedRemoteDebugPage) {
+            await new Promise((res) => setTimeout(res, timeConst.OPEN_NEW_TAB_DELAY));
+          }
 
-          page = await createScrapePage(browser);
+          if (useSharedRemoteDebugPage && sharedRemoteDebugPage) {
+            page = sharedRemoteDebugPage;
+            shouldClosePage = false;
+          } else {
+            page = await createScrapePage(browser);
+          }
+
           console.log(`Opening: ${url}`);
           const navResponse = await page.goto(url, {
             waitUntil: 'domcontentloaded',
@@ -628,7 +646,7 @@ export async function collectPostsFromUrlTabs(
           }
           return null;
         } finally {
-          if (page && !page.isClosed()) {
+          if (shouldClosePage && page && !page.isClosed()) {
             try {
               await page.close();
             } catch (closeErr) {
@@ -673,6 +691,23 @@ export async function collectPostsFromUrlTabs(
 
     return retPosts; // results.filter((r): r is PostData => r !== null);
   } finally {
+    if (
+      useSharedRemoteDebugPage &&
+      sharedRemoteDebugPage &&
+      !timeConst.REMOTE_DEBUG_KEEP_WORKER_PAGE_OPEN &&
+      !sharedRemoteDebugPage.isClosed()
+    ) {
+      try {
+        await sharedRemoteDebugPage.close();
+      } catch (closeErr) {
+        if (closeErr instanceof Error) {
+          console.warn('Error closing shared remote-debug worker page:', closeErr.message);
+        } else {
+          console.warn('Error closing shared remote-debug worker page:', closeErr);
+        }
+      }
+    }
+
     if (owned) {
       await browser.close();
     }

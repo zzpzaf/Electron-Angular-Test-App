@@ -91,6 +91,8 @@ export const timeConst = {
   // Tab handling
   OPEN_NEW_TAB_DELAY: 500,               // Delay before opening a new tab
   TAB_INITIAL_PAGE_LOADING_DELAY: 15000, // 15 sec for tab initial load
+  REMOTE_DEBUG_REUSE_SINGLE_PAGE: true,  // 260406 - Reuse one worker tab in remote-debug to reduce focus stealing
+  REMOTE_DEBUG_KEEP_WORKER_PAGE_OPEN: true, // 260406 - Keep reused worker tab open after batch
 
   // Auto-scroll
   SCROLL_DELAY: 1500,                    // Delay between scrolls in scrapeList()
