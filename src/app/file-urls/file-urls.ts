@@ -20,7 +20,7 @@ import {
   MultiScrapePersistSummary,
 } from '../shared/services/articlesmultiscraper';
 import { ContentScrapePolicy } from '../shared/services/content-scrape-policy';
-import { PostData } from '../../../shared/projectObjects/varObjects';
+import { Category, PostData } from '../../../shared/projectObjects/varObjects';
 import {
   NzTreeSelectComponent,
   NzTreeSelectModule,
@@ -28,7 +28,8 @@ import {
 import { NzTreeNodeOptions } from 'ng-zorro-antd/tree';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import { CategoryNodes } from '../shared/services/category-nodes';
-import { Subscription } from 'rxjs';
+import { BackEnd } from '../shared/services/back-end';
+import { firstValueFrom, Subscription } from 'rxjs';
 
 @Component({
   selector: 'file-urls',
@@ -76,6 +77,7 @@ export class FileUrls {
   private contentScrapePolicy = inject(ContentScrapePolicy);
   private fb = inject(NonNullableFormBuilder);
   private categoryNodesService = inject(CategoryNodes);
+  private backendService = inject(BackEnd);
 
   // private fileDropService = inject(FikeDrop);
   // filePath = this.fileDropService.$filePath;
@@ -196,15 +198,15 @@ export class FileUrls {
     this.precheckSummary.set(null);
   }
 
-  onImportedUrlsPaste(event: ClipboardEvent): void {
+  async onImportedUrlsPaste(event: ClipboardEvent): Promise<void> {
     event.preventDefault();
     const rawPastedText = event.clipboardData?.getData('text/plain') ?? '';
 
     // Remove blank lines from the beginning
     const textWithoutBlanks = removeBlankLines(rawPastedText);
 
-    // Attempt to parse as multi-grouped-links
-    this.parseAndTrackMultiGroupedLinks(textWithoutBlanks);
+    // Attempt to parse as multi-grouped-links and optionally create missing child categories
+    await this.parseAndTrackMultiGroupedLinks(textWithoutBlanks);
 
     // Sanitize for insertion
     const cleanedPastedText = this.sanitizePastedUrlsText(textWithoutBlanks);
@@ -695,7 +697,7 @@ export class FileUrls {
    * LinkGroup array for use during scraping.
    * No-op when no mother category is selected.
    */
-  private parseAndTrackMultiGroupedLinks(rawText: string): void {
+  private async parseAndTrackMultiGroupedLinks(rawText: string): Promise<void> {
     if (this.selectedCategoryIds.length === 0) {
       this.linkGroups = [];
       this.multiGroupedParseResult = null;
@@ -705,7 +707,17 @@ export class FileUrls {
     const motherCategoryId = this.selectedCategoryIds[0];
     const childCategories = this.getChildCategoriesMap(motherCategoryId);
 
-    const parseResult = parseMultiGroupedLinks(rawText, motherCategoryId, childCategories);
+    let parseResult = parseMultiGroupedLinks(rawText, motherCategoryId, childCategories);
+
+    if (parseResult.isMultiGrouped) {
+      parseResult = await this.tryCreateMissingChildCategoriesAndReparse(
+        rawText,
+        motherCategoryId,
+        childCategories,
+        parseResult
+      );
+    }
+
     this.multiGroupedParseResult = parseResult;
     this.linkGroups = parseResult.groups;
 
@@ -716,6 +728,92 @@ export class FileUrls {
         .join(', ');
       console.log('>===>> Multi-grouped-links detected. Groups:', matched);
     }
+  }
+
+  private async tryCreateMissingChildCategoriesAndReparse(
+    rawText: string,
+    motherCategoryId: number,
+    childCategories: Map<number, string>,
+    parseResult: MultiGroupedLinksParseResult
+  ): Promise<MultiGroupedLinksParseResult> {
+    const unmatchedLabels = this.getUnmatchedGroupLabels(parseResult.groups, motherCategoryId);
+    if (unmatchedLabels.length === 0) {
+      return parseResult;
+    }
+
+    const confirmContent =
+      `Unmatched grouping labels found:\n` +
+      unmatchedLabels.map((label) => `- ${label}`).join('\n') +
+      `\n\nDo you want to add new child categories found from the text-labels?`;
+
+    const confirmed = await firstValueFrom(
+      this.dlgService.popup({
+        token: 'conf',
+        header: 'Create Missing Child Categories?',
+        content: confirmContent,
+        posAnsMsg: 'Yes',
+        negAnsMsg: 'No',
+      })
+    );
+
+    if (!confirmed) {
+      return parseResult;
+    }
+
+    const createdCategories = await this.createChildCategoriesFromLabels(
+      motherCategoryId,
+      unmatchedLabels
+    );
+
+    const latestDirectChildren = await this.backendService.getCategoriesByParentId(
+      motherCategoryId
+    );
+    for (const child of latestDirectChildren) {
+      if (typeof child.id === 'number' && (child.name ?? '').trim().length > 0) {
+        childCategories.set(child.id, child.name);
+      }
+    }
+
+    this.categoryNodesService.setCategoryTreeNodesSignal();
+
+    if (createdCategories.length > 0) {
+      console.log('>===>> Multi-grouped-links: created child categories:', createdCategories);
+    }
+
+    return parseMultiGroupedLinks(rawText, motherCategoryId, childCategories);
+  }
+
+  private getUnmatchedGroupLabels(groups: LinkGroup[], motherCategoryId: number): string[] {
+    const labels = groups
+      .filter((group) => group.header !== 'orphan' && group.categoryId === motherCategoryId)
+      .map((group) => (group.header ?? '').trim())
+      .filter((label) => label.length > 0);
+
+    return Array.from(new Set(labels));
+  }
+
+  private async createChildCategoriesFromLabels(
+    motherCategoryId: number,
+    labels: string[]
+  ): Promise<Category[]> {
+    const created: Category[] = [];
+
+    for (const label of labels) {
+      try {
+        const category = (await this.backendService.addNewCategory(
+          label,
+          motherCategoryId
+        )) as Category | null;
+
+        if (category && typeof category.id === 'number') {
+          created.push(category);
+        }
+      } catch (error) {
+        console.warn('>===>> Failed to create child category from label:', label, error);
+      }
+    }
+
+    return created;
   }
 
   /**
