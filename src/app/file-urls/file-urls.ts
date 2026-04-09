@@ -6,11 +6,18 @@ import { NzFormModule } from 'ng-zorro-antd/form';
 import { NzInputModule } from 'ng-zorro-antd/input';
 import { StyleDrct } from '../shared/style-drct';
 import { extractAllNonImageUrls } from '../../../shared/utils/shared-utils';
+import {
+  parseMultiGroupedLinks,
+  MultiGroupedLinksParseResult,
+  removeBlankLines,
+  LinkGroup,
+} from '../shared/utils/multi-grouped-links-parser';
 import { DlgService } from '../shared/services/dlg-service';
 import { Articlebasicscraper } from '../shared/services/articlebasicscraper';
 import {
   Articlesmultiscraper,
   MultiScrapePrecheckSummary,
+  MultiScrapePersistSummary,
 } from '../shared/services/articlesmultiscraper';
 import { ContentScrapePolicy } from '../shared/services/content-scrape-policy';
 import { PostData } from '../../../shared/projectObjects/varObjects';
@@ -58,6 +65,11 @@ export class FileUrls {
     // fontSize: '20px',
     // padding: '10px'
   };
+
+  // Multi-grouped-links tracking: parsed groups with their category assignments
+  private linkGroups: LinkGroup[] = [];
+  private multiGroupedParseResult: MultiGroupedLinksParseResult | null = null;
+
   private dlgService = inject(DlgService);
   private scrapper = inject(Articlebasicscraper);
   private articlesmultiscraper = inject(Articlesmultiscraper);
@@ -107,52 +119,59 @@ export class FileUrls {
 
   async onScrape(): Promise<void> {
     let loading = true;
-    let result = null;
+    let result: PostData[] = [];
     let error = null;
-    // let scrapedData: PostData;
 
     const urls = this.urlsArray();
     if (!urls.length) return;
 
     try {
-      const scrapeOptions = this.contentScrapePolicy.buildScrapeTabsOptions(urls);
-      const response = await this.scrapper.scrapeTabsList(urls, scrapeOptions);
-      if (response.success) {
+      const hasGroupedLinks =
+        this.multiGroupedParseResult?.isMultiGrouped === true &&
+        this.linkGroups.length > 0;
+
+      let persistSummary: MultiScrapePersistSummary;
+
+      if (hasGroupedLinks) {
+        const groupedOutcome = await this.scrapeAndPersistPerGroup();
+        result = groupedOutcome.scrapedPosts;
+        persistSummary = groupedOutcome.summary;
+      } else {
+        const scrapeOptions = this.contentScrapePolicy.buildScrapeTabsOptions(urls);
+        const response = await this.scrapper.scrapeTabsList(urls, scrapeOptions);
+        if (!response.success) {
+          error = response.error;
+          return;
+        }
+
         const scrapedPosts = (response.data as PostData[]) || [];
         result = scrapedPosts.filter((post) => !post.excludeFromPersistence);
         this.scrappedDataArray.set(result);
-
-        if (this.scrappedDataArray().length > 0) {
-          this.scrappedDataArrayString.set(
-            JSON.stringify(this.scrappedDataArray(), null, 2)
-          );
-        }
-
-        const persistSummary = await this.articlesmultiscraper.persistScrapedArticlesWithDedup(
-          this.scrappedDataArray(),
-          this.selectedCategoryIds
-        );
-
-        this.dlgService
-          .popup({
-            token: 'info',
-            header: 'File URL Scraping Completed',
-            content:
-              `Inserted new articles: ${persistSummary.insertedCount}\n` +
-              `Updated existing articles: ${persistSummary.updatedCount}\n` +
-              `Skipped unchanged/newer DB articles: ${persistSummary.skippedCount}`,
-            posAnsMsg: 'OK',
-            negAnsMsg: '',
-          })
-          .subscribe((dlgResult) => {
-            console.log('Dialog closed with:', dlgResult);
-          });
-
-      } else {
-        error = response.error;
+        persistSummary = await this.persistScrapedArticlesByCategory();
       }
 
+      if (this.scrappedDataArray().length > 0) {
+        this.scrappedDataArrayString.set(
+          JSON.stringify(this.scrappedDataArray(), null, 2)
+        );
+      } else {
+        this.scrappedDataArrayString.set('');
+      }
 
+      this.dlgService
+        .popup({
+          token: 'info',
+          header: 'File URL Scraping Completed',
+          content:
+            `Inserted new articles: ${persistSummary.insertedCount}\n` +
+            `Updated existing articles: ${persistSummary.updatedCount}\n` +
+            `Skipped unchanged/newer DB articles: ${persistSummary.skippedCount}`,
+          posAnsMsg: 'OK',
+          negAnsMsg: '',
+        })
+        .subscribe((dlgResult) => {
+          console.log('Dialog closed with:', dlgResult);
+        });
     } catch (err) {
       error = err;
     } finally {
@@ -179,8 +198,16 @@ export class FileUrls {
 
   onImportedUrlsPaste(event: ClipboardEvent): void {
     event.preventDefault();
-    const pastedText = event.clipboardData?.getData('text/plain') ?? '';
-    const cleanedPastedText = this.sanitizePastedUrlsText(pastedText);
+    const rawPastedText = event.clipboardData?.getData('text/plain') ?? '';
+
+    // Remove blank lines from the beginning
+    const textWithoutBlanks = removeBlankLines(rawPastedText);
+
+    // Attempt to parse as multi-grouped-links
+    this.parseAndTrackMultiGroupedLinks(textWithoutBlanks);
+
+    // Sanitize for insertion
+    const cleanedPastedText = this.sanitizePastedUrlsText(textWithoutBlanks);
     if (!cleanedPastedText) {
       return;
     }
@@ -307,6 +334,9 @@ export class FileUrls {
     this.selectedCategoryIds = [];
     this.categorySelectForm.reset({ selectCategory: [] });
     this.$categorySearchText.set('');
+    // Clear multi-grouped-links tracking
+    this.linkGroups = [];
+    this.multiGroupedParseResult = null;
   }
 
   private extractUniqueUrls(rawText: string): string[] {
@@ -501,21 +531,28 @@ export class FileUrls {
   }
 
   private setExpandedNodesForSearch(nodes: NzTreeNodeOptions[], searchTerm: string): NzTreeNodeOptions[] {
-    return nodes.map(node => {
+    return nodes.map((node) => {
       const nodeMatches = node.title?.toString().toLowerCase().includes(searchTerm);
-      const hasMatchingChildren = node.children ? this.hasMatchingDescendants(node.children, searchTerm) : false;
+      const hasMatchingChildren = node.children
+        ? this.hasMatchingDescendants(node.children, searchTerm)
+        : false;
+
       return {
         ...node,
         expanded: nodeMatches || hasMatchingChildren,
-        children: node.children ? this.setExpandedNodesForSearch(node.children, searchTerm) : undefined,
+        children: node.children
+          ? this.setExpandedNodesForSearch(node.children, searchTerm)
+          : undefined,
       };
     });
   }
 
   private hasMatchingDescendants(nodes: NzTreeNodeOptions[], searchTerm: string): boolean {
-    return nodes.some(node => {
+    return nodes.some((node) => {
       const nodeMatches = node.title?.toString().toLowerCase().includes(searchTerm);
-      const childrenMatch = node.children ? this.hasMatchingDescendants(node.children, searchTerm) : false;
+      const childrenMatch = node.children
+        ? this.hasMatchingDescendants(node.children, searchTerm)
+        : false;
       return nodeMatches || childrenMatch;
     });
   }
@@ -651,6 +688,203 @@ export class FileUrls {
     });
   }
 
+  // ============ Multi-Grouped-Links Parsing & Tracking ============
+
+  /**
+   * Parses raw pasted text (already blank-line-stripped) and stores the resulting
+   * LinkGroup array for use during scraping.
+   * No-op when no mother category is selected.
+   */
+  private parseAndTrackMultiGroupedLinks(rawText: string): void {
+    if (this.selectedCategoryIds.length === 0) {
+      this.linkGroups = [];
+      this.multiGroupedParseResult = null;
+      return;
+    }
+
+    const motherCategoryId = this.selectedCategoryIds[0];
+    const childCategories = this.getChildCategoriesMap(motherCategoryId);
+
+    const parseResult = parseMultiGroupedLinks(rawText, motherCategoryId, childCategories);
+    this.multiGroupedParseResult = parseResult;
+    this.linkGroups = parseResult.groups;
+
+    if (parseResult.isMultiGrouped) {
+      const matched = parseResult.groups
+        .filter((g) => g.header !== 'orphan')
+        .map((g) => `"${g.header}" → categoryId ${g.categoryId} (links: ${g.urls.length})`)
+        .join(', ');
+      console.log('>===>> Multi-grouped-links detected. Groups:', matched);
+    }
+  }
+
+  /**
+   * Retrieves child categories of a given parent category from the category tree.
+   * Returns a Map of categoryId → categoryName for all direct and indirect children.
+   */
+  private getChildCategoriesMap(parentCategoryId: number): Map<number, string> {
+    const childMap = new Map<number, string>();
+
+    const collectChildren = (nodes: NzTreeNodeOptions[], parentKey: string) => {
+      for (const node of nodes) {
+        if (node.key === parentKey && node.children) {
+          const collectAllDescendants = (ancestorNodes: NzTreeNodeOptions[]) => {
+            for (const child of ancestorNodes) {
+              const childId = parseInt(child.key as string, 10);
+              if (!isNaN(childId)) {
+                childMap.set(childId, (child.title as string) ?? '');
+              }
+              if (child.children) {
+                collectAllDescendants(child.children);
+              }
+            }
+          };
+          collectAllDescendants(node.children);
+        } else if (node.children) {
+          collectChildren(node.children, parentKey);
+        }
+      }
+    };
+
+    const treeNodes = this.$categoryNodes();
+    collectChildren(treeNodes, String(parentCategoryId));
+
+    return childMap;
+  }
+
+  /**
+   * Persists scraped articles for the plain-URL flow.
+   *
+   * Grouped mode is handled separately by scrapeAndPersistPerGroup(), so this
+   * method is only used when there is no multi-grouped parse result.
+   */
+  private async persistScrapedArticlesByCategory(): Promise<MultiScrapePersistSummary> {
+    const dataArray = this.scrappedDataArray().filter((item) => !item.excludeFromPersistence);
+    if (dataArray.length === 0) {
+      return { totalScraped: 0, insertedCount: 0, updatedCount: 0, skippedCount: 0 };
+    }
+
+    const result = await this.articlesmultiscraper.persistScrapedArticlesWithDedup(
+      dataArray,
+      this.selectedCategoryIds
+    );
+
+    return {
+      totalScraped: dataArray.length,
+      insertedCount: result.insertedCount,
+      updatedCount: result.updatedCount,
+      skippedCount: result.skippedCount,
+    };
+  }
+
+  /**
+   * Grouped-mode flow: scrape each parsed group separately and persist with that
+   * group's category id. This avoids cross-group matching issues caused by
+   * all-links-in-one scrape/persist processing.
+   */
+  private async scrapeAndPersistPerGroup(): Promise<{
+    scrapedPosts: PostData[];
+    summary: MultiScrapePersistSummary;
+  }> {
+    const allScrapedPersistable: PostData[] = [];
+    let totalInserted = 0;
+    let totalUpdated = 0;
+    let totalSkipped = 0;
+
+    for (const group of this.linkGroups) {
+      const groupUrls = Array.from(
+        new Set(
+          group.urls
+            .map((url) => this.removeUrlQuery((url ?? '').trim()))
+            .filter((url) => url.length > 0)
+        )
+      );
+
+      if (groupUrls.length === 0) {
+        continue;
+      }
+
+      console.log('>===>> Group scrape starting:', {
+        header: group.header,
+        categoryId: group.categoryId,
+        urlCount: groupUrls.length,
+      });
+
+      const scrapeOptions = this.contentScrapePolicy.buildScrapeTabsOptions(groupUrls);
+      const response = await this.scrapper.scrapeTabsList(groupUrls, scrapeOptions);
+      if (!response.success) {
+        console.warn(
+          '>===>> Group scrape failed for header:',
+          group.header,
+          'error:',
+          response.error
+        );
+        continue;
+      }
+
+      const scrapedPosts = (response.data as PostData[]) || [];
+      const persistablePosts = scrapedPosts.filter((post) => !post.excludeFromPersistence);
+
+      console.log('>===>> Group scrape completed:', {
+        header: group.header,
+        categoryId: group.categoryId,
+        urlCount: groupUrls.length,
+        scrapedCount: persistablePosts.length,
+      });
+
+      if (persistablePosts.length === 0) {
+        console.log('>===>> Group persist skipped:', {
+          header: group.header,
+          categoryId: group.categoryId,
+          insertedCount: 0,
+          updatedCount: 0,
+          skippedCount: 0,
+        });
+        continue;
+      }
+
+      allScrapedPersistable.push(...persistablePosts);
+
+      const result = await this.articlesmultiscraper.persistScrapedArticlesWithDedup(
+        persistablePosts,
+        [group.categoryId]
+      );
+
+      console.log('>===>> Group persist completed:', {
+        header: group.header,
+        categoryId: group.categoryId,
+        urlCount: groupUrls.length,
+        scrapedCount: persistablePosts.length,
+        insertedCount: result.insertedCount,
+        updatedCount: result.updatedCount,
+        skippedCount: result.skippedCount,
+      });
+
+      totalInserted += result.insertedCount;
+      totalUpdated += result.updatedCount;
+      totalSkipped += result.skippedCount;
+    }
+
+    this.scrappedDataArray.set(allScrapedPersistable);
+
+    console.log('>===>> Grouped scrape summary:', {
+      groupCount: this.linkGroups.length,
+      scrapedCount: allScrapedPersistable.length,
+      insertedCount: totalInserted,
+      updatedCount: totalUpdated,
+      skippedCount: totalSkipped,
+    });
+
+    return {
+      scrapedPosts: allScrapedPersistable,
+      summary: {
+        totalScraped: allScrapedPersistable.length,
+        insertedCount: totalInserted,
+        updatedCount: totalUpdated,
+        skippedCount: totalSkipped,
+      },
+    };
+  }
 
 
 

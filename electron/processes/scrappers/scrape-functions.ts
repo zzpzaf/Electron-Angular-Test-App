@@ -200,6 +200,35 @@ type ScrapeBrowserSession = {
   mode: 'headless' | 'remote-debug';
 };
 
+// Cached worker page reused across collectPostsFromUrlTabs invocations in remote-debug mode.
+// This prevents creating a brand-new browser tab for every grouped scrape batch.
+let cachedRemoteDebugWorkerPage: Puppeteer.Page | undefined;
+
+async function getOrCreateRemoteDebugWorkerPage(
+  browser: Puppeteer.Browser
+): Promise<{ page: Puppeteer.Page; reused: boolean }> {
+  if (cachedRemoteDebugWorkerPage && !cachedRemoteDebugWorkerPage.isClosed()) {
+    return { page: cachedRemoteDebugWorkerPage, reused: true };
+  }
+
+  const page = await createScrapePage(browser);
+  cachedRemoteDebugWorkerPage = page;
+  return { page, reused: false };
+}
+
+async function closeCachedRemoteDebugWorkerPageIfAny(): Promise<void> {
+  if (!cachedRemoteDebugWorkerPage || cachedRemoteDebugWorkerPage.isClosed()) {
+    cachedRemoteDebugWorkerPage = undefined;
+    return;
+  }
+
+  try {
+    await cachedRemoteDebugWorkerPage.close();
+  } finally {
+    cachedRemoteDebugWorkerPage = undefined;
+  }
+}
+
 // 260328 Update: Refactored browser connection into a separate function for reuse and better error handling
 async function connectToBrowser(): Promise<ScrapeBrowserSession> {
   console.log(`[scraper] browser mode: ${timeConst.SCRAPE_BROWSER_MODE}`);
@@ -558,8 +587,11 @@ export async function collectPostsFromUrlTabs(
 
   try {
     if (useSharedRemoteDebugPage) {
-      sharedRemoteDebugPage = await createScrapePage(browser);
-      logScrapeTiming('collectPostsFromUrlTabs reusing single worker page in remote-debug mode');
+      const worker = await getOrCreateRemoteDebugWorkerPage(browser);
+      sharedRemoteDebugPage = worker.page;
+      logScrapeTiming(
+        `collectPostsFromUrlTabs using ${worker.reused ? 'existing' : 'new'} shared worker page in remote-debug mode`
+      );
     }
 
     let p = 0;
@@ -698,7 +730,7 @@ export async function collectPostsFromUrlTabs(
       !sharedRemoteDebugPage.isClosed()
     ) {
       try {
-        await sharedRemoteDebugPage.close();
+        await closeCachedRemoteDebugWorkerPageIfAny();
       } catch (closeErr) {
         if (closeErr instanceof Error) {
           console.warn('Error closing shared remote-debug worker page:', closeErr.message);
