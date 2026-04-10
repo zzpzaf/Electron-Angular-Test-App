@@ -165,6 +165,15 @@
   </form>
 
   <div class="scrape-button-row">
+    <label
+      nz-checkbox
+      [(ngModel)]="overwriteExisting"
+      [ngModelOptions]="{ standalone: true }"
+      class="overwrite-existing-checkbox"
+    >
+      Overwrite Existing
+    </label>
+
     <button
       nz-button
       nzType="primary"

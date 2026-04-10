@@ -5,7 +5,10 @@ import { NzCheckboxModule } from 'ng-zorro-antd/checkbox';
 import { NzFormModule } from 'ng-zorro-antd/form';
 import { NzInputModule } from 'ng-zorro-antd/input';
 import { StyleDrct } from '../shared/style-drct';
-import { extractAllNonImageUrls } from '../../../shared/utils/shared-utils';
+import {
+  extractAllNonImageUrls,
+  getMediumSlugFromUrl,
+} from '../../../shared/utils/shared-utils';
 import {
   parseMultiGroupedLinks,
   MultiGroupedLinksParseResult,
@@ -51,6 +54,7 @@ export class FileUrls {
   public importedUrlsArrayString = signal<string>('');
   public precheckSummary = signal<MultiScrapePrecheckSummary | null>(null);
   public isImportedUrlsDropActive = signal<boolean>(false);
+  public overwriteExisting = false;
 
   public urlsArray = signal<string[]>([]);
   public urlsArrayString = signal<string>('');
@@ -128,19 +132,45 @@ export class FileUrls {
     if (!urls.length) return;
 
     try {
+      const existingSlugSet = await this.getExistingSlugSet();
       const hasGroupedLinks =
         this.multiGroupedParseResult?.isMultiGrouped === true &&
         this.linkGroups.length > 0;
 
       let persistSummary: MultiScrapePersistSummary;
+      let existingSlugMatches = 0;
 
       if (hasGroupedLinks) {
-        const groupedOutcome = await this.scrapeAndPersistPerGroup();
+        const groupedOutcome = await this.scrapeAndPersistPerGroup(existingSlugSet);
         result = groupedOutcome.scrapedPosts;
         persistSummary = groupedOutcome.summary;
+        existingSlugMatches = groupedOutcome.existingSlugMatches;
       } else {
-        const scrapeOptions = this.contentScrapePolicy.buildScrapeTabsOptions(urls);
-        const response = await this.scrapper.scrapeTabsList(urls, scrapeOptions);
+        const plainUrlsPreparation = this.prepareUrlsForScrape(urls, existingSlugSet);
+        existingSlugMatches = plainUrlsPreparation.existingSlugMatches;
+
+        if (plainUrlsPreparation.urlsToScrape.length === 0) {
+          this.scrappedDataArray.set([]);
+          this.scrappedDataArrayString.set('');
+          this.showScrapeCompletedDialog(
+            {
+              totalScraped: 0,
+              insertedCount: 0,
+              updatedCount: 0,
+              skippedCount: 0,
+            },
+            existingSlugMatches
+          );
+          return;
+        }
+
+        const scrapeOptions = this.contentScrapePolicy.buildScrapeTabsOptions(
+          plainUrlsPreparation.urlsToScrape
+        );
+        const response = await this.scrapper.scrapeTabsList(
+          plainUrlsPreparation.urlsToScrape,
+          scrapeOptions
+        );
         if (!response.success) {
           error = response.error;
           return;
@@ -160,20 +190,7 @@ export class FileUrls {
         this.scrappedDataArrayString.set('');
       }
 
-      this.dlgService
-        .popup({
-          token: 'info',
-          header: 'File URL Scraping Completed',
-          content:
-            `Inserted new articles: ${persistSummary.insertedCount}\n` +
-            `Updated existing articles: ${persistSummary.updatedCount}\n` +
-            `Skipped unchanged/newer DB articles: ${persistSummary.skippedCount}`,
-          posAnsMsg: 'OK',
-          negAnsMsg: '',
-        })
-        .subscribe((dlgResult) => {
-          console.log('Dialog closed with:', dlgResult);
-        });
+      this.showScrapeCompletedDialog(persistSummary, existingSlugMatches);
     } catch (err) {
       error = err;
     } finally {
@@ -332,6 +349,7 @@ export class FileUrls {
     this.importedUrlsArrayString.set('');
     this.precheckSummary.set(null);
     this.isImportedUrlsDropActive.set(false);
+    this.overwriteExisting = false;
     this.fileName = '';
     this.selectedCategoryIds = [];
     this.categorySelectForm.reset({ selectCategory: [] });
@@ -419,6 +437,76 @@ export class FileUrls {
     }
 
     this.precheckSummary.set(precheck);
+  }
+
+  private showScrapeCompletedDialog(
+    persistSummary: MultiScrapePersistSummary,
+    existingSlugMatches: number
+  ): void {
+    const overwriteLine = this.overwriteExisting
+      ? `Re-scraped existing same-slug URLs: ${existingSlugMatches}`
+      : `Excluded existing same-slug URLs before scrape: ${existingSlugMatches}`;
+
+    this.dlgService
+      .popup({
+        token: 'info',
+        header: 'File URL Scraping Completed',
+        content:
+          `${overwriteLine}\n` +
+          `Inserted new articles: ${persistSummary.insertedCount}\n` +
+          `Updated existing articles: ${persistSummary.updatedCount}\n` +
+          `Skipped unchanged/newer DB articles: ${persistSummary.skippedCount}`,
+        posAnsMsg: 'OK',
+        negAnsMsg: '',
+      })
+      .subscribe((dlgResult) => {
+        console.log('Dialog closed with:', dlgResult);
+      });
+  }
+
+  private async getExistingSlugSet(): Promise<Set<string>> {
+    const existingArticles = await this.backendService.getAllArticles();
+    const existingSlugSet = new Set<string>();
+
+    for (const article of existingArticles) {
+      const slug = getMediumSlugFromUrl(article.link);
+      if (slug) {
+        existingSlugSet.add(slug);
+      }
+    }
+
+    return existingSlugSet;
+  }
+
+  private prepareUrlsForScrape(
+    urls: string[],
+    existingSlugSet: Set<string>
+  ): { urlsToScrape: string[]; existingSlugMatches: number } {
+    const uniqueNormalizedUrls = Array.from(
+      new Set(
+        (urls ?? [])
+          .map((url) => this.removeUrlQuery((url ?? '').trim()))
+          .filter((url) => url.length > 0)
+      )
+    );
+
+    let existingSlugMatches = 0;
+    const urlsToScrape: string[] = [];
+
+    for (const url of uniqueNormalizedUrls) {
+      const slug = getMediumSlugFromUrl(url);
+      const existsInDb = !!slug && existingSlugSet.has(slug);
+
+      if (existsInDb) {
+        existingSlugMatches++;
+      }
+
+      if (!existsInDb || this.overwriteExisting) {
+        urlsToScrape.push(url);
+      }
+    }
+
+    return { urlsToScrape, existingSlugMatches };
   }
 
   onCopyScrapedData() {
@@ -864,7 +952,8 @@ export class FileUrls {
 
     const result = await this.articlesmultiscraper.persistScrapedArticlesWithDedup(
       dataArray,
-      this.selectedCategoryIds
+      this.selectedCategoryIds,
+      this.overwriteExisting ? 'dbSync' : 'insertOnlyNew'
     );
 
     return {
@@ -880,25 +969,39 @@ export class FileUrls {
    * group's category id. This avoids cross-group matching issues caused by
    * all-links-in-one scrape/persist processing.
    */
-  private async scrapeAndPersistPerGroup(): Promise<{
+  private async scrapeAndPersistPerGroup(existingSlugSet: Set<string>): Promise<{
     scrapedPosts: PostData[];
     summary: MultiScrapePersistSummary;
+    existingSlugMatches: number;
   }> {
     const allScrapedPersistable: PostData[] = [];
     let totalInserted = 0;
     let totalUpdated = 0;
     let totalSkipped = 0;
+    let totalExistingSlugMatches = 0;
 
     for (const group of this.linkGroups) {
-      const groupUrls = Array.from(
-        new Set(
-          group.urls
-            .map((url) => this.removeUrlQuery((url ?? '').trim()))
-            .filter((url) => url.length > 0)
-        )
-      );
+      const preparedGroupUrls = this.prepareUrlsForScrape(group.urls, existingSlugSet);
+      const groupUrls = preparedGroupUrls.urlsToScrape;
+      totalExistingSlugMatches += preparedGroupUrls.existingSlugMatches;
+
+      if (preparedGroupUrls.existingSlugMatches > 0) {
+        console.log('>===>> Group existing-slug precheck:', {
+          header: group.header,
+          categoryId: group.categoryId,
+          existingSlugMatches: preparedGroupUrls.existingSlugMatches,
+          overwriteExisting: this.overwriteExisting,
+        });
+      }
 
       if (groupUrls.length === 0) {
+        console.log('>===>> Group scrape skipped before scraping:', {
+          header: group.header,
+          categoryId: group.categoryId,
+          reason: this.overwriteExisting
+            ? 'no-urls-after-normalization'
+            : 'all-urls-already-exist-in-db',
+        });
         continue;
       }
 
@@ -945,7 +1048,8 @@ export class FileUrls {
 
       const result = await this.articlesmultiscraper.persistScrapedArticlesWithDedup(
         persistablePosts,
-        [group.categoryId]
+        [group.categoryId],
+        this.overwriteExisting ? 'dbSync' : 'insertOnlyNew'
       );
 
       console.log('>===>> Group persist completed:', {
@@ -981,6 +1085,7 @@ export class FileUrls {
         updatedCount: totalUpdated,
         skippedCount: totalSkipped,
       },
+      existingSlugMatches: totalExistingSlugMatches,
     };
   }
 
