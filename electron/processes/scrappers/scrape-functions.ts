@@ -194,6 +194,80 @@ async function measureScrapeStep<T>(
   }
 }
 
+async function runWithHardTimeout<T>(
+  action: () => Promise<T>,
+  timeoutMs: number,
+  onTimeout?: () => void | Promise<void>
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+
+    const timer = setTimeout(() => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      // Reject immediately so queue processing can continue even if cleanup hangs.
+      // Run timeout cleanup in background as best effort.
+      reject(new Error(`scrape-timeout-${timeoutMs}ms`));
+
+      Promise.resolve(onTimeout?.()).catch(() => {
+        // Best-effort timeout cleanup; do not mask timeout error.
+      });
+    }, timeoutMs);
+
+    action()
+      .then((value) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((err) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
+}
+
+async function closePageBestEffort(
+  page: Puppeteer.Page | undefined,
+  reason: string
+): Promise<void> {
+  if (!page || page.isClosed()) {
+    return;
+  }
+
+  const closeTimeoutMs = timeConst.PAGE_CLOSE_TIMEOUT_MS;
+
+  try {
+    await Promise.race([
+      page.close().catch((err) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[scrape-close] close failed | reason=${reason} | error=${msg}`);
+      }),
+      new Promise<void>((resolve) => {
+        setTimeout(() => {
+          console.warn(
+            `[scrape-close] abandoning stuck tab close | reason=${reason} | limit=${closeTimeoutMs}ms`
+          );
+          resolve();
+        }, closeTimeoutMs);
+      }),
+    ]);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[scrape-close] unexpected close error | reason=${reason} | error=${msg}`);
+  }
+}
+
 type ScrapeBrowserSession = {
   browser: Puppeteer.Browser;
   owned: boolean;
@@ -202,31 +276,57 @@ type ScrapeBrowserSession = {
 
 // Cached worker page reused across collectPostsFromUrlTabs invocations in remote-debug mode.
 // This prevents creating a brand-new browser tab for every grouped scrape batch.
-let cachedRemoteDebugWorkerPage: Puppeteer.Page | undefined;
+type CachedRemoteDebugWorker = {
+  page: Puppeteer.Page;
+  lastActiveAt: number;
+};
+
+let cachedRemoteDebugWorker: CachedRemoteDebugWorker | undefined;
+
+function touchCachedRemoteDebugWorkerPage(page: Puppeteer.Page): void {
+  if (cachedRemoteDebugWorker && cachedRemoteDebugWorker.page === page) {
+    cachedRemoteDebugWorker.lastActiveAt = Date.now();
+  }
+}
 
 async function getOrCreateRemoteDebugWorkerPage(
   browser: Puppeteer.Browser
 ): Promise<{ page: Puppeteer.Page; reused: boolean }> {
-  if (cachedRemoteDebugWorkerPage && !cachedRemoteDebugWorkerPage.isClosed()) {
-    return { page: cachedRemoteDebugWorkerPage, reused: true };
+  const now = Date.now();
+  const staleAfterMs = timeConst.PER_LINK_SCRAPE_TIMEOUT_MS;
+
+  if (cachedRemoteDebugWorker && !cachedRemoteDebugWorker.page.isClosed()) {
+    const idleForMs = now - cachedRemoteDebugWorker.lastActiveAt;
+    if (idleForMs > staleAfterMs) {
+      logScrapeTiming(
+        `rotate stale remote-debug worker page | idle=${idleForMs}ms | threshold=${staleAfterMs}ms`
+      );
+      const stalePage = cachedRemoteDebugWorker.page;
+      cachedRemoteDebugWorker = undefined;
+      await closePageBestEffort(stalePage, 'rotate-stale-remote-debug-worker');
+    } else {
+      cachedRemoteDebugWorker.lastActiveAt = now;
+      return { page: cachedRemoteDebugWorker.page, reused: true };
+    }
   }
 
   const page = await createScrapePage(browser);
-  cachedRemoteDebugWorkerPage = page;
+  cachedRemoteDebugWorker = {
+    page,
+    lastActiveAt: now,
+  };
   return { page, reused: false };
 }
 
 async function closeCachedRemoteDebugWorkerPageIfAny(): Promise<void> {
-  if (!cachedRemoteDebugWorkerPage || cachedRemoteDebugWorkerPage.isClosed()) {
-    cachedRemoteDebugWorkerPage = undefined;
+  if (!cachedRemoteDebugWorker || cachedRemoteDebugWorker.page.isClosed()) {
+    cachedRemoteDebugWorker = undefined;
     return;
   }
 
-  try {
-    await cachedRemoteDebugWorkerPage.close();
-  } finally {
-    cachedRemoteDebugWorkerPage = undefined;
-  }
+  const page = cachedRemoteDebugWorker.page;
+  cachedRemoteDebugWorker = undefined;
+  await closePageBestEffort(page, 'close-cached-remote-debug-worker');
 }
 
 // 260328 Update: Refactored browser connection into a separate function for reuse and better error handling
@@ -547,7 +647,7 @@ export async function scrapeArticleBasic(url: string): Promise<PostData> {
     window.webContents.send('message-channel', msg);
     throw error;
   } finally {
-    await page.close();
+    await closePageBestEffort(page, 'scrapeArticleBasic-finally');
     if (owned) {
       await browser.close();
     }
@@ -600,101 +700,119 @@ export async function collectPostsFromUrlTabs(
         _scrapeContextStorage.run({ article: `${index + 1}/${urls.length}` }, async () => {
           let page: Puppeteer.Page | undefined;
           let shouldClosePage = true;
+          let timedOut = false;
+          const timeoutMs = timeConst.PER_LINK_SCRAPE_TIMEOUT_MS;
 
           try {
-            logScrapeLinkStart(
-              'collectPostsFromUrlTabs',
-              index + 1,
-              url,
-              urls.length
-            );
-
-          // Optional delay to avoid rapid tab creation
-          // await new Promise((res) => setTimeout(res, 500));
-          if (!useSharedRemoteDebugPage) {
-            await new Promise((res) => setTimeout(res, timeConst.OPEN_NEW_TAB_DELAY));
-          }
-
-          if (useSharedRemoteDebugPage && sharedRemoteDebugPage) {
-            page = sharedRemoteDebugPage;
-            shouldClosePage = false;
-          } else {
-            page = await createScrapePage(browser);
-          }
-
-          console.log(`Opening: ${url}`);
-          const navResponse = await page.goto(url, {
-            waitUntil: 'domcontentloaded',
-            timeout: timeConst.TAB_INITIAL_PAGE_LOADING_DELAY, //15000,   /****** */
-          });
-          const navStatus = navResponse?.status();
-          // 260405 Update: Added diagnostics for 403 responses on individual tabs
-          if (navStatus === 403) {
-            await logHttp403Diagnostics(page, url, navResponse);
-          }
-
-          const currentPage = page;
-
-          // Scrape the article data by calling the scrapeMediumArticle() key-function
-          const data = await scrapeMediumArticle(currentPage);
-
-          const contentDecision = await measureScrapeStep(
-            'shouldScrapeMarkdownContent',
-            () => shouldScrapeMarkdownContent(currentPage, url, options, navStatus),
-            `url=${url}`
-          );
-
-          logScrapeTiming(
-            `${contentDecision.allow ? 'ALLOW' : 'SKIP'} scrapeMediumMarkdownContent | url=${url} | reason=${contentDecision.reason}`
-          );
-
-          if (contentDecision.allow) {
-            const content = await measureScrapeStep(
-              'scrapeMediumMarkdownContent',
-              () => scrapeMediumMarkdownContent(currentPage),
-              `url=${url}`
-            );
-            data.content = content;
-          } else {
-            data.content = '';
-            if (contentDecision.excludeFromPersistence) {
-              data.excludeFromPersistence = true;
-              data.exclusionReason = contentDecision.reason;
-              logScrapeTiming(
-                `EXCLUDE post from persistence | url=${url} | reason=${contentDecision.reason}`
+            return await runWithHardTimeout(async () => {
+              logScrapeLinkStart(
+                'collectPostsFromUrlTabs',
+                index + 1,
+                url,
+                urls.length
               );
-            }
-          }
 
-          data.counter = p;
-          // console.log(` >===>> Post: ${p} ${JSON.stringify(data)} `);
-          return data;
+              // Optional delay to avoid rapid tab creation
+              // await new Promise((res) => setTimeout(res, 500));
+              if (!useSharedRemoteDebugPage) {
+                await new Promise((res) => setTimeout(res, timeConst.OPEN_NEW_TAB_DELAY));
+              }
+
+              if (useSharedRemoteDebugPage) {
+                if (!sharedRemoteDebugPage || sharedRemoteDebugPage.isClosed()) {
+                  const worker = await getOrCreateRemoteDebugWorkerPage(browser);
+                  sharedRemoteDebugPage = worker.page;
+                  logScrapeTiming(
+                    `collectPostsFromUrlTabs recovered shared worker page | reused=${worker.reused}`
+                  );
+                }
+
+                page = sharedRemoteDebugPage;
+                touchCachedRemoteDebugWorkerPage(page);
+                shouldClosePage = false;
+              } else {
+                page = await createScrapePage(browser);
+              }
+
+              console.log(`Opening: ${url}`);
+              const navResponse = await page.goto(url, {
+                waitUntil: 'domcontentloaded',
+                timeout: timeConst.TAB_INITIAL_PAGE_LOADING_DELAY, //15000,   /****** */
+              });
+              const navStatus = navResponse?.status();
+              // 260405 Update: Added diagnostics for 403 responses on individual tabs
+              if (navStatus === 403) {
+                await logHttp403Diagnostics(page, url, navResponse);
+              }
+
+              const currentPage = page;
+
+              // Scrape the article data by calling the scrapeMediumArticle() key-function
+              const data = await scrapeMediumArticle(currentPage);
+
+              const contentDecision = await measureScrapeStep(
+                'shouldScrapeMarkdownContent',
+                () => shouldScrapeMarkdownContent(currentPage, url, options, navStatus),
+                `url=${url}`
+              );
+
+              logScrapeTiming(
+                `${contentDecision.allow ? 'ALLOW' : 'SKIP'} scrapeMediumMarkdownContent | url=${url} | reason=${contentDecision.reason}`
+              );
+
+              if (contentDecision.allow) {
+                const content = await measureScrapeStep(
+                  'scrapeMediumMarkdownContent',
+                  () => scrapeMediumMarkdownContent(currentPage),
+                  `url=${url}`
+                );
+                data.content = content;
+              } else {
+                data.content = '';
+                if (contentDecision.excludeFromPersistence) {
+                  data.excludeFromPersistence = true;
+                  data.exclusionReason = contentDecision.reason;
+                  logScrapeTiming(
+                    `EXCLUDE post from persistence | url=${url} | reason=${contentDecision.reason}`
+                  );
+                }
+              }
+
+              data.counter = p;
+              // console.log(` >===>> Post: ${p} ${JSON.stringify(data)} `);
+              return data;
+            }, timeoutMs, async () => {
+              timedOut = true;
+              logScrapeTiming(
+                `TIMEOUT abandon current URL and continue | url=${url} | limit=${timeoutMs}ms`
+              );
+
+              if (page && !page.isClosed()) {
+                await closePageBestEffort(page, `timeout-cleanup url=${url}`);
+              }
+
+              if (useSharedRemoteDebugPage) {
+                sharedRemoteDebugPage = undefined;
+                await closeCachedRemoteDebugWorkerPageIfAny();
+              }
+            });
         } catch (err) {
           // console.error(`Failed to scrape ${url}:`, err.message || err);
-          if (err instanceof Error) {
+          if (timedOut) {
+            console.warn(`Skipped after timeout ${timeoutMs}ms: ${url}`);
+          } else if (err instanceof Error) {
             console.error(`Failed to scrape ${url}:`, err.message);
           } else {
             console.error(`Failed to scrape ${url}:`, err);
           }
           return null;
         } finally {
+          if (useSharedRemoteDebugPage && page && !page.isClosed()) {
+            touchCachedRemoteDebugWorkerPage(page);
+          }
+
           if (shouldClosePage && page && !page.isClosed()) {
-            try {
-              await page.close();
-            } catch (closeErr) {
-              // console.warn(
-              //   `Error closing page for ${url}:`,
-              //   closeErr.message || closeErr
-              // );
-              if (closeErr instanceof Error) {
-                console.warn(
-                  `Error closing page for ${url}:`,
-                  closeErr.message
-                );
-              } else {
-                console.warn(`Error closing page for ${url}:`, closeErr);
-              }
-            }
+            await closePageBestEffort(page, `collectPostsFromUrlTabs-finally url=${url}`);
           }
         }
       })

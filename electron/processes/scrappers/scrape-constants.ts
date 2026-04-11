@@ -91,6 +91,8 @@ export const timeConst = {
   // Tab handling
   OPEN_NEW_TAB_DELAY: 500,               // Delay before opening a new tab
   TAB_INITIAL_PAGE_LOADING_DELAY: 15000, // 15 sec for tab initial load
+  PER_LINK_SCRAPE_TIMEOUT_MS: 75000,     // 260410 -Hard timeout per URL in collectPostsFromUrlTabs
+  PAGE_CLOSE_TIMEOUT_MS: 3000,           // Best-effort page close timeout before abandoning stuck tab
   REMOTE_DEBUG_REUSE_SINGLE_PAGE: true,  // 260406 - Reuse one worker tab in remote-debug to reduce focus stealing
   REMOTE_DEBUG_KEEP_WORKER_PAGE_OPEN: true, // 260406 - Keep reused worker tab open after batch
 
