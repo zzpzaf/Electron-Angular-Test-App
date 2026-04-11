@@ -21,6 +21,7 @@ import {
   getMediumSlugFromUrl,
   isValidUrl,
 } from '../../../shared/utils/shared-utils';
+import { LIST_MAX_ARTICLES_DEFAULT } from '../../../shared/constants';
 
 import { DlgService } from '../shared/services/dlg-service';
 
@@ -31,7 +32,7 @@ import {
 import { CategoryNodes } from '../shared/services/category-nodes';
 import { NzTreeNodeOptions } from 'ng-zorro-antd/tree';
 import { BackEnd } from '../shared/services/back-end';
-import { firstValueFrom, Subscription } from 'rxjs';
+import { debounceTime, distinctUntilChanged, firstValueFrom, Subscription } from 'rxjs';
 import { LoaderService } from '../shared/services/loader-service';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import {
@@ -70,6 +71,10 @@ export class ListUrls {
   public $scrappedDataArrayString = signal<string>('');
   public precheckSummary = signal<MultiScrapePrecheckSummary | null>(null);
   public linkURL = signal<string>('');
+  public $declaredTotal = signal<number | null>(null);
+  public $declaredTotalLoading = signal<boolean>(false);
+  public readonly listMaxArticlesDefault = LIST_MAX_ARTICLES_DEFAULT;
+  private declaredTotalReqSeq = 0;
   private listurldata: listURLData = { listname: '', pubauthorslug: '' };
 
   // private modal = inject(NzModalService);
@@ -129,17 +134,54 @@ export class ListUrls {
       this.categoryNodesService.$catTreeNodes().length
     );
 
-    this.linkScrapeForm.get('url')?.valueChanges.subscribe((urlValue) => {
-      this.linkURL.set(urlValue);
-      this.precheckSummary.set(null);
+    this.linkScrapeForm.get('url')?.valueChanges
+      .pipe(debounceTime(350), distinctUntilChanged())
+      .subscribe(async (rawUrlValue) => {
+        const urlValue = (rawUrlValue || '').trim();
+        this.linkURL.set(urlValue);
+        this.precheckSummary.set(null);
 
-      this.listurldata = { listname: '', pubauthorslug: '' };
-      if (urlValue.trim().length > 0 && isValidUrl(urlValue.trim())) {
+        // For each new URL input, reset to default baseline until declared total is fetched.
+        this.$declaredTotalLoading.set(false);
+        this.$declaredTotal.set(null);
+        this.linkScrapeForm
+          .get('maxArticles')
+          ?.setValue(LIST_MAX_ARTICLES_DEFAULT, { emitEvent: false });
+
+        this.listurldata = { listname: '', pubauthorslug: '' };
+        if (urlValue.length === 0 || !isValidUrl(urlValue)) {
+          return;
+        }
+
         console.log('URL changed to:', this.linkURL());
         this.listurldata = analyzeListedLink(urlValue);
-        // console.log('List Name (if):', this.listurldata.listname.trim());
-      }
-    });
+
+        // Only Medium list URLs should trigger declared-total fetch.
+        if (this.listurldata.listname.trim().length === 0) {
+          return;
+        }
+
+        const reqSeq = ++this.declaredTotalReqSeq;
+        this.$declaredTotalLoading.set(true);
+        const declaredResp = await this.articlebasicscraper.getListDeclaredTotal(urlValue);
+
+        // Drop stale responses when user already changed URL again.
+        if (reqSeq !== this.declaredTotalReqSeq || this.linkURL() !== urlValue) {
+          this.$declaredTotalLoading.set(false);
+          return;
+        }
+
+        if (declaredResp.success && typeof declaredResp.declaredTotal === 'number') {
+          const declaredTotal = declaredResp.declaredTotal;
+          this.$declaredTotal.set(declaredTotal);
+
+          const initialMax = Math.min(LIST_MAX_ARTICLES_DEFAULT, declaredTotal);
+          this.linkScrapeForm
+            .get('maxArticles')
+            ?.setValue(initialMax, { emitEvent: false });
+        }
+        this.$declaredTotalLoading.set(false);
+      });
 
     // It captures directly any Electron message sent and passed via the "message-channel"
     window.electronAPI.on('message-channel', (message: string) => {
@@ -184,6 +226,7 @@ export class ListUrls {
   setupForm() {
     this.linkScrapeForm = this.fb.group({
       url: this.fb.control('', [Validators.required]),
+      maxArticles: this.fb.control(LIST_MAX_ARTICLES_DEFAULT, [Validators.required, Validators.min(1)]),
       add: this.fb.control(true),
       selectCategory: this.fb.control<string[]>([]),
     });
@@ -210,7 +253,8 @@ export class ListUrls {
         if (!confirmed) return; // User chose 'No', so exit
       }
 
-      this.runScraper(urlValue);
+      const maxArticles = this.linkScrapeForm.value.maxArticles ?? LIST_MAX_ARTICLES_DEFAULT;
+      this.runScraper(urlValue, maxArticles);
       // void this.loader.withLoader(
       //   () =>  this.runScraper(urlValue),
       //   'Scraping List articles data ...'
@@ -226,7 +270,7 @@ export class ListUrls {
     }
   }
 
-  async runScraper(url: string): Promise<void> {
+  async runScraper(url: string, maxArticles = LIST_MAX_ARTICLES_DEFAULT): Promise<void> {
     let loading = true;
     let result = null;
     this.scrappedError.set('');
@@ -247,8 +291,14 @@ export class ListUrls {
           .subscribe((res) => console.log('Dialog closed with:', res));
         return;
       }
-      const response = await this.articlebasicscraper.scrapeList(url);
+      const response = await this.articlebasicscraper.scrapeList(url, maxArticles);
       if (response.success) {
+        // Update declared total signal and pre-fill the input for the next run
+        const dt = response.declaredTotal ?? null;
+        this.$declaredTotal.set(dt);
+        if (dt !== null && dt < this.linkScrapeForm.value.maxArticles) {
+          this.linkScrapeForm.get('maxArticles')?.setValue(dt, { emitEvent: false });
+        }
         const listPosts = Array.isArray(response.data)
           ? this.dedupePostsBySlug(response.data as PostData[])
           : [];
@@ -366,8 +416,11 @@ export class ListUrls {
     this.$scrappedDataArrayString.set(''); // Clear the string representation of the array
     this.scrappedData.set(null); // Clear the scrapped data
     this.precheckSummary.set(null);
+    this.$declaredTotalLoading.set(false);
+    this.$declaredTotal.set(null);
     this.linkScrapeForm.reset(); // Reset the form
     this.linkScrapeForm.get('add')?.setValue(true, { emitEvent: false });
+    this.linkScrapeForm.get('maxArticles')?.setValue(LIST_MAX_ARTICLES_DEFAULT, { emitEvent: false });
   }
 
   onCopyScrappedData() {

@@ -2068,7 +2068,10 @@ export async function extractCodeFromIframe(
 // ==========================================================================================
 // ==========================================================================================
 
-export async function scrapeList(url: string): Promise<PostData[]> {
+export async function scrapeList(
+  url: string,
+  maxArticles: number = timeConst.MAX_ARTICLES_NUMBER
+): Promise<{ posts: PostData[]; declaredTotal: number | null }> {
   logFunctionHeader('scrapeList');
   logScrapeLinkStart('scrapeList', 1, url);
 
@@ -2107,10 +2110,42 @@ export async function scrapeList(url: string): Promise<PostData[]> {
       timeout: Math.max(timeConst.INITIAL_PAGE_LOADING_DELAY, 10000),
     });
 
+    const declaredTotal = await getListStoryCount(page);
+    if (declaredTotal !== null) {
+      console.log(
+        'scrape-functions ->  scrapeList() - Declared story count from header: ',
+        declaredTotal
+      );
+    } else {
+      console.log(
+        'scrape-functions ->  scrapeList() - Could not find story count in header; will use stagnation-based scroll termination.'
+      );
+    }
+
+    // effectiveMax = min(user's requested max, declared total) so we never scroll more than needed.
+    // When declaredTotal > maxArticles the user has deliberately capped it, so respect that.
+    const effectiveMax =
+      declaredTotal !== null ? Math.min(maxArticles, declaredTotal) : maxArticles;
+    // Only pass targetCount when the declared total fits within the user's cap —
+    // this enables enhanced persistence and the "reached declared count" stop.
+    const targetCount =
+      declaredTotal !== null && declaredTotal <= maxArticles ? declaredTotal : null;
+    console.log(
+      'scrape-functions ->  scrapeList() - effectiveMax: ',
+      effectiveMax,
+      '  targetCount: ',
+      targetCount
+    );
+
     const totalArticles = await autoScrollToEnd(
       page,
-      timeConst.MAX_ARTICLES_NUMBER,
-      timeConst.SCROLL_DELAY
+      effectiveMax,
+      timeConst.SCROLL_DELAY,
+      targetCount
+    );
+    console.log(
+      'scrape-functions ->  scrapeList() - Articles loaded after scroll: ',
+      totalArticles
     );
 
     const scrapedData = await scrapeMediumList(page);
@@ -2131,9 +2166,50 @@ export async function scrapeList(url: string): Promise<PostData[]> {
       item.pubauthorslug = extractFirstPathPart(new URL(item.link).pathname);
     }
 
-    return scrapedData;
+    return { posts: scrapedData, declaredTotal };
   } catch (error) {
     throw error;
+  } finally {
+    await page.close();
+    if (owned) {
+      await browser.close();
+    }
+  }
+}
+
+// ==========================================================================================
+// Lightweight helper: fetch only the declared story count from list header for a given URL
+// ==========================================================================================
+export async function getDeclaredStoryCountForListUrl(url: string): Promise<number | null> {
+  const listConnectTimeoutMs = Math.max(
+    timeConst.TAB_INITIAL_PAGE_LOADING_DELAY,
+    30000
+  );
+
+  const session = await connectToBrowser();
+  const { browser, owned } = session;
+  const page = await createScrapePage(browser);
+
+  try {
+    await page.goto(url, {
+      waitUntil: 'domcontentloaded',
+      timeout: listConnectTimeoutMs,
+    });
+
+    try {
+      await page.waitForFunction(
+        (SEL) => {
+          const paras = Array.from(document.querySelectorAll(SEL.headerStories));
+          return paras.some((p) => /^(\d[\d,]*)\s+stories$/i.test((p.textContent || '').trim()));
+        },
+        { timeout: Math.max(timeConst.INITIAL_PAGE_LOADING_DELAY, 10000) },
+        listSEL
+      );
+    } catch {
+      // Fallback: header story text might not be ready; we'll still try a direct read below.
+    }
+
+    return await getListStoryCount(page);
   } finally {
     await page.close();
     if (owned) {
@@ -2360,6 +2436,21 @@ export async function autoScrollArticlePage(
 
 
 // -----------------------------------------------------------------------------------------
+// Helper: reads the total story count displayed in the list header ("N stories")
+// Returns the count as a number, or null if not found
+// -----------------------------------------------------------------------------------------
+async function getListStoryCount(page: Puppeteer.Page): Promise<number | null> {
+  return page.evaluate((SEL) => {
+    const paras = Array.from(document.querySelectorAll(SEL.headerStories));
+    for (const p of paras) {
+      const m = (p as HTMLElement).textContent?.trim().match(/^(\d[\d,]*)\s+stories$/i);
+      if (m) return parseInt(m[1].replace(/,/g, ''), 10);
+    }
+    return null;
+  }, listSEL);
+}
+
+// -----------------------------------------------------------------------------------------
 // Helper function to automatically scroll to the end of the Medium List page
 // until a specified number of articles is reached or no new articles are loaded
 // Returns the total number of articles found
@@ -2367,23 +2458,37 @@ export async function autoScrollArticlePage(
 async function autoScrollToEnd(
   page: Puppeteer.Page,
   maxArticles: number,
-  scrollDelay: number
+  scrollDelay: number,
+  targetCount: number | null = null
 ): Promise<number> {
   let lastCount = await page.$$eval('article', (arts) => arts.length);
   let attemptsWithoutNew = 0;
-  const maxAttempts = 5;
+  // When a declared total is known, be much more persistent before giving up on stagnation
+  const effectiveMaxAttempts =
+    targetCount !== null
+      ? timeConst.MAX_ATTEMPTS_WITHOUT_NEW * 4
+      : timeConst.MAX_ATTEMPTS_WITHOUT_NEW;
   let scrolls = 0;
 
-  while (attemptsWithoutNew < maxAttempts) {
+  if (targetCount !== null) {
+    console.log(`🎯 Target article count from header: ${targetCount}`);
+  }
+
+  while (attemptsWithoutNew < effectiveMaxAttempts) {
+    // Primary stop: reached declared total
+    if (targetCount !== null && lastCount >= targetCount) {
+      console.log(`✅ Reached declared story count (${lastCount}/${targetCount}).`);
+      break;
+    }
+
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
     await sleep(scrollDelay);
 
     const currentCount = await page.$$eval('article', (arts) => arts.length);
     if (currentCount > lastCount) {
       console.log(
-        `🆕 Scroll ${scrolls + 1}: Loaded ${
-          currentCount - lastCount
-        } new articles (Total: ${currentCount})`
+        `🆕 Scroll ${scrolls + 1}: Loaded ${currentCount - lastCount} new articles` +
+        ` (Total: ${currentCount}${targetCount !== null ? `/${targetCount}` : ''})`
       );
       lastCount = currentCount;
       attemptsWithoutNew = 0;
@@ -2391,14 +2496,16 @@ async function autoScrollToEnd(
     } else {
       attemptsWithoutNew++;
       console.log(
-        `⚠️ No new articles, attempt ${attemptsWithoutNew}/${maxAttempts}`
+        `⚠️ No new articles, attempt ${attemptsWithoutNew}/${effectiveMaxAttempts}` +
+        `${targetCount !== null ? ` (loaded ${lastCount}/${targetCount})` : ''}`
       );
     }
     if (currentCount >= maxArticles) break;
   }
 
   console.log(
-    `✅ Final summary: ${scrolls} scrolls made, ${lastCount} articles found.`
+    `✅ Final summary: ${scrolls} scrolls made, ${lastCount} articles found.` +
+    `${targetCount !== null ? ` (declared total: ${targetCount})` : ''}`
   );
   return lastCount;
 }

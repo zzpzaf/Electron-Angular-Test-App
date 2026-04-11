@@ -27,6 +27,31 @@
     </nz-form-control>
   </nz-form-item>
 
+  <!-- Max articles input -->
+  <nz-form-item class="max-articles-form-item">
+    <nz-form-control>
+      <div class="max-articles-wrapper">
+        <span class="max-articles-label">
+          Max articles to scrape:
+          @if ($declaredTotalLoading()) {
+            <span class="declared-loading" title="Fetching declared story count"></span>
+          }
+          @if ($declaredTotal() !== null) {
+            <span class="declared-total">(declared: {{ $declaredTotal() }})</span>
+          }
+        </span>
+        <input
+          type="number"
+          nz-input
+          formControlName="maxArticles"
+          class="max-articles-input"
+          min="1"
+          step="10"
+        />
+      </div>
+    </nz-form-control>
+  </nz-form-item>
+
   <nz-form-item>
     <label
       nz-checkbox
@@ -37,7 +62,7 @@
     </label>
   </nz-form-item>
 
-  <nz-form-item>
+  <nz-form-item class="login-form-button">
     <button nz-button [nzType]="'primary'">Scrape</button>
   </nz-form-item>
 

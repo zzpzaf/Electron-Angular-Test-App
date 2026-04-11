@@ -186,6 +186,7 @@ export const listSEL = {
   postInfoBlock: 'span:has(svg[width="16"])',
   pubName: 'div a[href*="medium.com"] p',
   authorName: 'div a[href^="/@"] p',
+  headerStories: 'header p',   // <p> elements in list header; parse for "N stories" text
 } as const;
 
 // Medium identity selectors

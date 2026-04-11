@@ -4,6 +4,7 @@ import path from 'path';
 import {
   scrapeArticleBasic,
   scrapeList,
+  getDeclaredStoryCountForListUrl,
   collectPostsFromUrlTabs,
 } from './processes/scrappers/scrape-functions';
 import {
@@ -536,14 +537,31 @@ ipcMain.handle(
 
 ipcMain.handle(
   'scrape-list',
-  async (event: IpcMainInvokeEvent, url: string) => {
-    console.log(`Received scrape-list request for URL: ${url}`);
+  async (event: IpcMainInvokeEvent, url: string, maxArticles?: number) => {
+    console.log(`Received scrape-list request for URL: ${url}  maxArticles: ${maxArticles ?? 'default'}`);
     try {
-      const result = await scrapeList(url);
+      const result = await scrapeList(url, maxArticles);
       console.log('>= *** ==>> main.ts - scrape-list -Scraping successful');
-      return { success: true, data: result };
+      return { success: true, data: result.posts, declaredTotal: result.declaredTotal };
     } catch (error: unknown) {
       console.error('Scraping (scrape-list) error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+);
+
+ipcMain.handle(
+  'scrape-list-declared-total',
+  async (_event: IpcMainInvokeEvent, url: string) => {
+    console.log(`Received scrape-list-declared-total request for URL: ${url}`);
+    try {
+      const declaredTotal = await getDeclaredStoryCountForListUrl(url);
+      return { success: true, declaredTotal };
+    } catch (error: unknown) {
+      console.error('Scraping (scrape-list-declared-total) error:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error),
