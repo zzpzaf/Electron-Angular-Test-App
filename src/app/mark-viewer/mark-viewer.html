@@ -1,8 +1,102 @@
-<!-- <p>
-    The MarkViewer Component !
-</p> -->
-<div class="markdown-container" context-select-all-scope>
-    @if (safeHtmlContent())  {
+<div class="mv-shell" (click)="onShellClick($event)">
+
+  <!-- ===== HEADER ROW ===== -->
+  <div class="mv-header">
+
+    <!-- Navigation icon buttons -->
+    <div class="mv-nav-buttons">
+      <button
+        nz-button
+        nzType="text"
+        [disabled]="!$canGoPrev()"
+        (click)="onPrevArticle()"
+        title="Previous article">
+        <span nz-icon nzType="left" nzTheme="outline"></span>
+      </button>
+      <button
+        nz-button
+        nzType="text"
+        [disabled]="!$canGoNext()"
+        (click)="onNextArticle()"
+        title="Next article">
+        <span nz-icon nzType="right" nzTheme="outline"></span>
+      </button>
+    </div>
+
+    <!-- Article Metadata collapse -->
+    <div class="mv-meta-collapse">
+      <nz-collapse [nzBordered]="false">
+        <nz-collapse-panel
+          nzHeader="Article Metadata"
+          [nzActive]="$metaExpanded()"
+          (nzActiveChange)="$metaExpanded.set($event)">
+
+          @if ($article(); as art) {
+            <div class="mv-meta-grid">
+              <span class="mv-meta-label">ID</span>
+              <span class="mv-meta-value">{{ art.id ?? '—' }}</span>
+
+              <span class="mv-meta-label">Title</span>
+              <span class="mv-meta-value">{{ art.title || '—' }}</span>
+
+              <span class="mv-meta-label">Publication</span>
+              <span class="mv-meta-value">{{ art.pubname || '—' }}</span>
+
+              <span class="mv-meta-label">Author</span>
+              <span class="mv-meta-value">{{ art.authorname || '—' }}</span>
+
+              <span class="mv-meta-label">Hostname</span>
+              <span class="mv-meta-value">{{ art.hostname || '—' }}</span>
+
+              <span class="mv-meta-label">Date</span>
+              <span class="mv-meta-value">{{ art.date || '—' }}</span>
+
+              <span class="mv-meta-label">Likes</span>
+              <span class="mv-meta-value">{{ art.likes }}</span>
+
+              <span class="mv-meta-label">Comments</span>
+              <span class="mv-meta-value">{{ art.comments }}</span>
+
+              <span class="mv-meta-label">List</span>
+              <span class="mv-meta-value">{{ art.listname || '—' }}</span>
+
+              <span class="mv-meta-label">Link</span>
+              <span class="mv-meta-value mv-meta-link">
+                <a [href]="art.link" target="_blank" rel="noopener noreferrer">{{ art.link || '—' }}</a>
+              </span>
+            </div>
+          } @else {
+            <p class="mv-meta-empty">No article loaded.</p>
+          }
+
+        </nz-collapse-panel>
+      </nz-collapse>
+    </div>
+
+  </div>
+
+  <!-- ===== CONTENT AREA ===== -->
+  <div class="mv-content markdown-container" context-select-all-scope>
+    @if ($isEditMode()) {
+      <textarea
+        class="mv-editor"
+        [value]="$markdownDraft()"
+        (input)="onMarkdownInput($event)"
+        spellcheck="false"></textarea>
+    } @else {
+      @if (safeHtmlContent()) {
         <div [innerHTML]="safeHtmlContent()"></div>
+      }
     }
+  </div>
+
+  <!-- ===== BOTTOM ROW ===== -->
+  <div class="mv-bottom">
+    <button nz-button nzType="default" [disabled]="$isEditMode() || !$article()" (click)="onEdit()">Edit</button>
+    @if ($isEditMode()) {
+      <button nz-button nzType="default" (click)="onCancel()">Cancel</button>
+    }
+    <button nz-button nzType="primary" [disabled]="!$isEditMode()" (click)="onUpdate()">Update</button>
+  </div>
+
 </div>

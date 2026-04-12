@@ -2,3 +2,98 @@
 //  Moved to global styles.scss:
 //  @use '../../styles/markdown-styles.scss';
 
+// ── Shell: full-height flex column ──────────────────────────────────────────
+.mv-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+// ── Header row ──────────────────────────────────────────────────────────────
+.mv-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 12px 0;
+  flex-shrink: 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.mv-nav-buttons {
+  display: flex;
+  gap: 4px;
+  padding-top: 6px;   // align buttons visually with collapse header text
+  flex-shrink: 0;
+}
+
+.mv-meta-collapse {
+  flex: 1;
+  min-width: 0;
+
+  // Remove extra top margin that nz-collapse adds by default
+  nz-collapse {
+    background: transparent;
+  }
+}
+
+// ── Metadata grid inside collapse ───────────────────────────────────────────
+.mv-meta-grid {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 4px 12px;
+  font-size: 13px;
+}
+
+.mv-meta-label {
+  color: #8c8c8c;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.mv-meta-value {
+  color: #262626;
+  word-break: break-word;
+}
+
+.mv-meta-link a {
+  word-break: break-all;
+}
+
+.mv-meta-empty {
+  color: #bfbfbf;
+  font-style: italic;
+  margin: 0;
+}
+
+// ── Scrollable content ───────────────────────────────────────────────────────
+.mv-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 24px;
+}
+
+.mv-editor {
+  width: 100%;
+  min-height: calc(100vh - 230px);
+  resize: vertical;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  padding: 12px;
+  font-family: 'SF Mono', Menlo, Monaco, Consolas, 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #262626;
+  background: #fff;
+}
+
+// ── Bottom row ───────────────────────────────────────────────────────────────
+.mv-bottom {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid #f0f0f0;
+  flex-shrink: 0;
+}
+

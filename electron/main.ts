@@ -290,6 +290,7 @@ function createMainAppWindow() {
 // Handle a NEW Electron window openning via a route path (defined in Angular app.route.ts) and pass data
 // ======================================================================================================
 //
+
 ipcMain.handle('open-new-window', async (_event, data) => {
 
   const routePath: string = '/show-mark';
@@ -315,6 +316,28 @@ ipcMain.handle('open-new-window', async (_event, data) => {
     },
   });
   markViewerWindow = win;
+
+  // Block ALL navigation inside markViewerWindow.
+  // Angular hash-router changes do NOT trigger will-navigate, so this is safe.
+  // Root-relative links resolved by Electron against file:// would previously
+  // bypass the https-only check — the blanket block prevents that.
+  win.webContents.on('will-navigate', (event: any, url: string) => {
+    event.preventDefault();
+    // Fallback: for genuinely external URLs that bypassed the renderer handler,
+    // still open them in the system browser.
+    if (!url.startsWith('file://') && !url.startsWith('http://localhost')) {
+      shell.openExternal(url);
+    }
+  });
+
+  // Intercept target="_blank" links (e.g. the article link in metadata area)
+  // and open them in the user's default browser.
+  win.webContents.setWindowOpenHandler(({ url }: HandlerDetails) => {
+    if (!url.startsWith('file://') && !url.startsWith('http://localhost')) {
+      shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
 
   // Pass the data via query string 
   // *** Passing data via query parameters is not the best practice for large structured data
@@ -394,6 +417,15 @@ ipcMain.handle('open-new-window', async (_event, data) => {
 // ******************************************************************************************************
 // Custom IPC handlers
 // ******************************************************************************************************
+
+ipcMain.handle('open-external-url', async (_event, url: string) => {
+  if (typeof url !== 'string' || !url.trim()) {
+    return false;
+  }
+
+  await shell.openExternal(url);
+  return true;
+});
 
 ipcMain.handle('app:quit', (event: any) => {
   // Close all windows first (usually app.quit() will do it anyway)

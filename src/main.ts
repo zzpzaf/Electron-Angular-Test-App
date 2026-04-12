@@ -21,6 +21,8 @@ import {
   CloseCircleOutline,
   DeleteOutline,
   ReloadOutline,
+  LeftOutline,
+  RightOutline,
 } from '@ant-design/icons-angular/icons';
 
 // bootstrapApplication(App, appConfig)
@@ -46,6 +48,8 @@ bootstrapApplication(App, {
       CloseCircleOutline,
       DeleteOutline,
       ReloadOutline,
+      LeftOutline,
+      RightOutline,
     ]),
   ],
 }).catch((err) => console.error(err));
