@@ -60,22 +60,47 @@ export class Articlebasicscraper {
 
   async scrapeList(
     url: string,
-    maxArticles?: number
+    maxArticles?: number,
+    chunkSize?: number
   ): Promise<{ success: boolean; data?: any; declaredTotal?: number | null; error?: string }> {
     if (!window?.electronAPI?.invoke) {
       console.error('Electron API is not available.');
       return { success: false, error: 'Electron API not available' };
     }
     try {
-      console.log('Invoking scrapeList with URL:', url, '  maxArticles:', maxArticles ?? 'default');
+      console.log(
+        'Invoking scrapeList with URL:',
+        url,
+        '  maxArticles:',
+        maxArticles ?? 'default',
+        '  chunkSize:',
+        chunkSize ?? 'default'
+      );
       const result = (await window.electronAPI.invoke(
         'scrape-list',
         url,
-        maxArticles
+        maxArticles,
+        chunkSize
       )) as ScrapeResult & { declaredTotal?: number | null };
       return result;
     } catch (error: any) {
       console.error('Error during scrapeArticle invoke:', error);
+      return { success: false, error: error.message || 'Unknown error' };
+    }
+  }
+
+  async getListScrapeConfig(): Promise<{ success: boolean; chunkSizeDefault?: number; error?: string }> {
+    if (!window?.electronAPI?.invoke) {
+      console.error('Electron API is not available.');
+      return { success: false, error: 'Electron API not available' };
+    }
+    try {
+      const result = (await window.electronAPI.invoke(
+        'scrape-list-config'
+      )) as { success: boolean; chunkSizeDefault?: number; error?: string };
+      return result;
+    } catch (error: any) {
+      console.error('Error during scrape-list-config invoke:', error);
       return { success: false, error: error.message || 'Unknown error' };
     }
   }

@@ -7,6 +7,7 @@ import {
   getDeclaredStoryCountForListUrl,
   collectPostsFromUrlTabs,
 } from './processes/scrappers/scrape-functions';
+import { timeConst } from './processes/scrappers/scrape-constants';
 import {
   coerceParameter,
   copyFileAsync,
@@ -569,10 +570,31 @@ ipcMain.handle(
 
 ipcMain.handle(
   'scrape-list',
-  async (event: IpcMainInvokeEvent, url: string, maxArticles?: number) => {
-    console.log(`Received scrape-list request for URL: ${url}  maxArticles: ${maxArticles ?? 'default'}`);
+  async (event: IpcMainInvokeEvent, url: string, maxArticles?: number, chunkSize?: number) => {
+    console.log(
+      `Received scrape-list request for URL: ${url}  maxArticles: ${maxArticles ?? 'default'}  chunkSize: ${chunkSize ?? 'default'}`
+    );
     try {
-      const result = await scrapeList(url, maxArticles);
+      // Build a callback that pauses scrapeList after each chunk until Angular
+      // has updated its signals, run the DB precheck and resolved any dialogs.
+      const onChunkScraped = (
+        posts: PostData[],
+        chunkIndex: number
+      ): Promise<{ removeFromList: boolean; linksToRemove?: string[] }> => {
+        return new Promise((resolve) => {
+          // Push the chunk data to the renderer.
+          event.sender.send('scrape-list-chunk-ready', { posts, chunkIndex });
+          // Wait for the renderer to send back its decision.
+          ipcMain.once(
+            'scrape-list-chunk-confirm',
+            (_evt, data: { removeFromList: boolean; linksToRemove?: string[] }) => {
+              resolve(data ?? { removeFromList: false, linksToRemove: [] });
+            }
+          );
+        });
+      };
+
+      const result = await scrapeList(url, maxArticles, onChunkScraped, chunkSize);
       console.log('>= *** ==>> main.ts - scrape-list -Scraping successful');
       return { success: true, data: result.posts, declaredTotal: result.declaredTotal };
     } catch (error: unknown) {
@@ -584,6 +606,13 @@ ipcMain.handle(
     }
   }
 );
+
+ipcMain.handle('scrape-list-config', async () => {
+  return {
+    success: true,
+    chunkSizeDefault: timeConst.LIST_CHUNK_SIZE,
+  };
+});
 
 ipcMain.handle(
   'scrape-list-declared-total',

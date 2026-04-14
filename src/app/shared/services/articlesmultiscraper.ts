@@ -14,6 +14,12 @@ export interface MultiScrapePrecheckSummary {
   existingSlugCount: number;
 }
 
+export interface MultiScrapePostDbAnalysis {
+  summary: MultiScrapePrecheckSummary;
+  matchingPosts: PostData[];
+  remainingPosts: PostData[];
+}
+
 export interface MultiScrapePersistSummary {
   totalScraped: number;
   insertedCount: number;
@@ -51,6 +57,42 @@ export class Articlesmultiscraper {
       duplicateUrlCount: normalizedUrls.length - uniqueUrls.length,
       newCount: uniqueUrls.length - existingSlugCount,
       existingSlugCount,
+    };
+  }
+
+  async analyzeScrapedPostsAgainstDb(
+    posts: PostData[]
+  ): Promise<MultiScrapePostDbAnalysis> {
+    const sanitizedPosts = (posts ?? []).filter(
+      (post) => (post?.link ?? '').trim().length > 0
+    );
+    const normalizedUrls = sanitizedPosts.map((post) => post.link.trim());
+    const uniqueUrls = Array.from(new Set(normalizedUrls));
+    const existingArticles = await this.backendService.getAllArticles();
+    const existingBySlug = this.buildExistingBySlug(existingArticles);
+
+    const matchingPosts: PostData[] = [];
+    const remainingPosts: PostData[] = [];
+
+    for (const post of sanitizedPosts) {
+      const slug = getMediumSlugFromUrl(post.link);
+      if (slug && existingBySlug.has(slug)) {
+        matchingPosts.push(post);
+      } else {
+        remainingPosts.push(post);
+      }
+    }
+
+    return {
+      summary: {
+        totalUrls: normalizedUrls.length,
+        uniqueUrls,
+        duplicateUrlCount: normalizedUrls.length - uniqueUrls.length,
+        newCount: remainingPosts.length,
+        existingSlugCount: matchingPosts.length,
+      },
+      matchingPosts,
+      remainingPosts,
     };
   }
 

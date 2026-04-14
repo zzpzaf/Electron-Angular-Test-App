@@ -74,6 +74,7 @@ export class ListUrls {
   public $declaredTotal = signal<number | null>(null);
   public $declaredTotalLoading = signal<boolean>(false);
   public readonly listMaxArticlesDefault = LIST_MAX_ARTICLES_DEFAULT;
+  public listChunkSizeDefault = 250;
   private declaredTotalReqSeq = 0;
   private listurldata: listURLData = { listname: '', pubauthorslug: '' };
 
@@ -125,6 +126,8 @@ export class ListUrls {
 
   ngOnInit(): void {
     this.setupForm();
+
+    void this.loadListScrapeConfig();
 
     if (this.categoryNodesService.$catTreeNodes().length === 0) {
       this.categoryNodesService.setCategoryTreeNodesSignal();
@@ -227,9 +230,19 @@ export class ListUrls {
     this.linkScrapeForm = this.fb.group({
       url: this.fb.control('', [Validators.required]),
       maxArticles: this.fb.control(LIST_MAX_ARTICLES_DEFAULT, [Validators.required, Validators.min(1)]),
+      chunkSize: this.fb.control(this.listChunkSizeDefault, [Validators.required, Validators.min(1)]),
+      autoExcludeExisting: this.fb.control(true),
       add: this.fb.control(true),
       selectCategory: this.fb.control<string[]>([]),
     });
+  }
+
+  private async loadListScrapeConfig(): Promise<void> {
+    const cfg = await this.articlebasicscraper.getListScrapeConfig();
+    if (cfg.success && typeof cfg.chunkSizeDefault === 'number' && cfg.chunkSizeDefault > 0) {
+      this.listChunkSizeDefault = cfg.chunkSizeDefault;
+      this.linkScrapeForm.get('chunkSize')?.setValue(cfg.chunkSizeDefault, { emitEvent: false });
+    }
   }
 
   async submitForm(): Promise<void> {
@@ -254,7 +267,8 @@ export class ListUrls {
       }
 
       const maxArticles = this.linkScrapeForm.value.maxArticles ?? LIST_MAX_ARTICLES_DEFAULT;
-      this.runScraper(urlValue, maxArticles);
+      const chunkSize = this.linkScrapeForm.value.chunkSize ?? this.listChunkSizeDefault;
+      this.runScraper(urlValue, maxArticles, chunkSize);
       // void this.loader.withLoader(
       //   () =>  this.runScraper(urlValue),
       //   'Scraping List articles data ...'
@@ -270,10 +284,133 @@ export class ListUrls {
     }
   }
 
-  async runScraper(url: string, maxArticles = LIST_MAX_ARTICLES_DEFAULT): Promise<void> {
+  async runScraper(
+    url: string,
+    maxArticles = LIST_MAX_ARTICLES_DEFAULT,
+    chunkSize = this.listChunkSizeDefault
+  ): Promise<void> {
     let loading = true;
     let result = null;
+    let shouldStartFullScrape = false;
+    let chunkedModeReceived = false;
     this.scrappedError.set('');
+
+    // ── Per-chunk IPC handler (chunked mode only) ──────────────────────────────
+    // Registered before the invoke. Electron sends 'scrape-list-chunk-ready' with
+    // each chunk's metadata, then waits for 'scrape-list-chunk-confirm' before
+    // proceeding to article removal and the next chunk.
+    const chunkHandler = (data: { posts: PostData[]; chunkIndex: number }) => {
+      void (async () => {
+        let chunkDecision: { removeFromList: boolean; linksToRemove: string[] } = {
+          removeFromList: false,
+          linksToRemove: [],
+        };
+        let postsToScrapeAndPersist: PostData[] = [];
+        const linksToRemoveSet = new Set<string>();
+
+        try {
+          chunkedModeReceived = true;
+          const incoming = (data.posts ?? []) as PostData[];
+          const chunkIndex = data.chunkIndex ?? 1;
+
+          // 1. Accumulate into signals (replace on chunk 1, append on subsequent)
+          const current = chunkIndex === 1 ? [] : this.$scrappedDataArray();
+          const accumulated = this.dedupePostsBySlug([...current, ...incoming]);
+          this.setScrappedPosts(accumulated);
+          this.precheckSummary.set(this.buildPrecheckSummaryForPosts(accumulated));
+
+          // 2. DB analysis for this chunk only
+          const analysis = await this.articlesmultiscraper.analyzeScrapedPostsAgainstDb(incoming);
+          postsToScrapeAndPersist = incoming;
+          const autoExcludeExisting = this.linkScrapeForm.value.autoExcludeExisting !== false;
+
+          if (analysis.summary.existingSlugCount > 0) {
+            if (autoExcludeExisting) {
+              const slugsToRemove = new Set<string>(
+                analysis.matchingPosts
+                  .map((p) => getMediumSlugFromUrl(p.link))
+                  .filter((s): s is string => !!s)
+              );
+              const existingLinksToRemove = analysis.matchingPosts
+                .map((p) => p.link)
+                .filter((link): link is string => !!link);
+              existingLinksToRemove.forEach((link) => linksToRemoveSet.add(link));
+
+              const filtered = this.$scrappedDataArray().filter(
+                (p) => !slugsToRemove.has(getMediumSlugFromUrl(p.link) ?? '')
+              );
+              this.setScrappedPosts(filtered);
+              this.precheckSummary.set(this.buildPrecheckSummaryForPosts(filtered));
+              postsToScrapeAndPersist = analysis.remainingPosts;
+            } else {
+              // 3. Confirmation dialog for already-existing DB rows in this chunk.
+              const confirmed = await firstValueFrom(
+                this.dlgService.popup({
+                  token: 'conf',
+                  header: `Chunk ${chunkIndex} – Articles Already In DB`,
+                  content:
+                    `Chunk articles: ${incoming.length}\n` +
+                    `Already stored in DB: ${analysis.summary.existingSlugCount}\n` +
+                    `Remaining after removal: ${analysis.remainingPosts.length}\n\n` +
+                    `Remove the already-stored articles from this chunk before scraping?`,
+                  posAnsMsg: 'Remove Existing',
+                  negAnsMsg: 'Keep All',
+                  initialFocus: 1,
+                })
+              );
+
+              if (confirmed) {
+                const slugsToRemove = new Set<string>(
+                  analysis.matchingPosts
+                    .map((p) => getMediumSlugFromUrl(p.link))
+                    .filter((s): s is string => !!s)
+                );
+                const existingLinksToRemove = analysis.matchingPosts
+                  .map((p) => p.link)
+                  .filter((link): link is string => !!link);
+                existingLinksToRemove.forEach((link) => linksToRemoveSet.add(link));
+
+                const filtered = this.$scrappedDataArray().filter(
+                  (p) => !slugsToRemove.has(getMediumSlugFromUrl(p.link) ?? '')
+                );
+                this.setScrappedPosts(filtered);
+                this.precheckSummary.set(this.buildPrecheckSummaryForPosts(filtered));
+                postsToScrapeAndPersist = analysis.remainingPosts;
+              }
+            }
+          }
+
+          // 4. Scrape and persist remaining chunk posts BEFORE unblocking Electron.
+          if (postsToScrapeAndPersist.length > 0) {
+            await this.fullArticleScrapeFromPosts(postsToScrapeAndPersist, {
+              showCompletionPopup: false,
+              updateSignals: false,
+            });
+
+            // 5. After persist, these processed links are now DB-existing,
+            // so remove them from Medium list before loading next chunk.
+            postsToScrapeAndPersist
+              .map((p) => p.link)
+              .filter((link): link is string => !!link)
+              .forEach((link) => linksToRemoveSet.add(link));
+          }
+
+          if (linksToRemoveSet.size > 0) {
+            chunkDecision = {
+              removeFromList: true,
+              linksToRemove: Array.from(linksToRemoveSet),
+            };
+          }
+        } catch (err) {
+          console.error('scrape-list-chunk-ready handler error:', err);
+        } finally {
+          // Always unblock Electron so the next chunk / removal can proceed
+          window.electronAPI.send('scrape-list-chunk-confirm', chunkDecision);
+        }
+      })();
+    };
+
+    window.electronAPI.on('scrape-list-chunk-ready', chunkHandler);
 
     try {
       // Call the appropriate service method: scrapeArticle() or scrapeList()
@@ -291,7 +428,7 @@ export class ListUrls {
           .subscribe((res) => console.log('Dialog closed with:', res));
         return;
       }
-      const response = await this.articlebasicscraper.scrapeList(url, maxArticles);
+      const response = await this.articlebasicscraper.scrapeList(url, maxArticles, chunkSize);
       if (response.success) {
         // Update declared total signal and pre-fill the input for the next run
         const dt = response.declaredTotal ?? null;
@@ -299,50 +436,48 @@ export class ListUrls {
         if (dt !== null && dt < this.linkScrapeForm.value.maxArticles) {
           this.linkScrapeForm.get('maxArticles')?.setValue(dt, { emitEvent: false });
         }
-        const listPosts = Array.isArray(response.data)
-          ? this.dedupePostsBySlug(response.data as PostData[])
-          : [];
+        if (chunkedModeReceived) {
+          // Chunked mode: full scrape/persist already happened per chunk;
+          // skip final full-article scrape pass.
+          const accumulated = this.$scrappedDataArray();
+          if (accumulated.length === 0) {
+            this.dlgService
+              .popup({
+                token: 'info',
+                header: 'Nothing Left To Scrape',
+                content:
+                  'All loaded list articles are already stored in the DB. The article-by-article scraping process will not start.',
+                posAnsMsg: 'OK',
+                negAnsMsg: '',
+              })
+              .subscribe((res) => console.log('Dialog closed with:', res));
+            return;
+          }
+          result = accumulated;
+          shouldStartFullScrape = false;
+        } else {
+          // Non-chunked mode: original single-pass flow.
+          const listPosts = Array.isArray(response.data)
+            ? this.dedupePostsBySlug(response.data as PostData[])
+            : [];
 
-        if (listPosts.length === 0) {
-          this.dlgService
-            .popup({
-              token: 'warn',
-              header: 'No Articles Found',
-              content: 'No article URLs were found in the provided Medium list.',
-              posAnsMsg: 'OK',
-              negAnsMsg: '',
-            })
-            .subscribe((res) => console.log('Dialog closed with:', res));
-          return;
+          if (listPosts.length === 0) {
+            this.dlgService
+              .popup({
+                token: 'warn',
+                header: 'No Articles Found',
+                content: 'No article URLs were found in the provided Medium list.',
+                posAnsMsg: 'OK',
+                negAnsMsg: '',
+              })
+              .subscribe((res) => console.log('Dialog closed with:', res));
+            return;
+          }
+
+          this.setScrappedPosts(listPosts);
+          result = listPosts;
+          shouldStartFullScrape = await this.precheckLoadedListPosts();
         }
-
-        const precheck = await this.articlesmultiscraper.summarizeUrlsAgainstDb(
-          listPosts.map((post) => post.link)
-        );
-        this.precheckSummary.set(precheck);
-
-        this.dlgService
-          .popup({
-            token: 'info',
-            header: 'List Articles Summary',
-            content:
-              `List articles found: ${precheck.totalUrls}\n` +
-              `Unique URLs: ${precheck.uniqueUrls.length}\n` +
-              `New articles to insert: ${precheck.newCount}\n` +
-              `Existing same-slug articles: ${precheck.existingSlugCount}` +
-              (precheck.duplicateUrlCount > 0
-                ? `\nDuplicate URLs in list: ${precheck.duplicateUrlCount}`
-                : ''),
-            posAnsMsg: 'OK',
-            negAnsMsg: '',
-          })
-          .subscribe((res) => console.log('Dialog closed with:', res));
-
-        this.$scrappedDataArray.set(listPosts);
-        result = listPosts;
-        this.$scrappedDataArrayString.set(
-          JSON.stringify(this.$scrappedDataArray(), null, 2)
-        ); // Beutify the JSON data;
       } else {
         result = response.error;
       }
@@ -371,12 +506,15 @@ export class ListUrls {
       /** 250903
        *  * Continue with articles full scraping
        */
-      this.fullArticleScrapeFromMetaData();
+      if (shouldStartFullScrape) {
+        await this.fullArticleScrapeFromMetaData();
+      }
     } catch (err) {
       // result = { error: err };
       if (err) this.scrappedError.set(JSON.stringify({ err }));
     } finally {
       loading = false;
+      window.electronAPI.removeAllListeners('scrape-list-chunk-ready');
     }
 
     if (result) {
@@ -420,7 +558,9 @@ export class ListUrls {
     this.$declaredTotal.set(null);
     this.linkScrapeForm.reset(); // Reset the form
     this.linkScrapeForm.get('add')?.setValue(true, { emitEvent: false });
+    this.linkScrapeForm.get('autoExcludeExisting')?.setValue(true, { emitEvent: false });
     this.linkScrapeForm.get('maxArticles')?.setValue(LIST_MAX_ARTICLES_DEFAULT, { emitEvent: false });
+    this.linkScrapeForm.get('chunkSize')?.setValue(this.listChunkSizeDefault, { emitEvent: false });
   }
 
   onCopyScrappedData() {
@@ -469,14 +609,31 @@ export class ListUrls {
 
   // 250913
   private async fullArticleScrapeFromMetaData() {
+    await this.fullArticleScrapeFromPosts(this.$scrappedDataArray(), {
+      showCompletionPopup: true,
+      updateSignals: true,
+    });
+  }
+
+  private async fullArticleScrapeFromPosts(
+    basePosts: PostData[],
+    opts: { showCompletionPopup: boolean; updateSignals: boolean }
+  ): Promise<void> {
     console.log(
       '>===>> ListUrls - fullArticleScrapeFromMetaData() - Started ...'
     );
-    this.$scrappedDataArrayString.set('');
 
-    const urlsArray: string[] = this.$scrappedDataArray().map(
+    if (opts.updateSignals) {
+      this.$scrappedDataArrayString.set('');
+    }
+
+    const urlsArray: string[] = basePosts.map(
       (item) => item.link
     );
+    if (urlsArray.length === 0) {
+      return;
+    }
+
     try {
       const scrapeOptions = this.contentScrapePolicy.buildScrapeTabsOptions(urlsArray);
       const response = await this.articlebasicscraper.scrapeTabsList(
@@ -500,31 +657,36 @@ export class ListUrls {
         //   JSON.stringify(result, null, 2)
         // );
 
-        this.updateScrappedDataArray(result);
-        // console.log('>===>> Scrapped Data Array: ', this.$scrappedDataArray());
+        const mergedPosts = this.mergeScrapedDataIntoPosts(basePosts, result);
+
+        if (opts.updateSignals) {
+          this.setScrappedPosts(mergedPosts);
+        }
 
         // Insert scraped articles into the database, process/update article images and set/insert article categories
         // this.insertScrapedArticlesArrayToDB(this.$scrappedDataArray());   // 260325
 
         // 260325 - We moved the call to insertScrapedArticlesArrayToDB() inside the onGetFileUrls() function because we want to give the user the chance to review the scraped data and select a category before inserting into the DB. So, we will call insertScrapedArticlesArrayToDB() after the user clicks the "Get File URLs" button and after we get the file content from Electron.
         const persistSummary = await this.articlesmultiscraper.persistScrapedArticlesWithDedup(
-          this.$scrappedDataArray(),
+          mergedPosts,
           this.selectedCategoryIds,
           this.getPersistModeFromToggle()
         );
 
-        this.dlgService
-          .popup({
-            token: 'info',
-            header: 'List Scraping Completed',
-            content:
-              `Inserted new articles: ${persistSummary.insertedCount}\n` +
-              `Updated existing articles: ${persistSummary.updatedCount}\n` +
-              `Skipped unchanged/newer DB articles: ${persistSummary.skippedCount}`,
-            posAnsMsg: 'OK',
-            negAnsMsg: '',
-          })
-          .subscribe((res) => console.log('Dialog closed with:', res));
+        if (opts.showCompletionPopup) {
+          this.dlgService
+            .popup({
+              token: 'info',
+              header: 'List Scraping Completed',
+              content:
+                `Inserted new articles: ${persistSummary.insertedCount}\n` +
+                `Updated existing articles: ${persistSummary.updatedCount}\n` +
+                `Skipped unchanged/newer DB articles: ${persistSummary.skippedCount}`,
+              posAnsMsg: 'OK',
+              negAnsMsg: '',
+            })
+            .subscribe((res) => console.log('Dialog closed with:', res));
+        }
 
 
       }
@@ -534,9 +696,8 @@ export class ListUrls {
   }
 
   // 250913
-  private updateScrappedDataArray(fullScrapedData: PostData[]) {
-    console.log('>===>> ListUrls - updateScrappedDataArray() - Started ...');
-    const currentArray = this.$scrappedDataArray();
+  private mergeScrapedDataIntoPosts(basePosts: PostData[], fullScrapedData: PostData[]): PostData[] {
+    const merged = [...basePosts];
 
     const excludedLinks = new Set(
       fullScrapedData
@@ -544,52 +705,129 @@ export class ListUrls {
         .map((item) => item.link)
     );
 
-    const filteredCurrentArray =
+    const filteredMerged =
       excludedLinks.size > 0
-        ? currentArray.filter((item) => !excludedLinks.has(item.link))
-        : currentArray;
-
-    if (excludedLinks.size > 0) {
-      console.log(
-        '>===>> ListUrls - updateScrappedDataArray() - Excluding links from persistence:',
-        Array.from(excludedLinks)
-      );
-    }
+        ? merged.filter((item) => !excludedLinks.has(item.link))
+        : merged;
 
     for (const newData of fullScrapedData) {
       if (newData.excludeFromPersistence) {
         continue;
       }
 
-      console.log(
-        '>===>> ListUrls - updateScrappedDataArray() - FullScrapedData Article: ',
-        newData.link,
-        ' Slug: ',
-        getMediumSlugFromUrl(newData.link)
-      );
-      const match = filteredCurrentArray.find(
+      const match = filteredMerged.find(
         (item) =>
           getMediumSlugFromUrl(item.link) === getMediumSlugFromUrl(newData.link)
       );
-
-      if (match) {
-        console.log(
-          '>===>> ListUrls - updateScrappedDataArray() - Matched Article: ',
-          match.link,
-          ' Slug: ',
-          getMediumSlugFromUrl(match.link)
-        );
-      }
 
       if (match && newData.content) {
         match.content = newData.content;
         match.link = newData.link;
       }
     }
-    this.$scrappedDataArray.set([...filteredCurrentArray]);
+
+    return filteredMerged;
+  }
+
+  // 250913
+  private updateScrappedDataArray(fullScrapedData: PostData[]) {
+    console.log('>===>> ListUrls - updateScrappedDataArray() - Started ...');
+    const merged = this.mergeScrapedDataIntoPosts(this.$scrappedDataArray(), fullScrapedData);
+    this.$scrappedDataArray.set([...merged]);
     this.$scrappedDataArrayString.set(
       JSON.stringify(this.$scrappedDataArray(), null, 2)
     );
+  }
+
+  private setScrappedPosts(posts: PostData[]): void {
+    this.$scrappedDataArray.set([...posts]);
+    this.$scrappedDataArrayString.set(JSON.stringify(posts, null, 2));
+  }
+
+  private buildPrecheckSummaryForPosts(posts: PostData[]): MultiScrapePrecheckSummary {
+    const normalizedUrls = (posts ?? [])
+      .map((post) => (post?.link ?? '').trim())
+      .filter((url) => url.length > 0);
+    const uniqueUrls = Array.from(new Set(normalizedUrls));
+
+    return {
+      totalUrls: normalizedUrls.length,
+      uniqueUrls,
+      duplicateUrlCount: normalizedUrls.length - uniqueUrls.length,
+      newCount: uniqueUrls.length,
+      existingSlugCount: 0,
+    };
+  }
+
+  private async precheckLoadedListPosts(): Promise<boolean> {
+    const analysis = await this.articlesmultiscraper.analyzeScrapedPostsAgainstDb(
+      this.$scrappedDataArray()
+    );
+    this.precheckSummary.set(analysis.summary);
+
+    if (analysis.summary.existingSlugCount <= 0) {
+      this.dlgService
+        .popup({
+          token: 'info',
+          header: 'List Articles Summary',
+          content:
+            `List articles found: ${analysis.summary.totalUrls}\n` +
+            `Unique URLs: ${analysis.summary.uniqueUrls.length}\n` +
+            `New articles to insert: ${analysis.summary.newCount}\n` +
+            `Existing same-slug articles: ${analysis.summary.existingSlugCount}` +
+            (analysis.summary.duplicateUrlCount > 0
+              ? `\nDuplicate URLs in list: ${analysis.summary.duplicateUrlCount}`
+              : ''),
+          posAnsMsg: 'OK',
+          negAnsMsg: '',
+        })
+        .subscribe((res) => console.log('Dialog closed with:', res));
+
+      return true;
+    }
+
+    const confirmed = await firstValueFrom(
+      this.dlgService.popup({
+        token: 'conf',
+        header: 'Existing Articles Already In DB',
+        content:
+          `List articles found: ${analysis.summary.totalUrls}\n` +
+          `Unique URLs: ${analysis.summary.uniqueUrls.length}\n` +
+          `Already stored in DB: ${analysis.summary.existingSlugCount}\n` +
+          `Remaining after removal: ${analysis.remainingPosts.length}` +
+          (analysis.summary.duplicateUrlCount > 0
+            ? `\nDuplicate URLs in list: ${analysis.summary.duplicateUrlCount}`
+            : '') +
+          `\n\nDo you want to remove the already stored articles before the article-by-article scraping starts?`,
+        posAnsMsg: 'Remove Existing',
+        negAnsMsg: 'Keep All',
+        initialFocus: 1,
+      })
+    );
+
+    if (!confirmed) {
+      return true;
+    }
+
+    this.setScrappedPosts(analysis.remainingPosts);
+    this.precheckSummary.set(this.buildPrecheckSummaryForPosts(analysis.remainingPosts));
+
+    if (analysis.remainingPosts.length === 0) {
+      this.dlgService
+        .popup({
+          token: 'info',
+          header: 'Nothing Left To Scrape',
+          content:
+            'All loaded list articles are already stored in the DB. The article-by-article scraping process will not start.',
+          posAnsMsg: 'OK',
+          negAnsMsg: '',
+        })
+        .subscribe((res) => console.log('Dialog closed with:', res));
+
+      return false;
+    }
+
+    return true;
   }
 
   private dedupePostsBySlug(posts: PostData[]): PostData[] {

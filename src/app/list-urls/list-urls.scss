@@ -40,6 +40,24 @@
   flex: 0 0 auto;
 }
 
+.login-form-button {
+  margin-right: 8px;
+}
+
+.scrape-options-row {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding-left: 16px;
+  margin: 2px 0 8px;
+}
+
+.scrape-options-row .ant-form-item {
+  margin-bottom: 0 !important;
+}
+
 .max-articles-form-item {
   flex: 0 0 auto;
 }
@@ -82,6 +100,28 @@
 }
 
 .max-articles-input {
+  width: 80px;
+  text-align: right;
+}
+
+.chunk-size-form-item {
+  flex: 0 0 auto;
+}
+
+.chunk-size-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.chunk-size-label {
+  color: #fff;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.chunk-size-input {
   width: 80px;
   text-align: right;
 }

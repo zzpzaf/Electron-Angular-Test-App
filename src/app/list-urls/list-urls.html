@@ -27,49 +27,74 @@
     </nz-form-control>
   </nz-form-item>
 
-  <!-- Max articles input -->
-  <nz-form-item class="max-articles-form-item">
-    <nz-form-control>
-      <div class="max-articles-wrapper">
-        <span class="max-articles-label">
-          Max articles to scrape:
-          @if ($declaredTotalLoading()) {
-            <span class="declared-loading" title="Fetching declared story count"></span>
-          }
-          @if ($declaredTotal() !== null) {
-            <span class="declared-total">(declared: {{ $declaredTotal() }})</span>
-          }
-        </span>
-        <input
-          type="number"
-          nz-input
-          formControlName="maxArticles"
-          class="max-articles-input"
-          min="1"
-          step="10"
-        />
-      </div>
-    </nz-form-control>
-  </nz-form-item>
-
-  <nz-form-item>
-    <label
-      nz-checkbox
-      formControlName="add"
-      title="Checked: DB sync (insert new, update older, skip unchanged). Unchecked: insert only new (skip all existing slug records, no updates)."
-    >
-      <span class="sync-checkbox-label">DB sync</span>
-    </label>
-  </nz-form-item>
-
   <nz-form-item class="login-form-button">
     <button nz-button [nzType]="'primary'">Scrape</button>
   </nz-form-item>
 
-  <!-- 
-  2nd row - TO BE UPDATED WITH: 
-  CATEGORY SELECT, SEARCH & MATCHES COUNTER 
-  -->
+  <div class="scrape-options-row">
+    <nz-form-item class="max-articles-form-item">
+      <nz-form-control>
+        <div class="max-articles-wrapper">
+          <span class="max-articles-label">
+            Max articles:
+            @if ($declaredTotalLoading()) {
+              <span class="declared-loading" title="Fetching declared story count"></span>
+            }
+            @if ($declaredTotal() !== null) {
+              <span class="declared-total">(declared: {{ $declaredTotal() }})</span>
+            }
+          </span>
+          <input
+            type="number"
+            nz-input
+            formControlName="maxArticles"
+            class="max-articles-input"
+            min="1"
+            step="10"
+          />
+        </div>
+      </nz-form-control>
+    </nz-form-item>
+
+    <nz-form-item class="chunk-size-form-item">
+      <nz-form-control>
+        <div class="chunk-size-wrapper">
+          <span class="chunk-size-label">Articles Chunk size:</span>
+          <input
+            type="number"
+            nz-input
+            formControlName="chunkSize"
+            class="chunk-size-input"
+            min="1"
+            step="10"
+          />
+        </div>
+      </nz-form-control>
+    </nz-form-item>
+
+    <nz-form-item>
+      <label
+        nz-checkbox
+        formControlName="add"
+        title="Checked: DB sync (insert new, update older, skip unchanged). Unchecked: insert only new (skip all existing slug records, no updates)."
+      >
+        <span class="sync-checkbox-label">DB sync</span>
+      </label>
+    </nz-form-item>
+
+    <nz-form-item>
+      <label
+        nz-checkbox
+        formControlName="autoExcludeExisting"
+        title="Checked: automatically exclude existing DB matches per chunk without confirmation dialog. Unchecked: ask for confirmation per chunk."
+      >
+        <span class="sync-checkbox-label">Auto-exclude existing Articles</span>
+      </label>
+    </nz-form-item>
+  </div>
+
+
+  <!-- 3rd row - CATEGORY SELECT, SEARCH & MATCHES COUNTER -->
 
   <div class="category-row-container">
     <div class="category-node-select-container">

@@ -53,6 +53,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }     
    ),
 
+  // Remove all listeners for a given channel (use after a long-running invoke completes)
+  removeAllListeners: (channel: string) => ipcRenderer.removeAllListeners(channel),
+
   // Generic invoker for all channels, returns Promise<unknown> e.g.: window.electronAPI.invoke('collect-posts', urls);
   invoke: (channel: string, ...args: unknown[]) =>
     ipcRenderer.invoke(channel, ...args),

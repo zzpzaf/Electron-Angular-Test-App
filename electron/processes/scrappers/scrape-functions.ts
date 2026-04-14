@@ -2070,22 +2070,21 @@ export async function extractCodeFromIframe(
 
 export async function scrapeList(
   url: string,
-  maxArticles: number = timeConst.MAX_ARTICLES_NUMBER
+  maxArticles: number = timeConst.MAX_ARTICLES_NUMBER,
+  onChunkScraped?: (posts: PostData[], chunkIndex: number) => Promise<{ removeFromList: boolean; linksToRemove?: string[] }>,
+  chunkSize?: number
 ): Promise<{ posts: PostData[]; declaredTotal: number | null }> {
   logFunctionHeader('scrapeList');
   logScrapeLinkStart('scrapeList', 1, url);
 
-  console.log(
-    'scrape-functions ->  scrapeList() started .... target URL: ',
-    url
+  console.log('scrape-functions ->  scrapeList() started .... target URL: ', url);
+
+  const listConnectTimeoutMs = Math.max(timeConst.TAB_INITIAL_PAGE_LOADING_DELAY, 30000);
+  const effectiveChunkSize = Math.max(
+    1,
+    Math.floor(chunkSize ?? timeConst.LIST_CHUNK_SIZE)
   );
 
-  const listConnectTimeoutMs = Math.max(
-    timeConst.TAB_INITIAL_PAGE_LOADING_DELAY,
-    30000
-  );
-
-  // Connect to the configured scraping browser mode (headless by default)
   const session = await connectToBrowser();
   const { browser, owned, mode } = session;
 
@@ -2094,22 +2093,66 @@ export async function scrapeList(
     mode
   );
 
-  const page = await createScrapePage(browser);
+  const openFreshListPage = async (): Promise<Puppeteer.Page> => {
+    const maxOpenAttempts = 3;
+
+    for (let attempt = 1; attempt <= maxOpenAttempts; attempt++) {
+      const nextPage = await createScrapePage(browser);
+
+      try {
+        console.log(
+          `scrape-functions ->  scrapeList() - trying to go to page (attempt ${attempt}/${maxOpenAttempts}): `,
+          url
+        );
+
+        await nextPage.goto(url, {
+          waitUntil: 'domcontentloaded',
+          timeout: listConnectTimeoutMs,
+        });
+
+        try {
+          await nextPage.waitForSelector(listSEL.allArticle, {
+            timeout: Math.max(timeConst.INITIAL_PAGE_LOADING_DELAY, 15000),
+          });
+          return nextPage;
+        } catch {
+          const articleCount = await nextPage.$$eval('article', (arts) => arts.length).catch(() => 0);
+          if (articleCount > 0) {
+            return nextPage;
+          }
+
+          if (attempt < maxOpenAttempts) {
+            console.warn(
+              `⚠️  scrapeList -> openFreshListPage: no article cards yet (attempt ${attempt}/${maxOpenAttempts}); retrying...`
+            );
+            await nextPage.close().catch(() => {});
+            await sleep(1200 * attempt);
+            continue;
+          }
+
+          // Final attempt: continue with the page even if no cards are visible yet.
+          // Downstream scrolling may still load cards.
+          console.warn(
+            '⚠️  scrapeList -> openFreshListPage: proceeding without initial article selector; will rely on scroll loading.'
+          );
+          return nextPage;
+        }
+      } catch (err) {
+        await nextPage.close().catch(() => {});
+        if (attempt >= maxOpenAttempts) {
+          throw err;
+        }
+        await sleep(1200 * attempt);
+      }
+    }
+
+    // Unreachable in normal flow
+    throw new Error('openFreshListPage failed unexpectedly');
+  };
+
+  let page = await openFreshListPage();
 
   try {
-    console.log(
-      'scrape-functions ->  scrapeList() - trying to go to page: ',
-      url
-    );
-    await page.goto(url, {
-      waitUntil: 'domcontentloaded',
-      timeout: listConnectTimeoutMs,
-    });
-
-    await page.waitForSelector(listSEL.allArticle, {
-      timeout: Math.max(timeConst.INITIAL_PAGE_LOADING_DELAY, 10000),
-    });
-
     const declaredTotal = await getListStoryCount(page);
     if (declaredTotal !== null) {
       console.log(
@@ -2123,58 +2166,300 @@ export async function scrapeList(
     }
 
     // effectiveMax = min(user's requested max, declared total) so we never scroll more than needed.
-    // When declaredTotal > maxArticles the user has deliberately capped it, so respect that.
     const effectiveMax =
       declaredTotal !== null ? Math.min(maxArticles, declaredTotal) : maxArticles;
-    // Only pass targetCount when the declared total fits within the user's cap —
-    // this enables enhanced persistence and the "reached declared count" stop.
-    const targetCount =
-      declaredTotal !== null && declaredTotal <= maxArticles ? declaredTotal : null;
+
+    // Use chunked mode when the effective target exceeds one chunk size.
+    const useChunkedMode = effectiveMax > effectiveChunkSize;
+
+    if (!useChunkedMode) {
+      // ── Single-pass scrape (small list) ────────────────────────────────────────
+      const targetCount =
+        declaredTotal !== null && declaredTotal <= maxArticles ? declaredTotal : null;
+      console.log(
+        'scrape-functions ->  scrapeList() - effectiveMax: ',
+        effectiveMax,
+        '  targetCount: ',
+        targetCount
+      );
+
+      const totalArticles = await autoScrollToEnd(
+        page,
+        effectiveMax,
+        timeConst.SCROLL_DELAY,
+        targetCount
+      );
+      console.log(
+        'scrape-functions ->  scrapeList() - Articles loaded after scroll: ',
+        totalArticles
+      );
+
+      const scrapedData = await scrapeMediumList(page);
+
+      if (scrapedData.length > 0) {
+        logFunctionHeader('scrapeList:articles');
+        scrapedData.forEach((item, idx) => {
+          logScrapeLinkStart('scrapeList:article', idx + 1, item.link, scrapedData.length);
+          if (item.image) {
+            logScrapeLinkStart('scrapeList:image', idx + 1, item.image, scrapedData.length);
+          }
+        });
+      }
+
+      for (const item of scrapedData) {
+        item.date = formatDate(item.date);
+        item.pubauthorslug = extractFirstPathPart(new URL(item.link).pathname);
+      }
+
+      return { posts: scrapedData, declaredTotal };
+    }
+
+    // ── Chunked mode: load → scrape → remove → repeat ─────────────────────────
+    // currentListName is extracted from the first chunk's scrape results.
+    // scrapeMediumList() already processes the h1 text (strips "List:" prefix,
+    // splits on "|") and stores it as PostData.listname — much more reliable
+    // than a raw h1 textContent read before the page is fully settled.
+    let currentListName = '';
+
     console.log(
-      'scrape-functions ->  scrapeList() - effectiveMax: ',
-      effectiveMax,
-      '  targetCount: ',
-      targetCount
-    );
-
-    const totalArticles = await autoScrollToEnd(
-      page,
-      effectiveMax,
-      timeConst.SCROLL_DELAY,
-      targetCount
+      'scrape-functions ->  scrapeList() [chunked] - effectiveMax: ',
+      effectiveMax
     );
     console.log(
-      'scrape-functions ->  scrapeList() - Articles loaded after scroll: ',
-      totalArticles
+      'scrape-functions ->  scrapeList() [chunked] - chunkSize: ',
+      effectiveChunkSize
     );
 
-    const scrapedData = await scrapeMediumList(page);
+    const allPosts: PostData[] = [];
+    const seenSlugs = new Set<string>();
+    const failedRemovalLinks = new Set<string>();
+    let chunkIndex = 0;
 
-    if (scrapedData.length > 0) {
+    while (allPosts.length < effectiveMax) {
+      chunkIndex++;
+      const chunkTarget = Math.min(
+        effectiveChunkSize,
+        effectiveMax - allPosts.length
+      );
+
+      console.log(
+        `scrape-functions ->  scrapeList() [chunked] - chunk ${chunkIndex}: scrolling to ${chunkTarget} articles`
+      );
+
+      // Each chunk starts from a fresh page at top, so we only need the current
+      // chunk size visible, not the cumulative running total.
+      await autoScrollToEnd(
+        page,
+        chunkTarget,
+        timeConst.SCROLL_DELAY,
+        chunkTarget
+      );
+
+      // Scrape all currently visible article metadata.
+      const allVisible = await scrapeMediumList(page);
+
+        // Extract the list display name from the very first scrape result.
+        // This is the name shown in the Medium bookmark popup's list row.
+        if (chunkIndex === 1 && allVisible.length > 0) {
+          currentListName = allVisible[0].listname ?? '';
+          console.log(
+            `scrape-functions ->  scrapeList() [chunked] - list display name: "${currentListName}"`
+          );
+        }
+
+      // Keep only articles we haven't collected yet.
+      const newPosts = allVisible.filter((item) => {
+        try {
+          const slug = new URL(item.link).pathname;
+          if (seenSlugs.has(slug)) return false;
+          seenSlugs.add(slug);
+          return true;
+        } catch {
+          return false;
+        }
+      });
+
+      console.log(
+        `scrape-functions ->  scrapeList() [chunked] - chunk ${chunkIndex}: ${newPosts.length} new articles`
+      );
+
+      if (newPosts.length === 0) {
+        console.log(
+          `scrape-functions ->  scrapeList() [chunked] - no new articles found; stopping.`
+        );
+        break;
+      }
+
+      allPosts.push(...newPosts);
+
+      const stillNeedMore = allPosts.length < effectiveMax;
+
+      // Notify Angular of this chunk (signal update + DB precheck + optional dialog).
+      // Electron pauses here until Angular sends back 'scrape-list-chunk-confirm'.
+      let doRemove = stillNeedMore; // default when no callback: always remove if more needed
+      let linksToRemove = newPosts.map((p) => p.link);
+      if (onChunkScraped) {
+        const response = await onChunkScraped(newPosts, chunkIndex);
+        const requestedLinks = Array.from(new Set((response.linksToRemove ?? []).filter(Boolean)));
+        linksToRemove = requestedLinks;
+        doRemove = response.removeFromList && requestedLinks.length > 0 && stillNeedMore;
+      }
+
+      let removedInChunk = 0;
+      let pendingInChunk = 0;
+      let unavailableRemovedInChunk = 0;
+
+      if (doRemove) {
+        // Remove the newly scraped articles from the Medium list so the next
+        // scroll loads a fresh batch of previously-hidden articles.
+        console.log(
+          `scrape-functions ->  scrapeList() [chunked] - removing ${linksToRemove.length} selected articles from list`
+        );
+        const selectedPosts = linksToRemove.map((link) => ({ link }));
+        const { removed, failed, failedLinks } = await removeChunkFromCurrentList(
+          page,
+          selectedPosts,
+          currentListName
+        );
+        removedInChunk = removed;
+        pendingInChunk = failed;
+
+        const failedSet = new Set(failedLinks);
+        for (const link of linksToRemove) {
+          if (failedSet.has(link)) {
+            failedRemovalLinks.add(link);
+          } else {
+            failedRemovalLinks.delete(link);
+          }
+        }
+
+        console.log(
+          `scrape-functions ->  scrapeList() [chunked] - removed: ${removed}, failed: ${failed}`
+        );
+
+        // Remove placeholder cards like "This story is no longer available"
+        // using their dedicated "Remove from list" button.
+        const unavailableRemoved = await removeUnavailableStoriesFromCurrentList(page);
+        unavailableRemovedInChunk = unavailableRemoved;
+        if (unavailableRemoved > 0) {
+          console.log(
+            `scrape-functions ->  scrapeList() [chunked] - removed unavailable stories: ${unavailableRemoved}`
+          );
+        }
+
+        console.log(
+          `scrape-functions ->  scrapeList() [chunked] - removal summary: removed=${removedInChunk}, unavailableRemoved=${unavailableRemovedInChunk}, pending=${pendingInChunk}`
+        );
+
+        // Wait for the page to settle after bulk removal.
+        await new Promise((r) => setTimeout(r, timeConst.AFTER_REMOVE_SETTLE_DELAY));
+      }
+
+      if (stillNeedMore) {
+        // Start next chunk in a fresh tab from the beginning of the list.
+        if (!page.isClosed()) {
+          await page.close();
+        }
+        page = await openFreshListPage();
+      }
+    }
+
+    // Final cleanup pass: retry removing any links that previously failed in chunk passes.
+    if (failedRemovalLinks.size > 0 && currentListName.trim().length > 0) {
+      console.log(
+        `scrape-functions ->  scrapeList() [chunked] - final cleanup pass for ${failedRemovalLinks.size} pending removals`
+      );
+
+      if (!page.isClosed()) {
+        await page.close();
+      }
+      page = await openFreshListPage();
+
+      const finalPendingPosts = Array.from(failedRemovalLinks).map((link) => ({ link }));
+      const finalCleanup = await removeChunkFromCurrentList(
+        page,
+        finalPendingPosts,
+        currentListName
+      );
+
+      const finalUnavailableRemoved = await removeUnavailableStoriesFromCurrentList(page);
+
+      console.log(
+        `scrape-functions ->  scrapeList() [chunked] - final cleanup summary: removed=${finalCleanup.removed}, unavailableRemoved=${finalUnavailableRemoved}, pending=${finalCleanup.failed}`
+      );
+    }
+
+    if (allPosts.length > 0) {
       logFunctionHeader('scrapeList:articles');
-      scrapedData.forEach((item, idx) => {
-        logScrapeLinkStart('scrapeList:article', idx + 1, item.link, scrapedData.length);
+      allPosts.forEach((item, idx) => {
+        logScrapeLinkStart('scrapeList:article', idx + 1, item.link, allPosts.length);
         if (item.image) {
-          logScrapeLinkStart('scrapeList:image', idx + 1, item.image, scrapedData.length);
+          logScrapeLinkStart('scrapeList:image', idx + 1, item.image, allPosts.length);
         }
       });
     }
 
-    // We update here the gathered data, since in Puppeteer, we can not use outter functions
-    for (const item of scrapedData) {
+    for (const item of allPosts) {
       item.date = formatDate(item.date);
       item.pubauthorslug = extractFirstPathPart(new URL(item.link).pathname);
     }
 
-    return { posts: scrapedData, declaredTotal };
+    console.log(
+      `scrape-functions ->  scrapeList() [chunked] - total collected: ${allPosts.length}`
+    );
+    return { posts: allPosts, declaredTotal };
   } catch (error) {
     throw error;
   } finally {
-    await page.close();
+    if (!page.isClosed()) {
+      await page.close();
+    }
     if (owned) {
       await browser.close();
     }
   }
+}
+
+// -----------------------------------------------------------------------------------------
+// Remove placeholder cards that show "This story is no longer available"
+// by clicking each card's "Remove from list" button.
+// -----------------------------------------------------------------------------------------
+async function removeUnavailableStoriesFromCurrentList(page: Puppeteer.Page): Promise<number> {
+  let totalRemoved = 0;
+
+  for (let round = 1; round <= 6; round++) {
+    const removedThisRound = await page.evaluate(() => {
+      const norm = (s: string) => s.replace(/\s+/g, ' ').trim().toLowerCase();
+      const cards = Array.from(document.querySelectorAll<HTMLElement>('article'));
+      let clicked = 0;
+
+      for (const card of cards) {
+        const text = norm(card.textContent ?? '');
+        if (!text.includes('this story is no longer available')) continue;
+
+        const removeBtn = Array.from(card.querySelectorAll<HTMLElement>('button, [role="button"]')).find(
+          (el) => norm(el.textContent ?? '') === 'remove from list'
+        );
+        if (!removeBtn) continue;
+
+        removeBtn.click();
+        clicked++;
+      }
+
+      return clicked;
+    });
+
+    if (removedThisRound === 0) {
+      break;
+    }
+
+    totalRemoved += removedThisRound;
+    await sleep(650);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await sleep(220);
+  }
+
+  return totalRemoved;
 }
 
 // ==========================================================================================
@@ -2451,6 +2736,362 @@ async function getListStoryCount(page: Puppeteer.Page): Promise<number | null> {
 }
 
 // -----------------------------------------------------------------------------------------
+// Remove a single article from the currently-open list page by simulating the
+// "bookmark / list membership" button click, then un-checking the current list.
+//
+// Strategy:
+//   1. Find the article's <article> element by matching its href slug.
+//   2. Within that element click the bookmark button (aria-controls="addToCatalogBookmarkButton").
+//   3. Wait for the popup (list-selection panel) to appear.
+//   4. Parse every row in the popup to find the one whose <p> text matches `currentListName`
+//      AND whose row has a lock-icon sibling div (the distinctive extra <div> for the current list).
+//      If the distinctive div is absent, fall back to matching by name + checked state.
+//   5. If the matching row's checkbox is checked, click the label to uncheck it (= remove).
+//   6. Close the popup by pressing Escape.
+//
+// Returns: true if successfully removed, false if the article / popup / row was not found.
+// -----------------------------------------------------------------------------------------
+function normalizeMediumSlug(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return '';
+  try {
+    return decodeURIComponent(trimmed).normalize('NFKC').replace(/\/+$/, '');
+  } catch {
+    return trimmed.normalize('NFKC').replace(/\/+$/, '');
+  }
+}
+
+async function removeArticleFromCurrentList(
+  page: Puppeteer.Page,
+  articleLink: string,
+  currentListName: string
+): Promise<boolean> {
+  try {
+    const slug = normalizeMediumSlug(articleLink.split('/').filter(Boolean).pop() ?? '');
+    if (!slug) {
+      console.warn(`⚠️  removeArticleFromCurrentList: cannot derive slug from "${articleLink}"`);
+      return false;
+    }
+
+    let articleEl: Puppeteer.ElementHandle<Element> | null = null;
+    for (let findAttempt = 1; findAttempt <= 3; findAttempt++) {
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await sleep(120 * findAttempt);
+
+      const articleHandle = await page.evaluateHandle((wantedSlug: string) => {
+        const normalize = (raw: string) => {
+          const trimmed = raw.trim();
+          if (!trimmed) return '';
+          try {
+            return decodeURIComponent(trimmed).normalize('NFKC').replace(/\/+$/, '');
+          } catch {
+            return trimmed.normalize('NFKC').replace(/\/+$/, '');
+          }
+        };
+
+        const articles = Array.from(document.querySelectorAll('article'));
+        return (
+          articles.find((art) =>
+            Array.from(art.querySelectorAll('a')).some((a) => {
+              try {
+                const u = new URL(a.href, location.href);
+                const cleanPath = u.pathname.replace(/\/+$/, '');
+                const last = cleanPath.split('/').filter(Boolean).pop() ?? '';
+                return normalize(last) === wantedSlug;
+              } catch {
+                return false;
+              }
+            })
+          ) ?? null
+        );
+      }, slug);
+
+      articleEl = articleHandle.asElement() as Puppeteer.ElementHandle<Element> | null;
+      if (articleEl) {
+        break;
+      }
+    }
+
+    if (!articleEl) {
+      console.warn(`⚠️  removeArticleFromCurrentList: article not found on page for slug "${slug}"`);
+      return false;
+    }
+
+    // 2. Find & click the bookmark button inside that article element
+    const btnSelector = listSEL.bookmarkButton;
+    const btn = await articleEl.$(btnSelector);
+    if (!btn) {
+      console.warn(`⚠️  removeArticleFromCurrentList: bookmark button not found in article "${slug}"`);
+      return false;
+    }
+    await page.evaluate((el) => {
+      (el as HTMLElement).scrollIntoView({ block: 'center', inline: 'nearest' });
+    }, btn);
+
+    // 3. Try opening popup with retries (DOM may re-render while list updates).
+    let popupOpened = false;
+    for (let openAttempt = 1; openAttempt <= 3; openAttempt++) {
+      try {
+        // Best effort: close any stale popup before opening a new one.
+        await page.keyboard.press('Escape').catch(() => {});
+        await sleep(120);
+
+        // Click using DOM click to avoid hit-target issues.
+        await page.evaluate((el) => (el as HTMLElement).click(), btn);
+
+        await page.waitForFunction(
+          (b: Element | null) => {
+            if (b && b.getAttribute('aria-expanded') === 'true') return true;
+            const roots = Array.from(
+              document.querySelectorAll<HTMLElement>(
+                '[data-popper-placement], [data-testid="addToCatalogPanel"], [role="dialog"]'
+              )
+            );
+            return roots.some((el) => {
+              const r = el.getBoundingClientRect();
+              return r.width > 0 && r.height > 0 && el.querySelector('label input[type="checkbox"]');
+            });
+          },
+          { timeout: Math.max(1500, Math.floor(timeConst.BOOKMARK_POPUP_TIMEOUT / 3)) },
+          btn
+        );
+
+        popupOpened = true;
+        break;
+      } catch {
+        // Retry with a short backoff
+        await sleep(180 * openAttempt);
+      }
+    }
+
+    if (!popupOpened) {
+      console.warn(`⚠️  removeArticleFromCurrentList: popup did not appear for slug "${slug}"`);
+      return false;
+    }
+
+    const readRowStatus = async (): Promise<'not-found' | 'already-unchecked' | 'unchecked' | 'click-failed'> =>
+      page.evaluate(
+        (listName: string, containerSel: string, rowSel: string, namePSel: string, checkboxSel: string) => {
+          const norm = (s: string) =>
+            s
+              .normalize('NFKC')
+              .replace(/[\u200B-\u200D\uFEFF]/g, '')
+              .replace(/\s+/g, ' ')
+              .trim()
+              .toLowerCase();
+          const key = (s: string) => norm(s).replace(/[^a-z0-9]/g, '');
+          const wanted = norm(listName);
+          const wantedKey = key(listName);
+
+          const popupRoots = Array.from(
+            document.querySelectorAll<HTMLElement>(
+              '[data-popper-placement], [data-testid="addToCatalogPanel"], [role="dialog"]'
+            )
+          ).filter((el) => {
+            const r = el.getBoundingClientRect();
+            return r.width > 0 && r.height > 0;
+          });
+
+          let labels: HTMLElement[] = [];
+          for (const root of popupRoots) {
+            labels.push(...Array.from(root.querySelectorAll<HTMLElement>(rowSel)));
+          }
+
+          if (labels.length === 0) {
+            const container = document.querySelector(containerSel);
+            const searchRoot: Element | Document = container ?? document;
+            labels = Array.from(searchRoot.querySelectorAll<HTMLElement>(rowSel));
+          }
+
+          let targetLabel: HTMLElement | null = null;
+
+          for (const label of labels) {
+            const p = label.querySelector<HTMLElement>(namePSel);
+            if (!p) continue;
+            const name = norm(p.textContent ?? '');
+            const nameKey = key(name);
+            if (!(name === wanted || nameKey === wantedKey)) continue;
+
+            const checkbox = label.querySelector<HTMLInputElement>(checkboxSel);
+            if (checkbox?.checked) {
+              targetLabel = label;
+              break;
+            }
+
+            if (!targetLabel) {
+              targetLabel = label;
+            }
+          }
+
+          if (!targetLabel) return 'not-found';
+
+          const cb = targetLabel.querySelector<HTMLInputElement>(checkboxSel);
+          if (!cb) return 'not-found';
+          if (!cb.checked) {
+            return 'already-unchecked';
+          }
+
+          cb.click();
+          if (cb.checked) {
+            targetLabel.click();
+          }
+          return cb.checked ? 'click-failed' : 'unchecked';
+        },
+        currentListName,
+        listSEL.listPopupContainer,
+        listSEL.listPopupRow,
+        listSEL.listPopupListNameP,
+        listSEL.listPopupCheckbox
+      );
+
+    let rowStatus: 'not-found' | 'already-unchecked' | 'unchecked' | 'click-failed' = 'not-found';
+    for (let rowAttempt = 1; rowAttempt <= 3; rowAttempt++) {
+      rowStatus = await readRowStatus();
+      if (rowStatus === 'not-found' || rowStatus === 'click-failed') {
+        await sleep(140 * rowAttempt);
+        continue;
+      }
+      break;
+    }
+
+    if (rowStatus === 'not-found') {
+      // One full reopen retry: Medium popup can transiently miss row content on first open.
+      await page.keyboard.press('Escape').catch(() => {});
+      await sleep(180);
+
+      let reopened = false;
+      try {
+        await page.evaluate((el) => (el as HTMLElement).click(), btn);
+        await page.waitForFunction(
+          (b: Element | null) => {
+            if (b && b.getAttribute('aria-expanded') === 'true') return true;
+            const roots = Array.from(
+              document.querySelectorAll<HTMLElement>(
+                '[data-popper-placement], [data-testid="addToCatalogPanel"], [role="dialog"]'
+              )
+            );
+            return roots.some((el) => {
+              const r = el.getBoundingClientRect();
+              return r.width > 0 && r.height > 0 && el.querySelector('label input[type="checkbox"]');
+            });
+          },
+          { timeout: Math.max(1200, Math.floor(timeConst.BOOKMARK_POPUP_TIMEOUT / 3)) },
+          btn
+        );
+        reopened = true;
+      } catch {
+        reopened = false;
+      }
+
+      if (reopened) {
+        for (let rowAttempt = 1; rowAttempt <= 2; rowAttempt++) {
+          rowStatus = await readRowStatus();
+          if (rowStatus === 'not-found' || rowStatus === 'click-failed') {
+            await sleep(120 * rowAttempt);
+            continue;
+          }
+          break;
+        }
+      }
+
+      if (rowStatus === 'not-found') {
+        console.warn(
+          `⚠️  removeArticleFromCurrentList: list row "${currentListName}" not found on this pass (slug "${slug}")`
+        );
+        await page.keyboard.press('Escape').catch(() => {});
+        return false;
+      }
+    }
+
+    if (rowStatus === 'click-failed') {
+      console.warn(
+        `⚠️  removeArticleFromCurrentList: checkbox click failed for list "${currentListName}" (slug "${slug}")`
+      );
+      await page.keyboard.press('Escape');
+      return false;
+    }
+
+    // 6. Small settle delay, then close popup
+    await sleep(timeConst.BOOKMARK_POPUP_CLOSE_DELAY);
+    await page.keyboard.press('Escape');
+    if (rowStatus === 'already-unchecked') {
+      console.log(`ℹ️  Slug "${slug}" already unchecked for list "${currentListName}"`);
+      return true;
+    }
+    console.log(`🗑️  Requested uncheck for slug "${slug}" in list "${currentListName}"`);
+    return true;
+  } catch (err) {
+    console.error(`❌  removeArticleFromCurrentList error for "${articleLink}":`, err);
+    try { await page.keyboard.press('Escape'); } catch { /* best-effort close */ }
+    return false;
+  }
+}
+
+// -----------------------------------------------------------------------------------------
+// Remove all articles in `posts` from the currently-open list page.
+// Logs per-article outcomes and returns counts.
+// -----------------------------------------------------------------------------------------
+async function removeChunkFromCurrentList(
+  page: Puppeteer.Page,
+  posts: { link: string }[],
+  currentListName: string
+): Promise<{ removed: number; failed: number; failedLinks: string[] }> {
+  const MAX_RETRIES = 5;
+  const START_FROM_TOP_DELAY = 320;
+  const POST_ATTEMPT_SETTLE_DELAY = 780;
+  let remaining = Array.from(new Set(posts.map((p) => p.link)));
+  let removed = 0;
+  let attempt = 0;
+
+  while (remaining.length > 0 && attempt < MAX_RETRIES) {
+    attempt++;
+    const attemptStartCount = remaining.length;
+    console.log(`🔄 Removal attempt ${attempt}/${MAX_RETRIES}: ${remaining.length} articles pending`);
+
+    const stillPending: string[] = [];
+
+    for (const link of remaining) {
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await sleep(START_FROM_TOP_DELAY);
+
+      const ok = await removeArticleFromCurrentList(page, link, currentListName);
+      if (ok) {
+        removed++;
+      } else {
+        stillPending.push(link);
+      }
+
+      // Always restart from top before trying the next slug.
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await sleep(POST_ATTEMPT_SETTLE_DELAY);
+    }
+
+    remaining = Array.from(new Set(stillPending));
+
+    if (remaining.length === attemptStartCount) {
+      console.warn(
+        `⚠️  No progress in attempt ${attempt}: ${attemptStartCount} articles still pending. Will retry.`
+      );
+    }
+
+    console.log(
+      `📊 Removal attempt ${attempt}/${MAX_RETRIES} summary: removed ${attemptStartCount - remaining.length}, still pending ${remaining.length}`
+    );
+
+    if (remaining.length > 0) {
+      console.log(`⏳ Waiting before retry attempt ${attempt + 1}...`);
+      await sleep(1600);
+    }
+  }
+
+  const failed = remaining.length;
+  console.log(
+    `🧹 Chunk removal complete: removed ${removed}, pending ${failed} (list "${currentListName}"). Attempts: ${attempt}/${MAX_RETRIES}`
+  );
+  return { removed, failed, failedLinks: remaining };
+}
+
+// -----------------------------------------------------------------------------------------
 // Helper function to automatically scroll to the end of the Medium List page
 // until a specified number of articles is reached or no new articles are loaded
 // Returns the total number of articles found
@@ -2462,7 +3103,6 @@ async function autoScrollToEnd(
   targetCount: number | null = null
 ): Promise<number> {
   let lastCount = await page.$$eval('article', (arts) => arts.length);
-  let attemptsWithoutNew = 0;
   // When a declared total is known, be much more persistent before giving up on stagnation
   const effectiveMaxAttempts =
     targetCount !== null
@@ -2474,33 +3114,51 @@ async function autoScrollToEnd(
     console.log(`🎯 Target article count from header: ${targetCount}`);
   }
 
-  while (attemptsWithoutNew < effectiveMaxAttempts) {
-    // Primary stop: reached declared total
-    if (targetCount !== null && lastCount >= targetCount) {
-      console.log(`✅ Reached declared story count (${lastCount}/${targetCount}).`);
-      break;
-    }
-
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    await sleep(scrollDelay);
-
-    const currentCount = await page.$$eval('article', (arts) => arts.length);
-    if (currentCount > lastCount) {
+  for (let phase = 0; phase <= timeConst.SCROLL_RETRY_PHASES; phase++) {
+    // Each retry phase multiplies the delay: phase 0 = normal, phase 1 = ×2, etc.
+    const phaseDelay = scrollDelay * Math.pow(timeConst.SCROLL_RETRY_DELAY_MULTIPLIER, phase);
+    if (phase > 0) {
       console.log(
-        `🆕 Scroll ${scrolls + 1}: Loaded ${currentCount - lastCount} new articles` +
-        ` (Total: ${currentCount}${targetCount !== null ? `/${targetCount}` : ''})`
-      );
-      lastCount = currentCount;
-      attemptsWithoutNew = 0;
-      scrolls++;
-    } else {
-      attemptsWithoutNew++;
-      console.log(
-        `⚠️ No new articles, attempt ${attemptsWithoutNew}/${effectiveMaxAttempts}` +
-        `${targetCount !== null ? ` (loaded ${lastCount}/${targetCount})` : ''}`
+        `🔄 Scroll retry (phase ${phase}/${timeConst.SCROLL_RETRY_PHASES}):` +
+        ` increasing delay to ${phaseDelay}ms` +
+        ` (loaded ${lastCount}${targetCount !== null ? `/${targetCount}` : ''} so far)...`
       );
     }
-    if (currentCount >= maxArticles) break;
+
+    let attemptsWithoutNew = 0;
+    while (attemptsWithoutNew < effectiveMaxAttempts) {
+      // Primary stop: reached declared total
+      if (targetCount !== null && lastCount >= targetCount) {
+        console.log(`✅ Reached declared story count (${lastCount}/${targetCount}).`);
+        break;
+      }
+
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+      await sleep(phaseDelay);
+
+      const currentCount = await page.$$eval('article', (arts) => arts.length);
+      if (currentCount > lastCount) {
+        console.log(
+          `🆕 Scroll ${scrolls + 1}: Loaded ${currentCount - lastCount} new articles` +
+          ` (Total: ${currentCount}${targetCount !== null ? `/${targetCount}` : ''})`
+          + (phase > 0 ? ` [retry phase ${phase}]` : '')
+        );
+        lastCount = currentCount;
+        attemptsWithoutNew = 0;
+        scrolls++;
+      } else {
+        attemptsWithoutNew++;
+        console.log(
+          `⚠️ No new articles, attempt ${attemptsWithoutNew}/${effectiveMaxAttempts}` +
+          `${targetCount !== null ? ` (loaded ${lastCount}/${targetCount})` : ''}` +
+          (phase > 0 ? ` [retry phase ${phase}, delay ${phaseDelay}ms]` : '')
+        );
+      }
+      if (currentCount >= maxArticles) break;
+    }
+
+    // No need to retry if: target unknown, already reached target/cap, or no more phases
+    if (targetCount === null || lastCount >= targetCount || lastCount >= maxArticles) break;
   }
 
   console.log(

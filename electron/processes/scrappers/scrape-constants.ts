@@ -98,9 +98,17 @@ export const timeConst = {
 
   // Auto-scroll
   SCROLL_DELAY: 1500,                    // Delay between scrolls in scrapeList()
+  SCROLL_RETRY_PHASES: 1,                // Extra retry phases when stagnation hits but target not reached
+  SCROLL_RETRY_DELAY_MULTIPLIER: 2,      // Delay multiplier per retry phase (phase 1 → delay × 2)
   DEFAULT_AUTOSCROLL_DELAY: 100,         // Default delay for autoScrollArticlePage()
   AUTOSCROLL_MAX_DURATION_MS: 240000,    // Hard stop for article autoscroll loop
-  AUTOSCROLL_MAX_STAGNANT_STEPS: 12      // Stop after N steps without page-growth/progress
+  AUTOSCROLL_MAX_STAGNANT_STEPS: 12,     // Stop after N steps without page-growth/progress
+
+  // Chunked list scraping
+  LIST_CHUNK_SIZE: 250,                  // Articles per chunk before removing from list and re-scrolling
+  AFTER_REMOVE_SETTLE_DELAY: 3000,       // ms to wait after removing articles before re-scrolling
+  BOOKMARK_POPUP_TIMEOUT: 8000,          // ms to wait for the list-selection popup to appear
+  BOOKMARK_POPUP_CLOSE_DELAY: 600,       // ms after unchecking before closing the popup
 } as const;
 
 
@@ -187,6 +195,13 @@ export const listSEL = {
   pubName: 'div a[href*="medium.com"] p',
   authorName: 'div a[href^="/@"] p',
   headerStories: 'header p',   // <p> elements in list header; parse for "N stories" text
+
+  // Selectors used when removing an article from the current list (chunked scraping)
+  bookmarkButton: 'button[aria-controls="addToCatalogBookmarkButton"]',
+  listPopupContainer: '[data-testid="addToCatalogPanel"], .vj, [role="dialog"]',
+  listPopupRow: 'label',          // each row in the popup is a <label> containing a <p> with list name
+  listPopupListNameP: 'p',        // the <p> inside a popup row that holds the list name text
+  listPopupCheckbox: 'input[type="checkbox"]',
 } as const;
 
 // Medium identity selectors
