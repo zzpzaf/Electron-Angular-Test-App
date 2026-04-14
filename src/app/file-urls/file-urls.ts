@@ -953,7 +953,7 @@ export class FileUrls {
     const result = await this.articlesmultiscraper.persistScrapedArticlesWithDedup(
       dataArray,
       this.selectedCategoryIds,
-      this.overwriteExisting ? 'dbSync' : 'insertOnlyNew'
+      this.overwriteExisting ? 'overwriteExisting' : 'insertOnlyNew'
     );
 
     return {
@@ -1049,7 +1049,7 @@ export class FileUrls {
       const result = await this.articlesmultiscraper.persistScrapedArticlesWithDedup(
         persistablePosts,
         [group.categoryId],
-        this.overwriteExisting ? 'dbSync' : 'insertOnlyNew'
+        this.overwriteExisting ? 'overwriteExisting' : 'insertOnlyNew'
       );
 
       console.log('>===>> Group persist completed:', {

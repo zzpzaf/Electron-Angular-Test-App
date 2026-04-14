@@ -36,7 +36,7 @@ export interface MissingContentRecoverySummary {
   error?: string;
 }
 
-export type MultiScrapePersistMode = 'dbSync' | 'insertOnlyNew';
+export type MultiScrapePersistMode = 'dbSync' | 'insertOnlyNew' | 'overwriteExisting';
 
 @Injectable({
   providedIn: 'root',
@@ -143,6 +143,11 @@ export class Articlesmultiscraper {
 
       if (mode === 'insertOnlyNew') {
         skippedCount++;
+        continue;
+      }
+
+      if (mode === 'overwriteExisting') {
+        updatedArticles.push({ ...scraped, id: existing.id });
         continue;
       }
 
