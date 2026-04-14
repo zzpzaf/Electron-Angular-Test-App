@@ -4,6 +4,7 @@ import { PostData } from '../../../../shared/projectObjects/varObjects';
 import { getMediumSlugFromUrl } from '../../../../shared/utils/shared-utils';
 import { Articlebasicscraper } from './articlebasicscraper';
 import { BackEnd } from './back-end';
+import { ContentScrapePolicy } from './content-scrape-policy';
 import { DlgService } from './dlg-service';
 
 export interface MultiScrapePrecheckSummary {
@@ -27,6 +28,14 @@ export interface MultiScrapePersistSummary {
   skippedCount: number;
 }
 
+export interface MissingContentRecoverySummary {
+  checkedLinks: number;
+  missingLinks: string[];
+  scrapedCount: number;
+  persistSummary: MultiScrapePersistSummary;
+  error?: string;
+}
+
 export type MultiScrapePersistMode = 'dbSync' | 'insertOnlyNew';
 
 @Injectable({
@@ -35,6 +44,7 @@ export type MultiScrapePersistMode = 'dbSync' | 'insertOnlyNew';
 export class Articlesmultiscraper {
   private articlebasicscraper = inject(Articlebasicscraper);
   private backendService = inject(BackEnd);
+  private contentScrapePolicy = inject(ContentScrapePolicy);
   private dlgService = inject(DlgService);
 
   async summarizeUrlsAgainstDb(urls: string[]): Promise<MultiScrapePrecheckSummary> {
@@ -180,6 +190,117 @@ export class Articlesmultiscraper {
       updatedCount,
       skippedCount,
     };
+  }
+
+  async recoverMissingContentForStoredLinks(
+    links: string[],
+    selectedCategoryIds: number[] = [],
+    mode: MultiScrapePersistMode = 'dbSync'
+  ): Promise<MissingContentRecoverySummary> {
+    const normalizedLinks = Array.from(
+      new Set(
+        (links ?? [])
+          .map((link) => (link ?? '').trim())
+          .filter((link) => link.length > 0)
+      )
+    );
+
+    const emptyPersistSummary: MultiScrapePersistSummary = {
+      totalScraped: 0,
+      insertedCount: 0,
+      updatedCount: 0,
+      skippedCount: 0,
+    };
+
+    if (normalizedLinks.length === 0) {
+      return {
+        checkedLinks: 0,
+        missingLinks: [],
+        scrapedCount: 0,
+        persistSummary: emptyPersistSummary,
+      };
+    }
+
+    const existingArticles = await this.backendService.getAllArticles();
+    const existingBySlug = this.buildExistingBySlug(existingArticles);
+    const missingLinks = Array.from(
+      new Set(
+        normalizedLinks
+          .map((link) => {
+            const slug = getMediumSlugFromUrl(link);
+            if (!slug) return null;
+            const existing = existingBySlug.get(slug);
+            if (!existing || !this.isMissingContent(existing.content)) {
+              return null;
+            }
+            return (existing.link ?? '').trim() || link;
+          })
+          .filter((link): link is string => !!link)
+      )
+    );
+
+    if (missingLinks.length === 0) {
+      return {
+        checkedLinks: normalizedLinks.length,
+        missingLinks: [],
+        scrapedCount: 0,
+        persistSummary: emptyPersistSummary,
+      };
+    }
+
+    try {
+      const scrapeOptions = this.contentScrapePolicy.buildScrapeTabsOptions(
+        missingLinks
+      );
+      const response = await this.articlebasicscraper.scrapeTabsList(
+        missingLinks,
+        scrapeOptions
+      );
+
+      if (!response.success) {
+        return {
+          checkedLinks: normalizedLinks.length,
+          missingLinks,
+          scrapedCount: 0,
+          persistSummary: emptyPersistSummary,
+          error: response.error || 'Failed to scrape missing-content links.',
+        };
+      }
+
+      const scraped = ((response.data as PostData[]) || []).filter(
+        (post) => !post.excludeFromPersistence
+      );
+
+      if (scraped.length === 0) {
+        return {
+          checkedLinks: normalizedLinks.length,
+          missingLinks,
+          scrapedCount: 0,
+          persistSummary: emptyPersistSummary,
+        };
+      }
+
+      const persistSummary = await this.persistScrapedArticlesWithDedup(
+        scraped,
+        selectedCategoryIds,
+        mode
+      );
+
+      return {
+        checkedLinks: normalizedLinks.length,
+        missingLinks,
+        scrapedCount: scraped.length,
+        persistSummary,
+      };
+    } catch (error) {
+      return {
+        checkedLinks: normalizedLinks.length,
+        missingLinks,
+        scrapedCount: 0,
+        persistSummary: emptyPersistSummary,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
   }
 
   /**
@@ -405,5 +526,10 @@ export class Articlesmultiscraper {
 
   private normalizeValue(value: string | undefined): string {
     return (value ?? '').trim().toLowerCase();
+  }
+
+  private isMissingContent(value: string | undefined): boolean {
+    const normalized = this.normalizeValue(value);
+    return normalized.length === 0 || normalized === 'null' || normalized === 'undefined';
   }
 }

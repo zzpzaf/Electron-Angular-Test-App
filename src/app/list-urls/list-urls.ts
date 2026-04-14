@@ -37,6 +37,7 @@ import { LoaderService } from '../shared/services/loader-service';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import {
   Articlesmultiscraper,
+  MissingContentRecoverySummary,
   MultiScrapePersistMode,
   MultiScrapePrecheckSummary,
 } from '../shared/services/articlesmultiscraper';    // 260325
@@ -293,6 +294,7 @@ export class ListUrls {
     let result = null;
     let shouldStartFullScrape = false;
     let chunkedModeReceived = false;
+    const processedChunkLinks = new Set<string>();
     this.scrappedError.set('');
 
     // ── Per-chunk IPC handler (chunked mode only) ──────────────────────────────
@@ -386,6 +388,11 @@ export class ListUrls {
               showCompletionPopup: false,
               updateSignals: false,
             });
+
+            postsToScrapeAndPersist
+              .map((p) => p.link)
+              .filter((link): link is string => !!link)
+              .forEach((link) => processedChunkLinks.add(link));
 
             // 5. After persist, these processed links are now DB-existing,
             // so remove them from Medium list before loading next chunk.
@@ -509,6 +516,12 @@ export class ListUrls {
       if (shouldStartFullScrape) {
         await this.fullArticleScrapeFromMetaData();
       }
+
+      if (chunkedModeReceived && processedChunkLinks.size > 0) {
+        await this.recoverMissingContentAfterListFlow(
+          Array.from(processedChunkLinks)
+        );
+      }
     } catch (err) {
       // result = { error: err };
       if (err) this.scrappedError.set(JSON.stringify({ err }));
@@ -547,6 +560,52 @@ export class ListUrls {
         this.$scrappedDataArrayString.set(''); // Clear the string representation of the array
       }
     }
+  }
+
+  private async recoverMissingContentAfterListFlow(
+    processedLinks: string[]
+  ): Promise<void> {
+    const recovery: MissingContentRecoverySummary =
+      await this.articlesmultiscraper.recoverMissingContentForStoredLinks(
+        processedLinks,
+        [],
+        'dbSync'
+      );
+
+    if (recovery.error) {
+      this.dlgService
+        .popup({
+          token: 'warn',
+          header: 'Missing Content Recovery Failed',
+          content:
+            `Checked processed links: ${recovery.checkedLinks}\n` +
+            `Missing-content records found: ${recovery.missingLinks.length}\n` +
+            `Error: ${recovery.error}`,
+          posAnsMsg: 'OK',
+          negAnsMsg: '',
+        })
+        .subscribe((res) => console.log('Dialog closed with:', res));
+      return;
+    }
+
+    if (recovery.missingLinks.length === 0) {
+      return;
+    }
+
+    this.dlgService
+      .popup({
+        token: 'info',
+        header: 'Missing Content Recovery Completed',
+        content:
+          `Checked processed links: ${recovery.checkedLinks}\n` +
+          `Missing-content records re-scraped: ${recovery.missingLinks.length}\n` +
+          `Inserted: ${recovery.persistSummary.insertedCount}\n` +
+          `Updated: ${recovery.persistSummary.updatedCount}\n` +
+          `Skipped: ${recovery.persistSummary.skippedCount}`,
+        posAnsMsg: 'OK',
+        negAnsMsg: '',
+      })
+      .subscribe((res) => console.log('Dialog closed with:', res));
   }
 
   onClearScrappedData() {
