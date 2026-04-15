@@ -1,8 +1,8 @@
 <!-- <p>layout works!</p> -->
 
-<nz-layout>
+<nz-layout class="app-shell">
   @if (!showSettings()) {
-  <nz-sider nzCollapsible [nzWidth]="140" [nzCollapsedWidth]="50">
+  <nz-sider class="app-sider" nzCollapsible [nzWidth]="140" [nzCollapsedWidth]="50">
     <div >
       <button
         nz-button
@@ -37,7 +37,7 @@
     
   </nz-sider>
   }
-  <nz-layout>
+  <nz-layout class="app-main">
     <nz-header id="nzh1">
       <h1>{{ headerTitle }}</h1>
     </nz-header>
@@ -83,7 +83,7 @@
       </div>
     </nz-header>
 
-    <nz-content>
+    <nz-content class="app-content">
       <!-- <div>Main Content Goes Here</div> -->
       @if (showSettings()) {
       <settings (closed)="onSettingsClosed()" />
@@ -91,7 +91,7 @@
       <router-outlet />
       }
     </nz-content>
-    <nz-footer>
+    <nz-footer class="app-footer">
       {{ footerContent }}
     </nz-footer>
   </nz-layout>
