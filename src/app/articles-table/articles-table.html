@@ -4,7 +4,7 @@
   <div class="table-header">
     <div class="table-header-row">
       <h3>
-        Filter: {{ filter }}{{ selectedCategory }}, Nr of articles:
+        View: {{ getFilterSummaryLabel() }}, Articles:
         {{ $filteredArticles().length }}
         @if (articlesSearchTextDebounced().length > 0) {
           / {{ $articles().length }}
@@ -41,22 +41,53 @@
     </div>
 
     <div class="table-search-row">
-      <div class="search-label" aria-hidden="true">
-        <span nz-icon nzType="search" nzTheme="outline"></span>
-        Search
+      <div class="search-field-block">
+        <button
+          type="button"
+          class="search-mode-btn search-field-mode-btn"
+          [attr.data-search-mode]="includeSearchMode()"
+          [title]="getIncludeSearchModeTitle()"
+          (click)="toggleIncludeSearchMode()"
+        >
+          <span nz-icon nzType="search" nzTheme="outline"></span>
+          {{ getIncludeSearchModeLabel() }}
+        </button>
+        <nz-input-group [nzSuffix]="searchIncludeSuffixTpl" class="search-input-group search-input-group-half">
+          <input
+            id="articles-search-include"
+            nz-input
+            class="search-input"
+            [placeholder]="includeSearchMode() === 'words' ? 'Include words . . .' : 'Include phrase . . .'"
+            [ngModel]="articlesSearchText()"
+            (ngModelChange)="onSearchTextChange($event)"
+          />
+        </nz-input-group>
       </div>
 
-      <nz-input-group [nzSuffix]="searchSuffixTpl" class="search-input-group">
-        <input
-          nz-input
-          class="search-input"
-          placeholder="Search Articles . . ."
-          [ngModel]="articlesSearchText()"
-          (ngModelChange)="onSearchTextChange($event)"
-        />
-      </nz-input-group>
+      <div class="search-field-block">
+        <button
+          type="button"
+          class="search-mode-btn search-field-mode-btn"
+          [attr.data-search-mode]="excludeSearchMode()"
+          [title]="getExcludeSearchModeTitle()"
+          (click)="toggleExcludeSearchMode()"
+        >
+          <span nz-icon nzType="stop" nzTheme="outline"></span>
+          {{ getExcludeSearchModeLabel() }}
+        </button>
+        <nz-input-group [nzSuffix]="searchExcludeSuffixTpl" class="search-input-group search-input-group-half">
+          <input
+            id="articles-search-exclude"
+            nz-input
+            class="search-input"
+            [placeholder]="excludeSearchMode() === 'words' ? 'Exclude words . . .' : 'Exclude phrase . . .'"
+            [ngModel]="articlesExcludeText()"
+            (ngModelChange)="onExcludeSearchTextChange($event)"
+          />
+        </nz-input-group>
+      </div>
 
-      <ng-template #searchSuffixTpl>
+      <ng-template #searchIncludeSuffixTpl>
         @if (articlesSearchText().length > 0) {
           <span
             nz-icon
@@ -70,11 +101,26 @@
           <span nz-icon nzType="search" nzTheme="outline"></span>
         }
       </ng-template>
+
+      <ng-template #searchExcludeSuffixTpl>
+        @if (articlesExcludeText().length > 0) {
+          <span
+            nz-icon
+            nzType="close-circle"
+            nzTheme="outline"
+            class="search-suffix-action"
+            title="Clear exclude search"
+            (click)="clearArticlesExcludeText()"
+          ></span>
+        } @else {
+          <span nz-icon nzType="stop" nzTheme="outline"></span>
+        }
+      </ng-template>
     </div>
 
-    @if (articlesSearchTextDebounced().length > 0 && $filteredArticles().length === 0) {
+    @if ((articlesSearchTextDebounced().length > 0 || articlesExcludeTextDebounced().length > 0) && $filteredArticles().length === 0) {
       <div class="search-no-results">
-        No results for "{{ articlesSearchTextDebounced() }}".
+        No results for the current include/exclude search.
       </div>
     }
   </div>

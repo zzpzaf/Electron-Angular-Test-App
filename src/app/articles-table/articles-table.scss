@@ -31,12 +31,25 @@
 
 .table-search-row {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 10px;
   width: 100%;
+  flex-wrap: wrap;
 }
 
-.search-label {
+.search-field-block {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 220px;
+}
+
+.search-field-mode-btn {
+  align-self: flex-start;
+}
+
+.search-mode-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -45,13 +58,34 @@
   border-radius: 6px;
   background: #c2edef;
   color: #17363f;
+  font: inherit;
   font-weight: 600;
-  line-height: 1.2;
   white-space: nowrap;
+  cursor: pointer;
+}
+
+.search-mode-btn:hover {
+  background: #b3e7ea;
+}
+
+.search-mode-btn:focus-visible {
+  outline: 2px solid #1677ff;
+  outline-offset: 1px;
+}
+
+.search-mode-btn[data-search-mode='phrase'] {
+  background: #d9f7be;
+  border-color: #7cb35e;
+  color: #1f4a1b;
 }
 
 :host ::ng-deep .table-search-row .search-input-group {
-  flex: 1 1 auto;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+:host ::ng-deep .table-search-row .search-input-group-half {
+  flex: 1 1 0;
   min-width: 0;
 }
 

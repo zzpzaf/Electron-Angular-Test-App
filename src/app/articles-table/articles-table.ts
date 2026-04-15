@@ -25,6 +25,7 @@ import { firstValueFrom } from 'rxjs';
 
 type RowKey = number | string;
 type MdFilterMode = 'all' | 'withMarkdown' | 'withoutMarkdown';
+type SearchMode = 'words' | 'phrase';
 type ArticleColumnKey =
   | 'id'
   | 'md'
@@ -88,7 +89,8 @@ export class ArticlesTable {
   public $filteredArticles = computed(() => {
     const rows = this.$articles();
     const mdMode = this.mdFilterMode();
-    const term = this.articlesSearchTextDebounced().trim().toLowerCase();
+    const includeTerm = this.articlesSearchTextDebounced().trim().toLowerCase();
+    const excludeTerm = this.articlesExcludeTextDebounced().trim().toLowerCase();
     const mdFilteredRows = rows.filter((row) => {
       const hasMd = this.hasMarkdownContent(row);
       if (mdMode === 'withMarkdown') return hasMd;
@@ -96,15 +98,22 @@ export class ArticlesTable {
       return true;
     });
 
-    if (!term) return mdFilteredRows;
+    return mdFilteredRows.filter((row) => {
+      const matchesInclude = !includeTerm || this.matchesSearch(row, includeTerm, this.includeSearchMode());
+      const matchesExclude = !!excludeTerm && this.matchesSearch(row, excludeTerm, this.excludeSearchMode());
 
-    return mdFilteredRows.filter((row) => this.matchesSearch(row, term));
+      return matchesInclude && !matchesExclude;
+    });
   });
   public filter: 'unassigned' | 'all' | 'byCategory' = 'unassigned';
   public filter2: string = '';
   public selectedCategory: string  = '';
   public articlesSearchText = signal('');
   public articlesSearchTextDebounced = signal('');
+  public articlesExcludeText = signal('');
+  public articlesExcludeTextDebounced = signal('');
+  public includeSearchMode = signal<SearchMode>('words');
+  public excludeSearchMode = signal<SearchMode>('words');
   public $articleCategoryIdsByArticleId = signal<Record<number, number[]>>({});
   public mdFilterMode = signal<MdFilterMode>('all');
   public readonly minColumnWidth = 56;
@@ -173,15 +182,29 @@ export class ArticlesTable {
         this.$articles.set(this.backendService.$articles());
       }
       this.filter = this.backendService.$categoriesFilter();
-      // this.selectedCategory = this.backendService.$selectedCategoryId() > 0 ?
-      if (this.backendService.$selectedCategory()) {
-        this.selectedCategory = ': ' + this.backendService.$selectedCategory()!.name;
-      }
+      const activeCategory = this.backendService.$selectedCategory();
+      this.selectedCategory = this.filter === 'byCategory' && activeCategory
+        ? activeCategory.name
+        : '';
 
       // Prefetch category status for currently visible rows (used by categories tag icon styling).
       this.prefetchCategoryStatusForVisibleRows(this.$filteredArticles());
       console.log('>===>> ArticlesTable - Articles signal updated, count=', this.$articles().length);
     });
+  }
+
+  public getFilterSummaryLabel(): string {
+    switch (this.filter) {
+      case 'all':
+        return 'All articles';
+      case 'byCategory':
+        return this.selectedCategory
+          ? `Category: ${this.selectedCategory}`
+          : 'Category';
+      case 'unassigned':
+      default:
+        return 'Unassigned articles';
+    }
   }
 
   ngOnInit() {
@@ -295,34 +318,88 @@ export class ArticlesTable {
 
   // 260328 - Search UI handlers (UI phase only)
   onSearchTextChange(value: string): void {
-    const next = value ?? '';
-    this.articlesSearchText.set(next);
+    this.articlesSearchText.set(value ?? '');
+    this.scheduleSearchDebounce();
+  }
 
+  public onExcludeSearchTextChange(value: string): void {
+    this.articlesExcludeText.set(value ?? '');
+    this.scheduleSearchDebounce();
+  }
+
+  private scheduleSearchDebounce(): void {
     if (this.searchDebounceTimer) {
       clearTimeout(this.searchDebounceTimer);
     }
 
     this.searchDebounceTimer = setTimeout(() => {
-      const debounced = next.trim();
-      this.articlesSearchTextDebounced.set(debounced);
-      this.filter2 = debounced;
+      this.applySearchDebouncedValues();
+      this.searchDebounceTimer = null;
     }, 150);
   }
 
-  // 260328 - Clear search text and reset related signals and UI state
+  // 260328 - Clear include search text and reset related signals and UI state
   clearArticlesSearchText(): void {
     if (this.searchDebounceTimer) {
       clearTimeout(this.searchDebounceTimer);
       this.searchDebounceTimer = null;
     }
     this.articlesSearchText.set('');
-    this.articlesSearchTextDebounced.set('');
-    this.filter2 = '';
+    this.applySearchDebouncedValues();
+  }
+
+  public clearArticlesExcludeText(): void {
+    if (this.searchDebounceTimer) {
+      clearTimeout(this.searchDebounceTimer);
+      this.searchDebounceTimer = null;
+    }
+    this.articlesExcludeText.set('');
+    this.applySearchDebouncedValues();
+  }
+
+  private applySearchDebouncedValues(): void {
+    const includeDebounced = this.articlesSearchText().trim();
+    const excludeDebounced = this.articlesExcludeText().trim();
+    this.articlesSearchTextDebounced.set(includeDebounced);
+    this.articlesExcludeTextDebounced.set(excludeDebounced);
+    this.filter2 = includeDebounced;
+  }
+
+  public toggleIncludeSearchMode(): void {
+    this.includeSearchMode.update((current) => (current === 'words' ? 'phrase' : 'words'));
+  }
+
+  public toggleExcludeSearchMode(): void {
+    this.excludeSearchMode.update((current) => (current === 'words' ? 'phrase' : 'words'));
+  }
+
+  public getIncludeSearchModeLabel(): string {
+    return this.includeSearchMode() === 'words' ? 'Search words' : 'Search phrases';
+  }
+
+  public getExcludeSearchModeLabel(): string {
+    return this.excludeSearchMode() === 'words' ? 'Exclude words' : 'Exclude phrases';
+  }
+
+  public getIncludeSearchModeTitle(): string {
+    if (this.includeSearchMode() === 'words') {
+      return 'Search mode: match any entered word. Click to switch to whole-phrase search.';
+    }
+
+    return 'Search mode: match the whole entered phrase. Click to switch to any-word search.';
+  }
+
+  public getExcludeSearchModeTitle(): string {
+    if (this.excludeSearchMode() === 'words') {
+      return 'Exclude mode: remove rows matching any entered word. Click to switch to whole-phrase exclude.';
+    }
+
+    return 'Exclude mode: remove rows matching the whole entered phrase. Click to switch to any-word exclude.';
   }
 
   // 260328 - Check if any of the relevant fields in the row match the search term (case-insensitive)
   // For now I just left only title, but we can easily add more fields 
-  private matchesSearch(row: PostData, term: string): boolean {
+  private matchesSearch(row: PostData, term: string, mode: SearchMode): boolean {
     const values: string[] = [
       row.title,
       // row.link,
@@ -337,7 +414,23 @@ export class ArticlesTable {
       row.timestamp,
     ].map((v) => (v ?? '').toString().toLowerCase());
 
-    return values.some((v) => v.includes(term));
+    if (mode === 'phrase') {
+      return values.some((v) => v.includes(term));
+    }
+
+    const words = this.getSearchWords(term);
+    if (words.length === 0) {
+      return true;
+    }
+
+    return values.some((value) => words.some((word) => value.includes(word)));
+  }
+
+  private getSearchWords(term: string): string[] {
+    return term
+      .split(/\s+/)
+      .map((word) => word.trim())
+      .filter((word) => word.length > 0);
   }
 
   // 260328 - Highlight search term in the title by wrapping matches with <mark> tags, while safely escaping HTML
@@ -362,7 +455,21 @@ export class ArticlesTable {
 
     if (!term) return safeTitle;
 
-    const regex = new RegExp(`(${this.escapeRegExp(term)})`, 'ig');
+    const tokens = this.includeSearchMode() === 'phrase'
+      ? [term]
+      : this.getSearchWords(term);
+
+    if (tokens.length === 0) {
+      return safeTitle;
+    }
+
+    const regex = new RegExp(
+      `(${tokens
+        .map((token) => this.escapeRegExp(token))
+        .sort((left, right) => right.length - left.length)
+        .join('|')})`,
+      'ig'
+    );
     return safeTitle.replace(regex, '<mark class="search-hit">$1</mark>');
   }
 
