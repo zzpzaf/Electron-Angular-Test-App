@@ -182,11 +182,11 @@
 :host ::ng-deep .column-resize-trigger {
   position: absolute;
   top: 0;
-  right: -5px;
+  right: 0;
   width: 10px;
   height: 100%;
   cursor: col-resize;
-  z-index: 2;
+  z-index: 6;
 }
 
 :host ::ng-deep .column-resize-trigger::after {
@@ -207,6 +207,30 @@
 
 .categories-toggle-th {
   text-align: center;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+
+:host ::ng-deep th.date-column-th .column-resize-trigger {
+  right: -6px;
+  width: 14px;
+  z-index: 40;
+}
+
+:host ::ng-deep th.date-column-th .column-resize-trigger::after {
+  left: 6px;
+}
+
+/* Keep date sort arrow/text away from the right-edge resize grab area. */
+:host ::ng-deep th.date-column-th .ant-table-column-sorters {
+  position: relative;
+  z-index: 1;
+  padding-right: 14px;
+}
+
+/* Allow only Date header's right-edge resize hitbox to extend into the next column. */
+:host ::ng-deep th.date-column-th {
+  overflow: visible;
 }
 
 .md-filter-th {

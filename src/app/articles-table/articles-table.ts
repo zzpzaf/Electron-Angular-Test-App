@@ -52,8 +52,8 @@ const DEFAULT_ARTICLE_COLUMN_WIDTHS: Record<ArticleColumnKey, number> = {
   delete: 64,
   title: 420,
   image: 74,
-  date: 112,
-  categories: 128,
+  date: 138,
+  categories: 110,
   hostname: 180,
   publication: 180,
   author: 180,
@@ -663,7 +663,8 @@ export class ArticlesTable {
     const strictHeaderMins: Partial<Record<ArticleColumnKey, number>> = {
       md: 78,
       delete: 76,
-      categories: 128,
+      date: 132,
+      categories: 106,
     };
 
     return strictHeaderMins[key] ?? this.minColumnWidth;
@@ -695,6 +696,21 @@ export class ArticlesTable {
         }
 
         merged[key] = Math.max(this.columnMinWidthPx(key), Math.round(value));
+      }
+
+      // Migrate legacy defaults so Date/Categories are usable out of the box
+      // without wiping user-customized widths.
+      if (Number(parsed.date) === 112) {
+        merged.date = Math.max(this.columnMinWidthPx('date'), DEFAULT_ARTICLE_COLUMN_WIDTHS.date);
+      }
+      if (Number(parsed.date) === 126) {
+        merged.date = Math.max(this.columnMinWidthPx('date'), DEFAULT_ARTICLE_COLUMN_WIDTHS.date);
+      }
+      if (Number(parsed.categories) === 128) {
+        merged.categories = Math.max(this.columnMinWidthPx('categories'), DEFAULT_ARTICLE_COLUMN_WIDTHS.categories);
+      }
+      if (Number(parsed.categories) === 116) {
+        merged.categories = Math.max(this.columnMinWidthPx('categories'), DEFAULT_ARTICLE_COLUMN_WIDTHS.categories);
       }
 
       this.$columnWidths.set(merged);
