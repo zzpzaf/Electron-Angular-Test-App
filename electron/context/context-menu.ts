@@ -2,6 +2,27 @@
 
 import { BrowserWindow, Menu } from 'electron';
 
+function canUseWindow(win: BrowserWindow): boolean {
+  return !win.isDestroyed() && !win.webContents.isDestroyed();
+}
+
+function safeSend(win: BrowserWindow, channel: string, payload: unknown): void {
+  if (!canUseWindow(win)) {
+    return;
+  }
+  win.webContents.send(channel, payload);
+}
+
+function safeRemoveContextMenuListener(
+  win: BrowserWindow,
+  handler: (event: Electron.Event, params: Electron.ContextMenuParams) => void
+): void {
+  if (!canUseWindow(win)) {
+    return;
+  }
+  win.webContents.removeListener('context-menu', handler);
+}
+
 /**
  * Attaches a custom context menu to the given BrowserWindow.
  * This menu supports only editable contexts, e.g., text field inputs.
@@ -46,6 +67,10 @@ export function attachContextMenu1(win: BrowserWindow) {
 
     if (!template.length) return;
 
+    if (!canUseWindow(win)) {
+      return;
+    }
+
     const menu = Menu.buildFromTemplate(template);
     menu.popup({ window: win, x, y });
   };
@@ -54,7 +79,7 @@ export function attachContextMenu1(win: BrowserWindow) {
 
   // Return a disposer so callers can detach when needed
   return () => {
-    win.webContents.removeListener('context-menu', handler);
+    safeRemoveContextMenuListener(win, handler);
   };
 }
 
@@ -114,7 +139,7 @@ export function attachContextMenu2(win: BrowserWindow) {
           // 👉 Tell preload to select all, within an element having the defined tag: 
           // <context-select-all-scope> (or [context-select-all-scope])
           // via the IPC channel 'ctx-select-all'
-          win.webContents.send('ctx-select-all', { x, y });
+          safeSend(win, 'ctx-select-all', { x, y });
         },
       },
     ];
@@ -125,11 +150,14 @@ export function attachContextMenu2(win: BrowserWindow) {
       template.push({ type: 'separator' }, { role: 'toggleDevTools' });
     }
 
+    if (!canUseWindow(win)) {
+      return;
+    }
     Menu.buildFromTemplate(template).popup({ window: win, x, y });
   };
 
   win.webContents.on('context-menu', handler);
-  return () => win.webContents.removeListener('context-menu', handler);
+  return () => safeRemoveContextMenuListener(win, handler);
 }
 
 
@@ -188,7 +216,7 @@ export function attachContextMenu(win: BrowserWindow) {
         accelerator: 'CmdOrCtrl+C',
         click: () => {
           // tells renderer to copy current selection or tagged scope
-          win.webContents.send('ctx-copy', { x, y });
+          safeSend(win, 'ctx-copy', { x, y });
         }
       },  
       { type: 'separator' },
@@ -199,7 +227,7 @@ export function attachContextMenu(win: BrowserWindow) {
           // 👉 Tell preload to select all, within an element having the defined tag: 
           // <context-select-all-scope> (or [context-select-all-scope])
           // via the IPC channel 'ctx-select-all'
-          win.webContents.send('ctx-select-all', { x, y });
+          safeSend(win, 'ctx-select-all', { x, y });
         },
       },
     ];
@@ -210,9 +238,12 @@ export function attachContextMenu(win: BrowserWindow) {
       template.push({ type: 'separator' }, { role: 'toggleDevTools' });
     }
 
+    if (!canUseWindow(win)) {
+      return;
+    }
     Menu.buildFromTemplate(template).popup({ window: win, x, y });
   };
 
   win.webContents.on('context-menu', handler);
-  return () => win.webContents.removeListener('context-menu', handler);
+  return () => safeRemoveContextMenuListener(win, handler);
 }

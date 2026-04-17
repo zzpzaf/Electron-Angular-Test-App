@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { SafeHtml } from '@angular/platform-browser';
 import { PostData } from '../../../shared/projectObjects/varObjects';
 import { Markshow } from '../shared/services/markshow';
+import { BackEnd } from '../shared/services/back-end';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzCollapseModule } from 'ng-zorro-antd/collapse';
@@ -40,6 +41,7 @@ export class MarkViewer {
   public $metaExpanded = signal(false);
 
   private markedService = inject(Markshow);
+  private backEndService = inject(BackEnd);
   private modalService = inject(NzModalService);
 
   // Stores an incoming article while a save/discard dialog is in progress
@@ -165,18 +167,25 @@ export class MarkViewer {
     this.$isEditMode.set(false);
   }
 
-  onUpdate(): void {
+  async onUpdate(): Promise<void> {
     if (!this.$isEditMode()) {
       return;
     }
-    this.applyUpdate();
+    await this.applyUpdate();
   }
 
-  private applyUpdate(): void {
+  private async applyUpdate(): Promise<boolean> {
     const article = this.$article();
     const idx = this.$historyIndex();
     if (!article || idx < 0) {
-      return;
+      return false;
+    }
+    if (typeof article.id !== 'number') {
+      this.modalService.error({
+        nzTitle: 'Update Failed',
+        nzContent: 'Cannot persist changes because this article has no database ID.',
+      });
+      return false;
     }
 
     const updatedContent = this.$markdownDraft();
@@ -185,12 +194,22 @@ export class MarkViewer {
       content: updatedContent,
     };
 
+    const persisted = await this.backEndService.updateArticleById(updatedArticle);
+    if (!persisted) {
+      this.modalService.error({
+        nzTitle: 'Update Failed',
+        nzContent: 'The edited content could not be saved to the database.',
+      });
+      return false;
+    }
+
     const history = [...this.articleHistory()];
     history[idx] = updatedArticle;
     this.articleHistory.set(history);
 
     this.renderArticle(updatedArticle);
     this.$isEditMode.set(false);
+    return true;
   }
 
   private hasUnsavedChanges(): boolean {
@@ -220,8 +239,11 @@ export class MarkViewer {
         {
           label: 'Save Changes',
           type: 'primary',
-          onClick: () => {
-            this.applyUpdate();
+          onClick: async () => {
+            const saved = await this.applyUpdate();
+            if (!saved) {
+              return;
+            }
             this.loadPendingArticle();
             modal.destroy();
           },

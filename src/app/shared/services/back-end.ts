@@ -91,13 +91,28 @@ export class BackEnd {
   }
 
   updateArticleContentById(id: number, newContent: string): Promise<boolean> {
-    const result = this.ipcInvoke<boolean>('sqlite:update-article-content-by-id', id, newContent);
-    return result;
+    return this.ipcInvoke<{ success: boolean; message?: boolean; error?: string } | boolean>(
+      'sqlite:update-article-content-by-id',
+      id,
+      newContent
+    ).then((result) => {
+      if (typeof result === 'boolean') {
+        return result;
+      }
+      return !!(result.success && result.message);
+    });
   }
 
   updateArticleById(post: PostData): Promise<boolean> {
-    const result = this.ipcInvoke<boolean>('sqlite:update-article-by-id', post);
-    return result;
+    return this.ipcInvoke<{ success: boolean; message?: boolean; error?: string } | boolean>(
+      'sqlite:update-article-by-id',
+      post
+    ).then((result) => {
+      if (typeof result === 'boolean') {
+        return result;
+      }
+      return !!(result.success && result.message);
+    });
   }
 
   checkUrlExists(link: string): Promise<boolean> {
