@@ -25,7 +25,7 @@ import { firstValueFrom } from 'rxjs';
 
 type RowKey = number | string;
 type MdFilterMode = 'all' | 'withMarkdown' | 'withoutMarkdown';
-type SearchMode = 'words' | 'phrase';
+type SearchMode = 'words-all' | 'words-any' | 'phrase';
 type ArticleColumnKey =
   | 'id'
   | 'md'
@@ -112,8 +112,8 @@ export class ArticlesTable {
   public articlesSearchTextDebounced = signal('');
   public articlesExcludeText = signal('');
   public articlesExcludeTextDebounced = signal('');
-  public includeSearchMode = signal<SearchMode>('words');
-  public excludeSearchMode = signal<SearchMode>('words');
+  public includeSearchMode = signal<SearchMode>('words-all');
+  public excludeSearchMode = signal<SearchMode>('words-all');
   public $articleCategoryIdsByArticleId = signal<Record<number, number[]>>({});
   public mdFilterMode = signal<MdFilterMode>('all');
   public readonly minColumnWidth = 56;
@@ -365,36 +365,46 @@ export class ArticlesTable {
     this.filter2 = includeDebounced;
   }
 
+  private cycleSearchMode(current: SearchMode): SearchMode {
+    if (current === 'words-all') return 'words-any';
+    if (current === 'words-any') return 'phrase';
+    return 'words-all';
+  }
+
   public toggleIncludeSearchMode(): void {
-    this.includeSearchMode.update((current) => (current === 'words' ? 'phrase' : 'words'));
+    this.includeSearchMode.update((current) => this.cycleSearchMode(current));
   }
 
   public toggleExcludeSearchMode(): void {
-    this.excludeSearchMode.update((current) => (current === 'words' ? 'phrase' : 'words'));
+    this.excludeSearchMode.update((current) => this.cycleSearchMode(current));
   }
 
   public getIncludeSearchModeLabel(): string {
-    return this.includeSearchMode() === 'words' ? 'Search words' : 'Search phrases';
+    const mode = this.includeSearchMode();
+    if (mode === 'words-all') return 'Search words \u2013 ALL';
+    if (mode === 'words-any') return 'Search words \u2013 ANY';
+    return 'Search Full phrase';
   }
 
   public getExcludeSearchModeLabel(): string {
-    return this.excludeSearchMode() === 'words' ? 'Exclude words' : 'Exclude phrases';
+    const mode = this.excludeSearchMode();
+    if (mode === 'words-all') return 'Exclude words \u2013 ALL';
+    if (mode === 'words-any') return 'Exclude words \u2013 ANY';
+    return 'Exclude Full phrase';
   }
 
   public getIncludeSearchModeTitle(): string {
-    if (this.includeSearchMode() === 'words') {
-      return 'Search mode: match any entered word. Click to switch to whole-phrase search.';
-    }
-
-    return 'Search mode: match the whole entered phrase. Click to switch to any-word search.';
+    const mode = this.includeSearchMode();
+    if (mode === 'words-all') return 'Search mode: title must contain ALL entered words. Click to switch to ANY-word mode.';
+    if (mode === 'words-any') return 'Search mode: title must contain ANY entered word. Click to switch to full-phrase mode.';
+    return 'Search mode: title must contain the exact phrase. Click to switch to ALL-words mode.';
   }
 
   public getExcludeSearchModeTitle(): string {
-    if (this.excludeSearchMode() === 'words') {
-      return 'Exclude mode: remove rows matching any entered word. Click to switch to whole-phrase exclude.';
-    }
-
-    return 'Exclude mode: remove rows matching the whole entered phrase. Click to switch to any-word exclude.';
+    const mode = this.excludeSearchMode();
+    if (mode === 'words-all') return 'Exclude mode: exclude articles whose title contains ALL entered words. Click to switch to ANY-word mode.';
+    if (mode === 'words-any') return 'Exclude mode: exclude articles whose title contains ANY entered word. Click to switch to full-phrase mode.';
+    return 'Exclude mode: exclude articles whose title contains the exact phrase. Click to switch to ALL-words mode.';
   }
 
   // 260328 - Check if any of the relevant fields in the row match the search term (case-insensitive)
@@ -423,6 +433,12 @@ export class ArticlesTable {
       return true;
     }
 
+    if (mode === 'words-all') {
+      // Every word must appear in at least one of the searchable values
+      return words.every((word) => values.some((v) => v.includes(word)));
+    }
+
+    // words-any: at least one word appears in any value
     return values.some((value) => words.some((word) => value.includes(word)));
   }
 

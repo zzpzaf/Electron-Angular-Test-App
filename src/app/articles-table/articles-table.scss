@@ -73,6 +73,12 @@
   outline-offset: 1px;
 }
 
+.search-mode-btn[data-search-mode='words-any'] {
+  background: #fff7e6;
+  border-color: #d48806;
+  color: #5c3a00;
+}
+
 .search-mode-btn[data-search-mode='phrase'] {
   background: #d9f7be;
   border-color: #7cb35e;

@@ -57,7 +57,7 @@
             id="articles-search-include"
             nz-input
             class="search-input"
-            [placeholder]="includeSearchMode() === 'words' ? 'Include words . . .' : 'Include phrase . . .'"
+            [placeholder]="includeSearchMode() === 'phrase' ? 'Include phrase . . .' : (includeSearchMode() === 'words-any' ? 'Include any word . . .' : 'Include all words . . .')"
             [ngModel]="articlesSearchText()"
             (ngModelChange)="onSearchTextChange($event)"
           />
@@ -80,7 +80,7 @@
             id="articles-search-exclude"
             nz-input
             class="search-input"
-            [placeholder]="excludeSearchMode() === 'words' ? 'Exclude words . . .' : 'Exclude phrase . . .'"
+            [placeholder]="excludeSearchMode() === 'phrase' ? 'Exclude phrase . . .' : (excludeSearchMode() === 'words-any' ? 'Exclude any word . . .' : 'Exclude all words . . .')"
             [ngModel]="articlesExcludeText()"
             (ngModelChange)="onExcludeSearchTextChange($event)"
           />
