@@ -1166,7 +1166,9 @@ export async function getCleanedPageContent(
               el.getAttribute('data-title')?.trim() ||
               '';
 
-            return { src, title };
+            const fromFigure =
+              el.tagName.toLowerCase() === 'iframe' && !!el.closest('figure');
+            return { src, title, fromFigure };
           })
           .filter((item) => Boolean(item.src));
       }, cleanSEL)
@@ -1174,13 +1176,16 @@ export async function getCleanedPageContent(
         entries
           .map((entry) => {
             const type = classifyIframeSource(entry.src);
-            if (!type) return null;
 
-            return {
-              src: entry.src,
-              title: entry.title,
-              type,
-            } as IframeEmbed;
+            if (type) {
+              return { src: entry.src, title: entry.title, type } as IframeEmbed;
+            }
+
+            if (entry.fromFigure) {
+              return { src: entry.src, title: entry.title, type: 'gist' as IframeEmbedType } as IframeEmbed;
+            }
+
+            return null;
           })
           .filter((item): item is IframeEmbed => item !== null)
       ),
@@ -1395,6 +1400,19 @@ export async function getCleanedPageContent(
                 const placeholder = document.createElement('div');
                 placeholder.className = 'iframe-embed-placeholder';
                 placeholder.setAttribute('data-embed-type', embedType);
+                placeholder.setAttribute('data-iframe-src', src);
+                const title = iframe.getAttribute('title')?.trim();
+                if (title) {
+                  placeholder.setAttribute('data-iframe-title', title);
+                }
+                iframe.replaceWith(placeholder);
+              } else if (iframe.closest('figure')) {
+                // Unclassified iframe inside a <figure>: treat as gist.
+                // Mirrors the old working approach: all figure iframes were
+                // passed to processGists regardless of URL format.
+                const placeholder = document.createElement('div');
+                placeholder.className = 'iframe-embed-placeholder';
+                placeholder.setAttribute('data-embed-type', 'gist');
                 placeholder.setAttribute('data-iframe-src', src);
                 const title = iframe.getAttribute('title')?.trim();
                 if (title) {
