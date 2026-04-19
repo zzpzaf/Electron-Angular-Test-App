@@ -935,32 +935,58 @@ async function scrapeMediumArticle(page: Puppeteer.Page): Promise<PostData> {
     // 250806 Update
     // 250905 Selectors Update : bh.m -> bi.m and ac.af -> ac.ag
 
+    const pickDateText = (container: Element | null): string => {
+      if (!container) return '';
+      const childNodes = Array.from(container.childNodes);
+
+      for (let i = childNodes.length - 1; i >= 0; i--) {
+        const node = childNodes[i];
+
+        // If it's an element, try to get its text
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const text = node.textContent?.trim() || '';
+          if (text && text !== '·' && !/min read/i.test(text)) {
+            return text;
+          }
+        }
+
+        // If it's a text node, read it directly
+        if (node.nodeType === Node.TEXT_NODE) {
+          const text = node.textContent?.trim() || '';
+          if (text && text !== '·' && !/min read/i.test(text)) {
+            return text;
+          }
+        }
+      }
+
+      return '';
+    };
+
     let rawDate = '';
-    const outerContainer = document.querySelector(SEL.dateOuter);
-    if (outerContainer) {
-      const dateContainer = outerContainer.querySelector(SEL.dateInner);
-      if (dateContainer) {
-        const childNodes = Array.from(dateContainer.childNodes);
-        for (let i = childNodes.length - 1; i >= 0; i--) {
-          const node = childNodes[i];
 
-          // If it's an element, try to get its text
-          if (node.nodeType === Node.ELEMENT_NODE) {
-            const text = node.textContent?.trim() || '';
-            if (text && text !== '·' && !/min read/i.test(text)) {
-              rawDate = text;
-              break;
-            }
-          }
+    // 1) Stable explicit date markers (preferred)
+    const storyPublishDate = document.querySelector(
+      'span[data-testid="storyPublishDate"]'
+    );
+    rawDate = storyPublishDate?.textContent?.trim() || '';
 
-          // If it's a text node, read it directly
-          if (node.nodeType === Node.TEXT_NODE) {
-            const text = node.textContent?.trim() || '';
-            if (text && text !== '·') {
-              rawDate = text;
-              break;
-            }
-          }
+    // 2) Semantic time tag fallback
+    if (!rawDate) {
+      const timeEl = document.querySelector('time[datetime], time');
+      rawDate =
+        timeEl?.getAttribute('datetime')?.trim() ||
+        timeEl?.textContent?.trim() ||
+        '';
+    }
+
+    // 3) Legacy/new class-based fallback
+    if (!rawDate) {
+      const outerContainers = Array.from(document.querySelectorAll(SEL.dateOuter));
+      for (const outerContainer of outerContainers) {
+        const dateContainer = outerContainer.querySelector(SEL.dateInner);
+        rawDate = pickDateText(dateContainer);
+        if (rawDate) {
+          break;
         }
       }
     }
