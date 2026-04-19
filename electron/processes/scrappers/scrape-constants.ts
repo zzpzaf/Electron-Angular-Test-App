@@ -143,10 +143,12 @@ export const metaSEL = {
   leadImage: 'figure img',
   author: 'a[data-testid="authorName"]',
   // dateOuter matches both legacy and new variants:
-  // <div class="speechify-ignore bi m">, <div class="speechify-ignore bh m">, <div class="speechify-ignore bd e">
+  // <div class="speechify-ignore bi m">, <div class="speechify-ignore bh m">,
+  // <div class="speechify-ignore bd e">, <div class="speechify-ignore v ct">
   // dateInner matches both legacy and new variants:
   // <div class="ac af">, <div class="ac ag">, <div class="v y">
-  dateOuter: 'div.speechify-ignore:is(.bi,.bh).m, div.speechify-ignore.bd.e',
+  dateOuter:
+    'div.speechify-ignore:is(.bi,.bh).m, div.speechify-ignore.bd.e, div.speechify-ignore.v.ct',
   dateInner: 'div.ac:is(.af,.ag), div.v.y',
   
   
