@@ -2252,6 +2252,7 @@ export async function scrapeList(
     const seenSlugs = new Set<string>();
     const failedRemovalLinks = new Set<string>();
     let chunkIndex = 0;
+    let continueWithoutRemoval = false;
 
     while (allPosts.length < effectiveMax) {
       chunkIndex++;
@@ -2259,18 +2260,21 @@ export async function scrapeList(
         effectiveChunkSize,
         effectiveMax - allPosts.length
       );
+      const visibleTarget = continueWithoutRemoval
+        ? Math.min(effectiveMax, allPosts.length + chunkTarget)
+        : chunkTarget;
 
       console.log(
-        `scrape-functions ->  scrapeList() [chunked] - chunk ${chunkIndex}: scrolling to ${chunkTarget} articles`
+        `scrape-functions ->  scrapeList() [chunked] - chunk ${chunkIndex}: scrolling to ${visibleTarget} visible articles`
       );
 
-      // Each chunk starts from a fresh page at top, so we only need the current
-      // chunk size visible, not the cumulative running total.
+      // When removals are enabled each chunk starts from a fresh page.
+      // When removals are disabled we keep the same page and scroll cumulatively.
       await autoScrollToEnd(
         page,
-        chunkTarget,
+        visibleTarget,
         timeConst.SCROLL_DELAY,
-        chunkTarget
+        visibleTarget
       );
 
       // Scrape all currently visible article metadata.
@@ -2320,7 +2324,9 @@ export async function scrapeList(
         const response = await onChunkScraped(newPosts, chunkIndex);
         const requestedLinks = Array.from(new Set((response.linksToRemove ?? []).filter(Boolean)));
         linksToRemove = requestedLinks;
-        doRemove = response.removeFromList && requestedLinks.length > 0 && stillNeedMore;
+        const removeRequested = response.removeFromList === true;
+        doRemove = removeRequested && requestedLinks.length > 0 && stillNeedMore;
+        continueWithoutRemoval = !removeRequested;
       }
 
       let removedInChunk = 0;
@@ -2374,11 +2380,16 @@ export async function scrapeList(
       }
 
       if (stillNeedMore) {
-        // Start next chunk in a fresh tab from the beginning of the list.
-        if (!page.isClosed()) {
-          await page.close();
+        if (continueWithoutRemoval) {
+          // Keep current page position; next chunk will scroll deeper on this tab.
+          await new Promise((r) => setTimeout(r, timeConst.AFTER_REMOVE_SETTLE_DELAY));
+        } else {
+          // Start next chunk in a fresh tab from the beginning of the list.
+          if (!page.isClosed()) {
+            await page.close();
+          }
+          page = await openFreshListPage();
         }
-        page = await openFreshListPage();
       }
     }
 

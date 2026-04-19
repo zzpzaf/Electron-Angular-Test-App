@@ -234,6 +234,7 @@ export class ListUrls {
       chunkSize: this.fb.control(this.listChunkSizeDefault, [Validators.required, Validators.min(1)]),
       autoExcludeExisting: this.fb.control(true),
       add: this.fb.control(true),
+      doNotRemoveFromList: this.fb.control(false),
       selectCategory: this.fb.control<string[]>([]),
     });
   }
@@ -402,7 +403,8 @@ export class ListUrls {
               .forEach((link) => linksToRemoveSet.add(link));
           }
 
-          if (linksToRemoveSet.size > 0) {
+          const doNotRemove = this.linkScrapeForm.value.doNotRemoveFromList === true;
+          if (!doNotRemove && linksToRemoveSet.size > 0) {
             chunkDecision = {
               removeFromList: true,
               linksToRemove: Array.from(linksToRemoveSet),

@@ -91,6 +91,16 @@
         <span class="sync-checkbox-label">Auto-exclude existing Articles</span>
       </label>
     </nz-form-item>
+
+    <nz-form-item>
+      <label
+        nz-checkbox
+        formControlName="doNotRemoveFromList"
+        title="Checked: skip removing scraped articles from the Medium List after each chunk (faster, but the list won't shrink). Unchecked: articles are removed from the list as usual."
+      >
+        <span class="sync-checkbox-label">Do not remove articles from List</span>
+      </label>
+    </nz-form-item>
   </div>
 
 
