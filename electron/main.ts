@@ -52,6 +52,7 @@ import {
   getCategoriesByParentId,
   getCategoryById,
   getCategoryIdsOfAnArticle,
+  getImageOrgUrlById,
   getPostBySlug,
   getSubcategoryForest,
   getUncategorizedArticles,
@@ -845,6 +846,18 @@ ipcMain.handle('sqlite:get-post-data-by-slug', (event: any, slug: string) => {
   } catch (err) {
     console.error('Error getting Post data by Slug:', slug, err);
     return false; // always return boolean
+  }
+});
+
+ipcMain.handle('sqlite:get-image-org-url-by-id', (event: any, imageId: number) => {
+  try {
+    if (!Number.isInteger(imageId) || imageId < 1) {
+      return null;
+    }
+    return getImageOrgUrlById(imageId);
+  } catch (err) {
+    console.error('Error getting original image URL by id:', imageId, err);
+    return null;
   }
 });
 

@@ -127,6 +127,10 @@ export class BackEnd {
     return this.ipcInvoke<PostData | null>('sqlite:get-post-data-by-slug', slug);
   }
 
+  getImageOrgUrlById(imageId: number): Promise<string | null> {
+    return this.ipcInvoke<string | null>('sqlite:get-image-org-url-by-id', imageId);
+  }
+
   getArticlesById(id? : number): Promise<PostData[]> {
      return this.ipcInvoke<PostData[]>('sqlite:get-articles-by-id', id);
   }

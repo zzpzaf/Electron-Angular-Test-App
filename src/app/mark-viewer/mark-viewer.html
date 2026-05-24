@@ -92,6 +92,7 @@
 
   <!-- ===== BOTTOM ROW ===== -->
   <div class="mv-bottom">
+    <button nz-button nzType="default" [disabled]="!$article()" (click)="onSave()">Save</button>
     <button nz-button nzType="default" [disabled]="$isEditMode() || !$article()" (click)="onEdit()">Edit</button>
     @if ($isEditMode()) {
       <button nz-button nzType="default" (click)="onCancel()">Cancel</button>

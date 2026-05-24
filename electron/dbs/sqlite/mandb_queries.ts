@@ -1253,6 +1253,27 @@ export function getImageBlobById(
   };
 }
 
+/**
+ * Returns the original image URL (orgImgUrl) for a given image id.
+ * Returns null when not found or when DB is unavailable.
+ */
+export function getImageOrgUrlById(imageId: number): string | null {
+  if (!mainDb) {
+    console.error('>===>> No Main DB connection.');
+    return null;
+  }
+
+  const stmt = mainDb.prepare<number[], { orgImgUrl: string }>(`
+    SELECT orgImgUrl
+    FROM images
+    WHERE id = ?
+    LIMIT 1
+  `);
+
+  const row = stmt.get(imageId);
+  return row?.orgImgUrl ?? null;
+}
+
 
 
 

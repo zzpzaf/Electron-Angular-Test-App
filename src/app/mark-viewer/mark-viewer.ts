@@ -167,6 +167,64 @@ export class MarkViewer {
     this.$isEditMode.set(false);
   }
 
+  async onSave(): Promise<void> {
+    const article = this.$article();
+    if (!article) {
+      return;
+    }
+
+    const markdown = this.$isEditMode()
+      ? this.$markdownDraft()
+      : article.content ?? '';
+
+    if (!markdown.trim()) {
+      return;
+    }
+
+    try {
+      const markdownForSave = await this.resolveDbImageLinksForSave(markdown);
+      await window.electronAPI.invoke('save-md-file', markdownForSave, article.title);
+    } catch (error) {
+      console.error('Error saving Markdown File:', error);
+      this.modalService.error({
+        nzTitle: 'Save Failed',
+        nzContent: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  private async resolveDbImageLinksForSave(markdown: string): Promise<string> {
+    const dbLinkPattern = /db:\/\/image\/(\d+)/g;
+    const matches = Array.from(markdown.matchAll(dbLinkPattern));
+    if (!matches.length) {
+      return markdown;
+    }
+
+    const ids = Array.from(new Set(matches.map((m) => Number(m[1])))).filter(
+      (id) => Number.isInteger(id) && id > 0
+    );
+    if (!ids.length) {
+      return markdown;
+    }
+
+    const replacementMap = new Map<number, string>();
+    for (const id of ids) {
+      const orgImgUrl = await this.backEndService.getImageOrgUrlById(id);
+      if (orgImgUrl) {
+        replacementMap.set(id, orgImgUrl);
+      }
+    }
+
+    if (!replacementMap.size) {
+      return markdown;
+    }
+
+    return markdown.replace(dbLinkPattern, (fullMatch, idStr: string) => {
+      const replacement = replacementMap.get(Number(idStr));
+      return replacement ?? fullMatch;
+    });
+  }
+
   async onUpdate(): Promise<void> {
     if (!this.$isEditMode()) {
       return;
