@@ -877,6 +877,16 @@ async function scrapeMediumArticle(page: Puppeteer.Page): Promise<PostData> {
   // await new Promise((resolve) => setTimeout(resolve, 1000));
   await new Promise((resolve) => setTimeout(resolve, timeConst.ADDITIONAL_PAGE_DELAY)); // 1000 ms delay for additional page loading
 
+  // Give Medium hydration a short window to render publish-date markers before extraction.
+  try {
+    await page.waitForSelector(
+      'span[data-testid="storyPublishDate"], time[datetime], time, meta[property="article:published_time"], meta[name="article:published_time"]',
+      { timeout: timeConst.GIST_IFRAME_SELECTOR_DELAY }
+    );
+  } catch {
+    // Best-effort: continue with extraction fallbacks below.
+  }
+
   // Cloudflare challenge detection
   const challenge = await page.evaluate(() =>
     document.body.innerText.includes('Verify you are human')
@@ -977,6 +987,47 @@ async function scrapeMediumArticle(page: Puppeteer.Page): Promise<PostData> {
         timeEl?.getAttribute('datetime')?.trim() ||
         timeEl?.textContent?.trim() ||
         '';
+    }
+
+    // 2.1) Metadata fallback for variants where visible byline date is delayed/virtualized
+    if (!rawDate) {
+      const metaDate = document.querySelector(
+        'meta[property="article:published_time"], meta[name="article:published_time"], meta[itemprop="datePublished"], meta[property="og:published_time"]'
+      );
+      rawDate = metaDate?.getAttribute('content')?.trim() || '';
+    }
+
+    // 2.2) JSON-LD fallback (BlogPosting/NewsArticle datePublished)
+    if (!rawDate) {
+      const ldScripts = Array.from(
+        document.querySelectorAll('script[type="application/ld+json"]')
+      );
+
+      for (const script of ldScripts) {
+        const txt = script.textContent?.trim();
+        if (!txt) continue;
+
+        try {
+          const parsed = JSON.parse(txt);
+          const blocks = Array.isArray(parsed)
+            ? parsed
+            : Array.isArray(parsed?.['@graph'])
+              ? parsed['@graph']
+              : [parsed];
+
+          for (const block of blocks) {
+            const datePublished = block?.datePublished;
+            if (typeof datePublished === 'string' && datePublished.trim()) {
+              rawDate = datePublished.trim();
+              break;
+            }
+          }
+
+          if (rawDate) break;
+        } catch {
+          // Ignore malformed JSON-LD blocks.
+        }
+      }
     }
 
     // 3) Legacy/new class-based fallback
